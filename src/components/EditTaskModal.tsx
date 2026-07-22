@@ -27,14 +27,20 @@ export default function EditTaskModal({
   const [estimatedMinutes, setEstimatedMinutes] = useState(0);
   const [showTimeSelector, setShowTimeSelector] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [selectedBucket, setSelectedBucket] = useState<Bucket | ''>('');
 
   useEffect(() => {
     if (task && visible) {
       setTitle(task.title);
       setTagId(task.tagId);
       setEstimatedMinutes(task.estimatedMinutes);
+      
+      const tag = tags.find(t => t.id === task.tagId);
+      if (tag) {
+        setSelectedBucket(tag.bucket);
+      }
     }
-  }, [task, visible]);
+  }, [task, visible, tags]);
 
   if (!task) return null;
 
@@ -118,63 +124,99 @@ export default function EditTaskModal({
               </Pressable>
             </View>
 
-            {/* Category Dropdown */}
+            {/* Category Selection (Pillar -> Journey) */}
             <View style={{ marginBottom: 32 }}>
-              <Text style={{ color: '#A1A1AA', fontSize: 13, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase' }}>
-                Category
+              <Text style={{ color: '#A1A1AA', fontSize: 13, fontWeight: '600', marginBottom: 12, textTransform: 'uppercase' }}>
+                1. Select Pillar
               </Text>
               
-              <Pressable
-                onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                style={{
-                  backgroundColor: '#18181B',
-                  padding: 16,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: '#27272A',
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                <Text style={{ color: tagId ? '#FFFFFF' : '#52525B', fontSize: 14 }}>
-                  {tagId ? tags.find(t => t.id === tagId)?.name : 'Select a category'}
-                </Text>
-                <Ionicons name={showCategoryDropdown ? "chevron-up" : "chevron-down"} size={16} color="#A1A1AA" />
-              </Pressable>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
+                {(['office', 'health', 'personal'] as Bucket[]).map(bucket => (
+                  <Pressable
+                    key={bucket}
+                    onPress={() => {
+                      setSelectedBucket(bucket);
+                      setTagId(''); // Reset specific journey when changing pillar
+                    }}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                      borderRadius: 9999,
+                      borderWidth: 1,
+                      backgroundColor: selectedBucket === bucket ? '#FFFFFF' : '#18181B',
+                      borderColor: selectedBucket === bucket ? '#FFFFFF' : '#27272A'
+                    }}
+                  >
+                    <Text style={{ 
+                      color: selectedBucket === bucket ? '#000000' : '#A1A1AA', 
+                      fontSize: 13, 
+                      fontWeight: selectedBucket === bucket ? '700' : '500',
+                      textTransform: 'capitalize'
+                    }}>
+                      {bucket}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
 
-              {showCategoryDropdown && (
-                <View style={{ 
-                  marginTop: 4,
-                  backgroundColor: '#09090B', 
-                  borderWidth: 1, 
-                  borderColor: '#27272A', 
-                  borderRadius: 8,
-                  overflow: 'hidden'
-                }}>
-                  {tags.map(tag => (
-                    <Pressable
-                      key={tag.id}
-                      onPress={() => {
-                        setTagId(tag.id);
-                        setShowCategoryDropdown(false);
-                      }}
-                      style={{
-                        padding: 12,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        borderBottomWidth: 1,
-                        borderBottomColor: '#18181B'
-                      }}
-                    >
-                      <Text style={{ color: tagId === tag.id ? '#FFFFFF' : '#A1A1AA', fontSize: 14 }}>
-                        {tag.name}
-                      </Text>
-                      {tagId === tag.id && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
-                    </Pressable>
-                  ))}
-                </View>
+              {selectedBucket !== '' && (
+                <>
+                  <Text style={{ color: '#A1A1AA', fontSize: 13, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase' }}>
+                    2. Select Journey
+                  </Text>
+                  <Pressable
+                    onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                    style={{
+                      backgroundColor: '#18181B',
+                      padding: 16,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#27272A',
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <Text style={{ color: tagId ? '#FFFFFF' : '#52525B', fontSize: 14 }}>
+                      {tagId ? tags.find(t => t.id === tagId)?.name : 'Select a specific journey...'}
+                    </Text>
+                    <Ionicons name={showCategoryDropdown ? "chevron-up" : "chevron-down"} size={16} color="#A1A1AA" />
+                  </Pressable>
+
+                  {showCategoryDropdown && (
+                    <View style={{ 
+                      marginTop: 4,
+                      backgroundColor: '#09090B', 
+                      borderWidth: 1, 
+                      borderColor: '#27272A', 
+                      borderRadius: 8,
+                      overflow: 'hidden'
+                    }}>
+                      {tags.filter(t => t.bucket === selectedBucket).map(tag => (
+                        <Pressable
+                          key={tag.id}
+                          onPress={() => {
+                            setTagId(tag.id);
+                            setShowCategoryDropdown(false);
+                          }}
+                          style={{
+                            padding: 12,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            borderBottomWidth: 1,
+                            borderBottomColor: '#18181B'
+                          }}
+                        >
+                          <Text style={{ color: tagId === tag.id ? '#FFFFFF' : '#A1A1AA', fontSize: 14 }}>
+                            {tag.name}
+                          </Text>
+                          {tagId === tag.id && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                </>
               )}
             </View>
 
