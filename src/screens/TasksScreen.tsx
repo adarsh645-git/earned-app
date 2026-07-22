@@ -9,8 +9,11 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import RewardToast from '../components/RewardToast';
 import AnimatedTaskRow from '../components/AnimatedTaskRow';
 import DialPicker from '../components/DialPicker';
+import EditTaskModal from '../components/EditTaskModal';
+import TimeSelectorModal from '../components/TimeSelectorModal';
+
 export default function TasksScreen() {
-  const { tasks, tags, addTask, toggleTask, moveToIcebox, activateFromIcebox } = useTaskStore();
+  const { tasks, tags, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox } = useTaskStore();
   const { macroGoals } = useMacroGoalStore();
   
   const [modalVisible, setModalVisible] = useState(false);
@@ -26,6 +29,10 @@ export default function TasksScreen() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastSubtext, setToastSubtext] = useState('');
 
+  // Modals state
+  const [editTask, setEditTask] = useState<Task | null>(null);
+  const [showAddTimeSelector, setShowAddTimeSelector] = useState(false);
+
   const incompleteTasks = tasks.filter(t => !t.isIcebox && !t.completed);
   const completedTasks = tasks.filter(t => !t.isIcebox && t.completed);
   const iceboxTasks = tasks.filter(t => t.isIcebox);
@@ -39,12 +46,7 @@ export default function TasksScreen() {
     }
     
     if (estimatedMinutes <= 0) {
-      setValidationError('Estimated focus time must be a valid number of minutes');
-      return;
-    }
-    
-    if (estimatedMinutes > 60) {
-      setValidationError('Focus chunks cannot exceed 60 minutes. Break it down!');
+      setValidationError('Estimated focus time must be greater than 0 minutes');
       return;
     }
 
@@ -93,15 +95,27 @@ export default function TasksScreen() {
             style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 16, borderRadius: 16, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2C2C2E' }}
           />
 
-          {/* Estimated Minutes Input */}
-          <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Estimated Focus (Minutes)</Text>
-          <View style={{ backgroundColor: '#151517', borderColor: '#2C2C2E', borderWidth: 1 }} className="rounded-2xl py-2 mb-6 items-center justify-center">
-            <DialPicker 
-              value={estimatedMinutes} 
-              onChange={setEstimatedMinutes} 
-              options={[5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]} 
-              itemHeight={40} 
-            />
+          {/* Focus Duration */}
+          <View style={{ marginBottom: 24 }}>
+            <Text style={{ color: '#8E8E93', fontSize: 13, fontWeight: '600', marginBottom: 8 }}>Estimated Duration</Text>
+            <Pressable 
+              onPress={() => setShowAddTimeSelector(true)}
+              style={{
+                backgroundColor: '#18181B',
+                padding: 16,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: '#27272A',
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '500' }}>
+                {Math.floor(estimatedMinutes / 60)}h {estimatedMinutes % 60}m
+              </Text>
+              <Ionicons name="time-outline" size={20} color="#A1A1AA" />
+            </Pressable>
           </View>
 
           {/* Tag Selection */}
@@ -213,6 +227,17 @@ export default function TasksScreen() {
             title="Add Focus Item (+$0.02)"
             style={{ width: '100%' }}
           />
+
+          <TimeSelectorModal
+            visible={showAddTimeSelector}
+            initialMinutes={estimatedMinutes}
+            title="Estimate Duration"
+            onClose={() => setShowAddTimeSelector(false)}
+            onConfirm={(mins) => {
+              setEstimatedMinutes(mins);
+              setShowAddTimeSelector(false);
+            }}
+          />
         </ScrollView>
       </SafeAreaView>
     );
@@ -266,7 +291,8 @@ export default function TasksScreen() {
                     isLast={isLast}
                     onToggle={toggleTask}
                     onMoveToIcebox={moveToIcebox}
-                    showIceboxButton
+                    onEdit={setEditTask}
+                    showStartButton
                   />
                 );
               })}
@@ -291,6 +317,7 @@ export default function TasksScreen() {
                       isLast={isLast}
                       onToggle={toggleTask}
                       onMoveToIcebox={moveToIcebox}
+                      onEdit={setEditTask}
                       showIceboxButton={false}
                     />
                   );
@@ -354,8 +381,16 @@ export default function TasksScreen() {
             )}
           </View>
         </ScrollView>
-
       </View>
+
+      <EditTaskModal 
+        task={editTask}
+        visible={!!editTask}
+        tags={tags}
+        onClose={() => setEditTask(null)}
+        onSave={(id, updates) => updateTask(id, updates)}
+        onDelete={(id) => deleteTask(id)}
+      />
     </SafeAreaView>
   );
 }

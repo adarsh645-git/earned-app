@@ -17,6 +17,7 @@ interface AnimatedTaskRowProps {
   isLast: boolean;
   onToggle: (id: string) => void;
   onMoveToIcebox?: (id: string) => void;
+  onEdit?: (task: Task) => void;
   onStartTimer?: (id: string, mins: number) => void;
   showStartButton?: boolean;
   showIceboxButton?: boolean;
@@ -28,6 +29,7 @@ export default function AnimatedTaskRow({
   isLast,
   onToggle,
   onMoveToIcebox,
+  onEdit,
   onStartTimer,
   showStartButton = false,
   showIceboxButton = true,
@@ -158,7 +160,11 @@ export default function AnimatedTaskRow({
           </Pressable>
 
           {/* Task Text */}
-          <View className="flex-1">
+          <Pressable 
+            onPress={() => onEdit?.(task)}
+            className="flex-1"
+            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+          >
             <Text
               className={`text-base font-semibold ${
                 isStrikethrough ? 'line-through text-[#8E8E93]' : 'text-white'
@@ -176,7 +182,7 @@ export default function AnimatedTaskRow({
                 {task.estimatedMinutes} mins
               </Text>
             </View>
-          </View>
+          </Pressable>
         </View>
 
         {/* Actions */}

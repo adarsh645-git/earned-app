@@ -28,6 +28,8 @@ interface TaskState {
   tasks: Task[];
   tags: Tag[];
   addTask: (task: Omit<Task, 'id' | 'completed' | 'dateCreated'>) => void;
+  updateTask: (id: string, updates: Partial<Task>) => void;
+  deleteTask: (id: string) => void;
   toggleTask: (id: string) => void;
   moveToIcebox: (id: string) => void;
   activateFromIcebox: (id: string) => void;
@@ -50,6 +52,12 @@ export const useTaskStore = create<TaskState>()(
           completed: false,
           dateCreated: new Date().toISOString().split('T')[0]
         }]
+      })),
+      updateTask: (id, updates) => set((state) => ({
+        tasks: state.tasks.map(t => t.id === id ? { ...t, ...updates } : t)
+      })),
+      deleteTask: (id) => set((state) => ({
+        tasks: state.tasks.filter(t => t.id !== id)
       })),
       toggleTask: (id) => set((state) => ({
         tasks: state.tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t)

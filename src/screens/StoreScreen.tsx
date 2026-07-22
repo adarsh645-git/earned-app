@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEconomyStore } from '../store/economyStore';
 import { useRewardStore, Reward } from '../store/rewardStore';
 import { useMacroGoalStore } from '../store/macroGoalStore';
+import TimeSelectorModal from '../components/TimeSelectorModal';
 import { hapticSuccess, hapticError } from '../utils/haptics';
 import { useConfettiStore } from '../store/confettiStore';
 import ConfirmModal, { ConfirmAction } from '../components/ConfirmModal';
@@ -45,6 +46,8 @@ export default function StoreScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [title, setTitle] = useState('');
   const [costOrHours, setCostOrHours] = useState('');
+  const [projectMinutes, setProjectMinutes] = useState(0);
+  const [showTimeSelector, setShowTimeSelector] = useState(false);
   const [validationError, setValidationError] = useState('');
 
   // Custom dialog state
@@ -84,21 +87,20 @@ export default function StoreScreen() {
       return;
     }
 
-    const hours = parseFloat(costOrHours);
-    if (isNaN(hours) || hours <= 0) {
-      setValidationError('Target must be a valid number of hours');
+    if (projectMinutes <= 0) {
+      setValidationError('Target duration must be greater than 0 minutes');
       return;
     }
 
     addMacroGoal({
       title: title.trim(),
       horizon: 'yearly',
-      targetMinutes: Math.round(hours * 60),
+      targetMinutes: projectMinutes,
       type: 'entertainment',
     });
 
     setTitle('');
-    setCostOrHours('');
+    setProjectMinutes(0);
     setShowAddModal(false);
   };
 
@@ -217,7 +219,8 @@ export default function StoreScreen() {
 
   // Render Add Item Modal (Shadcn style)
   const renderAddModal = () => (
-    <Modal visible={showAddModal} transparent animationType="fade">
+    <>
+      <Modal visible={showAddModal} transparent animationType="fade">
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
         <View style={{ width: '100%', maxWidth: 400, backgroundColor: '#09090B', borderWidth: 1, borderColor: '#27272A', borderRadius: 16, padding: 24 }}>
           <View className="flex-row justify-between items-center mb-6">
@@ -249,17 +252,38 @@ export default function StoreScreen() {
 
           <View className="mb-6">
             <Text className="text-[#8E8E93] text-xs font-semibold mb-2">
-              {activeTab === 'material' ? 'Cost ($)' : 'Target Duration (Hours)'}
+              {activeTab === 'material' ? 'Cost ($)' : 'Target Duration'}
             </Text>
-            <TextInput
-              value={costOrHours}
-              onChangeText={setCostOrHours}
-              placeholder={activeTab === 'material' ? "e.g. 150.00" : "e.g. 60"}
-              placeholderTextColor="#52525B"
-              keyboardType="numeric"
-              style={{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }}
-              className="text-white rounded-lg p-3 text-sm"
-            />
+            {activeTab === 'material' ? (
+              <TextInput
+                value={costOrHours}
+                onChangeText={setCostOrHours}
+                placeholder="e.g. 150.00"
+                placeholderTextColor="#52525B"
+                keyboardType="numeric"
+                style={{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }}
+                className="text-white rounded-lg p-3 text-sm"
+              />
+            ) : (
+              <Pressable 
+                onPress={() => setShowTimeSelector(true)}
+                style={{
+                  backgroundColor: '#09090B',
+                  padding: 12,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: '#27272A',
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 14 }}>
+                  {Math.floor(projectMinutes / 60)}h {projectMinutes % 60}m
+                </Text>
+                <Ionicons name="time-outline" size={18} color="#A1A1AA" />
+              </Pressable>
+            )}
           </View>
 
           <PrimaryButton
@@ -268,7 +292,19 @@ export default function StoreScreen() {
           />
         </View>
       </View>
-    </Modal>
+      </Modal>
+      
+      <TimeSelectorModal
+        visible={showTimeSelector}
+        initialMinutes={projectMinutes}
+        onClose={() => setShowTimeSelector(false)}
+        onConfirm={(mins) => {
+          setProjectMinutes(mins);
+          setShowTimeSelector(false);
+        }}
+        title="Project Target Duration"
+      />
+    </>
   );
 
   return (
