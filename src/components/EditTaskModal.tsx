@@ -26,6 +26,7 @@ export default function EditTaskModal({
   const [tagId, setTagId] = useState('');
   const [estimatedMinutes, setEstimatedMinutes] = useState(0);
   const [showTimeSelector, setShowTimeSelector] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
   useEffect(() => {
     if (task && visible) {
@@ -52,28 +53,13 @@ export default function EditTaskModal({
     onClose();
   };
 
-  // Group tags by bucket
-  const tagsByBucket = tags.reduce((acc, tag) => {
-    if (!acc[tag.bucket]) acc[tag.bucket] = [];
-    acc[tag.bucket].push(tag);
-    return acc;
-  }, {} as Record<Bucket, Tag[]>);
-
-  const bucketColors: Record<Bucket, string> = {
-    office: '#0A84FF',
-    health: '#30D158',
-    personal: '#BF5AF2'
-  };
-
-  const getBucketColor = (bucket: Bucket) => bucketColors[bucket] || '#A1A1AA';
-
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.8)' }}
+        style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.8)', padding: 16 }}
       >
-        <View style={{ backgroundColor: '#09090B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '90%' }}>
+        <View style={{ width: '100%', maxWidth: 425, alignSelf: 'center', backgroundColor: '#09090B', borderRadius: 12, padding: 24, borderWidth: 1, borderColor: '#27272A', maxHeight: '90%' }}>
           {/* Header */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
             <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '700' }}>Edit Task</Text>
@@ -132,60 +118,79 @@ export default function EditTaskModal({
               </Pressable>
             </View>
 
-            {/* Tags */}
+            {/* Category Dropdown */}
             <View style={{ marginBottom: 32 }}>
-              <Text style={{ color: '#A1A1AA', fontSize: 13, fontWeight: '600', marginBottom: 12, textTransform: 'uppercase' }}>
+              <Text style={{ color: '#A1A1AA', fontSize: 13, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase' }}>
                 Category
               </Text>
-              {(Object.keys(tagsByBucket) as Bucket[]).map(bucket => (
-                <View key={bucket} style={{ marginBottom: 16 }}>
-                  <Text style={{ color: getBucketColor(bucket), fontSize: 12, fontWeight: '700', marginBottom: 8, textTransform: 'capitalize' }}>
-                    {bucket}
-                  </Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                    {tagsByBucket[bucket].map(tag => (
-                      <Pressable
-                        key={tag.id}
-                        onPress={() => setTagId(tag.id)}
-                        style={{
-                          paddingHorizontal: 16,
-                          paddingVertical: 8,
-                          borderRadius: 20,
-                          backgroundColor: tagId === tag.id ? getBucketColor(bucket) : '#18181B',
-                          borderWidth: 1,
-                          borderColor: tagId === tag.id ? getBucketColor(bucket) : '#27272A'
-                        }}
-                      >
-                        <Text style={{ 
-                          color: tagId === tag.id ? '#FFFFFF' : '#A1A1AA',
-                          fontSize: 13,
-                          fontWeight: tagId === tag.id ? '700' : '500'
-                        }}>
-                          {tag.name}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
+              
+              <Pressable
+                onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                style={{
+                  backgroundColor: '#18181B',
+                  padding: 16,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: '#27272A',
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: tagId ? '#FFFFFF' : '#52525B', fontSize: 14 }}>
+                  {tagId ? tags.find(t => t.id === tagId)?.name : 'Select a category'}
+                </Text>
+                <Ionicons name={showCategoryDropdown ? "chevron-up" : "chevron-down"} size={16} color="#A1A1AA" />
+              </Pressable>
+
+              {showCategoryDropdown && (
+                <View style={{ 
+                  marginTop: 4,
+                  backgroundColor: '#09090B', 
+                  borderWidth: 1, 
+                  borderColor: '#27272A', 
+                  borderRadius: 8,
+                  overflow: 'hidden'
+                }}>
+                  {tags.map(tag => (
+                    <Pressable
+                      key={tag.id}
+                      onPress={() => {
+                        setTagId(tag.id);
+                        setShowCategoryDropdown(false);
+                      }}
+                      style={{
+                        padding: 12,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        borderBottomWidth: 1,
+                        borderBottomColor: '#18181B'
+                      }}
+                    >
+                      <Text style={{ color: tagId === tag.id ? '#FFFFFF' : '#A1A1AA', fontSize: 14 }}>
+                        {tag.name}
+                      </Text>
+                      {tagId === tag.id && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
+                    </Pressable>
+                  ))}
                 </View>
-              ))}
+              )}
             </View>
 
-            <PrimaryButton title="Save Changes" onPress={handleSave} />
-            
-            <Pressable 
-              onPress={handleDelete}
-              style={({ pressed }) => ({
-                marginTop: 16,
-                paddingVertical: 16,
-                borderRadius: 12,
-                backgroundColor: pressed ? '#3F161A' : '#2A0E12',
-                alignItems: 'center',
-                borderWidth: 1,
-                borderColor: '#4C1014'
-              })}
-            >
-              <Text style={{ color: '#FF453A', fontSize: 16, fontWeight: '600' }}>Delete Task</Text>
-            </Pressable>
+            {/* Footer */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Pressable onPress={handleDelete} style={{ padding: 8 }}>
+                <Ionicons name="trash-outline" size={20} color="#FF453A" />
+              </Pressable>
+              
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                <Pressable onPress={onClose}>
+                  <Text style={{ color: '#A1A1AA', fontSize: 14, fontWeight: '500' }}>Cancel</Text>
+                </Pressable>
+                <PrimaryButton title="Save Changes" onPress={handleSave} />
+              </View>
+            </View>
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
