@@ -295,6 +295,7 @@ export default function TasksScreen() {
                     onToggle={toggleTask}
                     onMoveToIcebox={moveToIcebox}
                     onEdit={setEditTask}
+                    onDelete={deleteTask}
                     showStartButton
                   />
                 );
@@ -321,6 +322,7 @@ export default function TasksScreen() {
                       onToggle={toggleTask}
                       onMoveToIcebox={moveToIcebox}
                       onEdit={setEditTask}
+                      onDelete={deleteTask}
                       showIceboxButton={false}
                     />
                   );

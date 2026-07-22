@@ -18,6 +18,7 @@ interface AnimatedTaskRowProps {
   onToggle: (id: string) => void;
   onMoveToIcebox?: (id: string) => void;
   onEdit?: (task: Task) => void;
+  onDelete?: (id: string) => void;
   onStartTimer?: (id: string, mins: number) => void;
   showStartButton?: boolean;
   showIceboxButton?: boolean;
@@ -30,6 +31,7 @@ export default function AnimatedTaskRow({
   onToggle,
   onMoveToIcebox,
   onEdit,
+  onDelete,
   onStartTimer,
   showStartButton = false,
   showIceboxButton = true,
@@ -185,32 +187,45 @@ export default function AnimatedTaskRow({
           </Pressable>
         </View>
 
-        {/* Actions */}
-        <View className="flex-row items-center gap-2">
+        {/* Actions - Shadcn-style ghost buttons */}
+        <View className="flex-row items-center gap-1">
           {showStartButton && !localCompleted && onStartTimer && (
             <Pressable
               onPress={() => onStartTimer(task.id, task.estimatedMinutes)}
-              style={{
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                backgroundColor: 'rgba(191,90,242,0.2)',
-                borderWidth: 1,
-                borderColor: 'rgba(191,90,242,0.4)',
-                borderRadius: 12,
-              }}
-              className="flex-row items-center"
+              className="p-2 rounded-md bg-transparent hover:bg-[#2C2C2E]"
+              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
             >
-              <Ionicons name="play" size={14} color="#BF5AF2" />
-              <Text className="text-[#BF5AF2] text-xs font-bold ml-1">Start</Text>
+              <Ionicons name="play" size={16} color="#BF5AF2" />
             </Pressable>
           )}
+
+          {onEdit && (
+            <Pressable
+              onPress={() => onEdit(task)}
+              className="p-2 rounded-md bg-transparent hover:bg-[#2C2C2E]"
+              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+            >
+              <Ionicons name="pencil" size={16} color="#8E8E93" />
+            </Pressable>
+          )}
+
           {showIceboxButton && onMoveToIcebox && (
             <Pressable
               onPress={() => onMoveToIcebox(task.id)}
-              style={{ backgroundColor: '#2C2C2E' }}
-              className="p-2 rounded-xl"
+              className="p-2 rounded-md bg-transparent hover:bg-[#2C2C2E]"
+              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
             >
-              <Ionicons name="snow-outline" size={15} color="#8E8E93" />
+              <Ionicons name="snow-outline" size={16} color="#8E8E93" />
+            </Pressable>
+          )}
+
+          {onDelete && (
+            <Pressable
+              onPress={() => onDelete(task.id)}
+              className="p-2 rounded-md bg-transparent hover:bg-[rgba(255,69,58,0.1)]"
+              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+            >
+              <Ionicons name="trash-outline" size={16} color="#FF453A" />
             </Pressable>
           )}
         </View>

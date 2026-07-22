@@ -12,6 +12,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import AnimatedTaskRow from '../components/AnimatedTaskRow';
 import AnimatedMacroGoalCard from '../components/AnimatedMacroGoalCard';
 import { useConfettiStore } from '../store/confettiStore';
+import EditTaskModal from '../components/EditTaskModal';
 
 // ─── Animated Task Row & Macro Goal Card imported from components ─────────────
 
@@ -27,9 +28,10 @@ export default function DashboardScreen() {
 
   const [activePillarId, setActivePillarId] = useState<string>('');
   const [blockedModal, setBlockedModal] = useState<{ title: string; message: string } | null>(null);
+  const [editTask, setEditTask] = useState<Task | null>(null);
   
   const { dollarBalance, hoursBalanceMinutes, debt, streak, lastCheckInDate } = useEconomyStore();
-  const { tasks, tags, pillars, toggleTask, moveToIcebox } = useTaskStore();
+  const { tasks, tags, pillars, toggleTask, moveToIcebox, deleteTask, updateTask } = useTaskStore();
   const activePillars = pillars.filter(p => !p.isArchived);
   const currentPillarId = activePillarId || activePillars[0]?.id;
   const { macroGoals } = useMacroGoalStore();
@@ -271,6 +273,8 @@ export default function DashboardScreen() {
                   onToggle={toggleTask}
                   onStartTimer={handleStartTimer}
                   onMoveToIcebox={moveToIcebox}
+                  onEdit={setEditTask}
+                  onDelete={deleteTask}
                   showStartButton
                   showIceboxButton
                 />
@@ -296,6 +300,8 @@ export default function DashboardScreen() {
                     tagName={tag?.name}
                     isLast={isLast}
                     onToggle={toggleTask}
+                    onEdit={setEditTask}
+                    onDelete={deleteTask}
                     showStartButton={false}
                     showIceboxButton={false}
                   />
@@ -356,6 +362,16 @@ export default function DashboardScreen() {
           ]}
         />
       )}
+
+      <EditTaskModal 
+        pillars={pillars} 
+        task={editTask}
+        visible={!!editTask}
+        tags={tags}
+        onClose={() => setEditTask(null)}
+        onSave={(id, updates) => updateTask(id, updates)}
+        onDelete={(id) => deleteTask(id)}
+      />
     </SafeAreaView>
   );
 }
