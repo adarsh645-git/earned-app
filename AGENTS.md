@@ -85,7 +85,7 @@ All AI agents working on **Earned** adopt a **Triad Mindset**:
 - **Mandatory Interactive Brainstorming & Alignment**: Before generating an implementation plan artifact (`implementation_plan.md`), drafting specs, or writing code for ANY non-trivial feature:
   1. **DO NOT** create an `implementation_plan.md` artifact or write code on your first response turn.
   2. **MUST** present Phase 0 analysis directly in chat to the user evaluating the feature through 3 lenses (*Behavioral Psychology*, *Behavioral Economics*, *System Architecture*).
-  3. **MUST** ask targeted questions regarding trade-offs, schemas, and user flow **1 by 1**, providing explicit multiple-choice options for selection, and WAIT for the user's response to each question before proceeding to the next or creating plans/code.
+  3. **MUST** ask targeted questions regarding trade-offs, schemas, and user flow **1 by 1** by ALWAYS invoking the `ask_question` tool with explicit multiple-choice options (prefixing the top option with `(Recommended)`), and WAIT for the user's response to each question before asking the next question or creating plans/code.
 
 ### Phase 1–4: Execution Loop
 1. **Specs Directory**: Feature specifications reside in `docs/sdd/` (indexed in `docs/sdd/README.md`).
