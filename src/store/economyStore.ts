@@ -49,11 +49,14 @@ export interface EconomyState {
 
   // Actions
   addBalance: (amount: number) => void;
+  removeBalance: (amount: number) => void;
   spendBalance: (amount: number, allowDebt: boolean) => boolean;
   addHours: (minutes: number) => void;
+  removeHours: (minutes: number) => void;
   spendHours: (minutes: number) => boolean;
   recordFocusSession: () => void;
   incrementCompletedTasks: () => void;
+  decrementCompletedTasks: () => void;
   incrementCompletedMacroGoals: () => void;
   applyPenalty: () => void;
   incrementStreak: () => void;
@@ -166,6 +169,16 @@ export const useEconomyStore = create<EconomyState>()(
         };
       }),
 
+      removeBalance: (amount) => set((state) => {
+        // Simple deduction from balance; could put them in debt theoretically,
+        // but for now we just deduct to 0 to prevent negative cash if they spent it.
+        // If they already spent it, they shouldn't be able to un-check, but we'll 
+        // deduct as much as we can.
+        let newBalance = state.dollarBalance - amount;
+        if (newBalance < 0) newBalance = 0; // Prevent negative balance from revokes
+        return { dollarBalance: Math.round(newBalance * 100) / 100 };
+      }),
+
       spendBalance: (amount, allowDebt) => {
         const state = get();
         const today = new Date().toISOString().split('T')[0];
@@ -208,6 +221,10 @@ export const useEconomyStore = create<EconomyState>()(
         hoursBalanceMinutes: Math.max(0, state.hoursBalanceMinutes + Math.round(minutes))
       })),
 
+      removeHours: (minutes) => set((state) => ({
+        hoursBalanceMinutes: Math.max(0, state.hoursBalanceMinutes - Math.round(minutes))
+      })),
+
       spendHours: (minutes) => {
         const state = get();
         if (state.hoursBalanceMinutes >= minutes) {
@@ -226,6 +243,10 @@ export const useEconomyStore = create<EconomyState>()(
 
       incrementCompletedTasks: () => set((state) => ({
         completedTasksCount: state.completedTasksCount + 1
+      })),
+
+      decrementCompletedTasks: () => set((state) => ({
+        completedTasksCount: Math.max(0, state.completedTasksCount - 1)
       })),
 
       incrementCompletedMacroGoals: () => set((state) => ({

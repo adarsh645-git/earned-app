@@ -194,8 +194,8 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       useEconomyStore.getState().spendHours(minutesElapsed);
     }
 
-    // Mark task as completed
-    useTaskStore.getState().toggleTask(activeTaskId);
+    // Mark task as completed (pass false to prevent manual payout logic)
+    useTaskStore.getState().toggleTask(activeTaskId, false);
 
     // Roll up progress to Macro Goal if linked & capture milestone rewards (awards Dollars at milestones)
     let unlockedMilestones: UnlockedMilestoneInfo[] = [];

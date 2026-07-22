@@ -51,6 +51,7 @@ interface MacroGoalState {
   updateMacroGoal: (id: string, updates: Partial<MacroGoal>) => void;
   deleteMacroGoal: (id: string) => void;
   addProgress: (id: string, amount: number) => UnlockedMilestoneInfo[];
+  removeProgress: (id: string, amount: number) => void;
 }
 
 export const useMacroGoalStore = create<MacroGoalState>()(
@@ -134,6 +135,57 @@ export const useMacroGoalStore = create<MacroGoalState>()(
         }));
 
         return newlyUnlocked;
+      },
+      removeProgress: (id, amount) => {
+        const goal = get().macroGoals.find(g => g.id === id);
+        if (!goal) return;
+
+        const isUnits = goal.metricType === 'units';
+        
+        let newPct = 0;
+        let newMinutes = goal.completedMinutes;
+        let newMetric = goal.completedMetric || 0;
+        let targetForPayout = goal.targetMinutes;
+
+        if (isUnits) {
+          newMetric = Math.max(0, newMetric - amount);
+          const target = goal.targetMetric || 1;
+          newPct = Math.min(100, Math.floor((newMetric / target) * 100));
+          targetForPayout = (goal.targetMetric || 1) * 60; 
+        } else {
+          newMinutes = Math.max(0, newMinutes - amount);
+          const target = goal.targetMinutes;
+          newPct = Math.min(100, Math.floor((newMinutes / target) * 100));
+        }
+
+        const existingMilestones = goal.unlockedMilestones || [];
+        const possibleMilestones = [25, 50, 75, 100];
+        const updatedUnlocked = [...existingMilestones];
+
+        possibleMilestones.forEach(m => {
+          // If we had unlocked this milestone previously, but our new percentage has dropped below it...
+          if (existingMilestones.includes(m) && newPct < m) {
+            const dollars = getMilestoneDollars(targetForPayout, m);
+            // Remove the milestone from the active array
+            const idx = updatedUnlocked.indexOf(m);
+            if (idx > -1) {
+              updatedUnlocked.splice(idx, 1);
+            }
+            // Revoke the bonus dollars
+            useEconomyStore.getState().removeBalance(dollars);
+            
+            // Wait, we can't easily revoke the discipline score increment for 100%, 
+            // but we can just leave it or decrement it if we wanted. For now, just revoke money.
+          }
+        });
+
+        set((state) => ({
+          macroGoals: state.macroGoals.map(g =>
+            g.id === id
+              ? { ...g, completedMinutes: newMinutes, completedMetric: newMetric, unlockedMilestones: updatedUnlocked }
+              : g
+          ),
+        }));
       },
     }),
     {

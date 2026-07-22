@@ -38,7 +38,7 @@ interface TaskState {
   addTask: (task: Omit<Task, 'id' | 'completed' | 'dateCreated'>) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
-  toggleTask: (id: string) => void;
+  toggleTask: (id: string, isManual?: boolean) => void;
   moveToIcebox: (id: string) => void;
   activateFromIcebox: (id: string) => void;
   
@@ -82,9 +82,59 @@ export const useTaskStore = create<TaskState>()(
       deleteTask: (id) => set((state) => ({
         tasks: state.tasks.filter(t => t.id !== id)
       })),
-      toggleTask: (id) => set((state) => ({
-        tasks: state.tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t)
-      })),
+      toggleTask: (id, isManual = true) => set((state) => {
+        const task = state.tasks.find(t => t.id === id);
+        if (!task) return state;
+
+        const isCompleting = !task.completed;
+
+        if (isManual) {
+          const tag = state.tags.find(t => t.id === task.tagId);
+          
+          // Require stores dynamically inside to avoid circular dependencies if any
+          const { useEconomyStore } = require('./economyStore');
+          const { useMacroGoalStore } = require('./macroGoalStore');
+          
+          const economyState = useEconomyStore.getState();
+          const macroState = useMacroGoalStore.getState();
+
+          if (isCompleting) {
+            // Payout
+            if (tag?.type === 'earner') {
+              const conversion = economyState.getConversionRate();
+              const hoursEarned = Math.round(task.estimatedMinutes * conversion.multiplier);
+              economyState.addHours(hoursEarned);
+              economyState.incrementStreak();
+              economyState.recordFocusSession();
+              economyState.incrementCompletedTasks();
+
+              if (task.macroGoalId) {
+                macroState.addProgress(task.macroGoalId, task.estimatedMinutes);
+              }
+            } else if (tag?.type === 'burner') {
+              economyState.spendHours(task.estimatedMinutes);
+            }
+          } else {
+            // Revert
+            if (tag?.type === 'earner') {
+              const conversion = economyState.getConversionRate();
+              const hoursEarned = Math.round(task.estimatedMinutes * conversion.multiplier);
+              economyState.removeHours(hoursEarned);
+              economyState.decrementCompletedTasks();
+
+              if (task.macroGoalId) {
+                macroState.removeProgress(task.macroGoalId, task.estimatedMinutes);
+              }
+            } else if (tag?.type === 'burner') {
+              economyState.addHours(task.estimatedMinutes);
+            }
+          }
+        }
+
+        return {
+          tasks: state.tasks.map(t => t.id === id ? { ...t, completed: isCompleting } : t)
+        };
+      }),
       moveToIcebox: (id) => set((state) => ({
         tasks: state.tasks.map(t => t.id === id ? { ...t, isIcebox: true } : t)
       })),
