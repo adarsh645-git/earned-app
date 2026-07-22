@@ -8,4 +8,5 @@ This directory contains the feature specification documents and task checklists 
 - **[002-focus-lock-timer.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/002-focus-lock-timer.md)**: Focus timer overlay, economic multiplier rates, and session completion rollup.
 - **[003-daily-checkin-and-planning-rewards.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/003-daily-checkin-and-planning-rewards.md)**: Daily launch check-in bonus, planning task creation bounties (+1 key, max 3/day), and streak grace period shield.
 - **[004-dual-currency-reward-economy.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/004-dual-currency-reward-economy.md)**: Dual-currency economy (Hours + Dollars), streak-based focus conversion, entertainment macro goals, and hard-block timer enforcement.
+- **[005-journey-editing-and-timeframe-allocation.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/005-journey-editing-and-timeframe-allocation.md)**: Editable and deletable Journeys, Year/Month timeframe allocation, and sub-category tag breakdown.
 

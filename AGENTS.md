@@ -82,10 +82,10 @@ All AI agents working on **Earned** adopt a **Triad Mindset**:
 ## 📐 Specification-Driven Development (SDD) Workflow
 
 ### Phase 0: 3-Lens Peer Brainstorming & Alignment
-- **Mandatory Planning & Brainstorming**: Before creating specs or writing code for any feature, conduct a Phase 0 peer brainstorming session analyzing the feature through 3 lenses:
-  1. *Behavioral Psychology*: Impact on habit loops, friction balance, and motivation.
-  2. *Behavioral Economics*: Impact on dual-currency balances, streak multipliers, and indulgence cost.
-  3. *System Architecture*: Data schemas, Zustand store contracts, Supabase RLS, and performance trade-offs.
+- **Mandatory Interactive Brainstorming & Alignment**: Before generating an implementation plan artifact (`implementation_plan.md`), drafting specs, or writing code for ANY non-trivial feature:
+  1. **DO NOT** create an `implementation_plan.md` artifact or write code on your first response turn.
+  2. **MUST** present Phase 0 analysis directly in chat to the user evaluating the feature through 3 lenses (*Behavioral Psychology*, *Behavioral Economics*, *System Architecture*).
+  3. **MUST** ask targeted questions regarding trade-offs, schemas, and user flow **1 by 1**, providing explicit multiple-choice options for selection, and WAIT for the user's response to each question before proceeding to the next or creating plans/code.
 
 ### Phase 1–4: Execution Loop
 1. **Specs Directory**: Feature specifications reside in `docs/sdd/` (indexed in `docs/sdd/README.md`).
