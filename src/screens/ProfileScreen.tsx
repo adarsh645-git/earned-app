@@ -6,6 +6,29 @@ import { useEconomyStore } from '../store/economyStore';
 import { useTaskStore } from '../store/taskStore';
 import { useMacroGoalStore, MacroGoal, getMilestoneDollars } from '../store/macroGoalStore';
 import { useAuthStore } from '../store/authStore';
+import { PrimaryButton } from '../components/PrimaryButton';
+
+const PremiumInput = (props: React.ComponentProps<typeof TextInput>) => {
+  const [isFocused, setIsFocused] = useState(false);
+  return (
+    <TextInput
+      {...props}
+      onFocus={(e) => {
+        setIsFocused(true);
+        props.onFocus?.(e);
+      }}
+      onBlur={(e) => {
+        setIsFocused(false);
+        props.onBlur?.(e);
+      }}
+      style={[
+        props.style,
+        { outlineStyle: 'none' } as any,
+        isFocused && { borderColor: '#BF5AF2', borderWidth: 2 }
+      ]}
+    />
+  );
+};
 
 export default function ProfileScreen() {
   const { user, openModal } = useAuthStore();
@@ -100,7 +123,7 @@ export default function ProfileScreen() {
 
           {/* Title Input */}
           <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Pyramid Goal Title</Text>
-          <TextInput
+          <PremiumInput
             value={title}
             onChangeText={setTitle}
             placeholder="e.g. Hike 100 miles, Write a Novel, Learn French"
@@ -111,7 +134,7 @@ export default function ProfileScreen() {
 
           {/* Target Hours Input */}
           <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Target Hours</Text>
-          <TextInput
+          <PremiumInput
             value={targetHours}
             onChangeText={setTargetHours}
             placeholder="e.g. 50"
@@ -130,15 +153,16 @@ export default function ProfileScreen() {
                 <Pressable
                   key={h}
                   onPress={() => setHorizon(h)}
-                  style={{
+                  style={({ hovered }: any) => ({
                     flex: 1,
                     paddingVertical: 8,
                     borderRadius: 8,
                     alignItems: 'center',
-                    backgroundColor: isActive ? '#2C2C2E' : 'transparent',
+                    backgroundColor: isActive ? (hovered ? '#3A2053' : '#2C183E') : 'transparent',
                     borderWidth: isActive ? 1 : 0,
-                    borderColor: isActive ? 'rgba(255,255,255,0.15)' : 'transparent',
-                  }}
+                    borderColor: isActive ? (hovered ? '#5A3382' : '#4D2A6B') : 'transparent',
+                    transition: 'all 0.15s ease-in-out',
+                  })}
                 >
                   <Text className={`font-semibold text-xs capitalize ${isActive ? 'text-white' : 'text-[#8E8E93]'}`}>
                     {h}
@@ -149,13 +173,11 @@ export default function ProfileScreen() {
           </View>
 
           {/* Submit Button */}
-          <Pressable
+          <PrimaryButton
             onPress={handleAddMacro}
-            style={{ backgroundColor: '#AF52DE' }}
-            className="w-full py-4 rounded-2xl items-center justify-center"
-          >
-            <Text className="text-white font-extrabold text-base">Add Pyramid Target</Text>
-          </Pressable>
+            title="Add Pyramid Target"
+            style={{ width: '100%' }}
+          />
         </ScrollView>
       </SafeAreaView>
     );
@@ -396,7 +418,7 @@ export default function ProfileScreen() {
                   {/* Progress Bar */}
                   <View style={{ backgroundColor: '#2C2C2E' }} className="w-full h-2 rounded-full overflow-hidden mb-3">
                     <View
-                      style={{ width: `${pct}%`, backgroundColor: '#AF52DE' }}
+                      style={{ width: `${pct}%`, backgroundColor: '#BF5AF2' }}
                       className="h-full rounded-full"
                     />
                   </View>

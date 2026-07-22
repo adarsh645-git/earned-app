@@ -9,7 +9,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface AnimatedMacroGoalCardProps {
   goal: MacroGoal;
-  accentColor: string; // '#AF52DE' for productive, '#5AC8FA' for entertainment
+  accentColor: string; // '#BF5AF2' for productive, '#5AC8FA' for entertainment
   showIcon?: boolean;
   iconName?: string;
 }

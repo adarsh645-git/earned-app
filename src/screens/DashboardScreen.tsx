@@ -290,7 +290,7 @@ export default function DashboardScreen() {
               <AnimatedMacroGoalCard
                 key={goal.id}
                 goal={goal}
-                accentColor="#AF52DE"
+                accentColor="#BF5AF2"
               />
             ))}
           </View>

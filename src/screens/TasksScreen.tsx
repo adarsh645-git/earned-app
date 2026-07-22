@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTaskStore, Bucket, Task } from '../store/taskStore';
 import { useMacroGoalStore } from '../store/macroGoalStore';
 import { useEconomyStore } from '../store/economyStore';
+import { PrimaryButton } from '../components/PrimaryButton';
 import RewardToast from '../components/RewardToast';
 import AnimatedTaskRow from '../components/AnimatedTaskRow';
 import DialPicker from '../components/DialPicker';
@@ -70,8 +71,8 @@ export default function TasksScreen() {
           
           {/* Header */}
           <View className="flex-row justify-between items-center mt-3 mb-6">
-            <Text className="text-white text-xl font-extrabold tracking-tight">New Focus Block</Text>
-            <Pressable onPress={() => setModalVisible(false)} style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 }} className="p-2 rounded-full">
+            <Text style={{ color: '#FFF', fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>New Focus Block</Text>
+            <Pressable onPress={() => setModalVisible(false)} style={{ backgroundColor: '#2C2C2E', padding: 6, borderRadius: 12 }}>
               <Ionicons name="close" size={20} color="#8E8E93" />
             </Pressable>
           </View>
@@ -83,19 +84,18 @@ export default function TasksScreen() {
           ) : null}
 
           {/* Title Input */}
-          <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Focus Item Title</Text>
+          <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Focus Item Title</Text>
           <TextInput
             value={title}
             onChangeText={setTitle}
             placeholder="e.g. Code Review, Bike Ride, Read Book"
-            placeholderTextColor="#8E8E93"
-            style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }}
-            className="text-white rounded-2xl p-4 mb-4 text-sm font-semibold"
+            placeholderTextColor="#5C5C5E"
+            style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 16, borderRadius: 16, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2C2C2E' }}
           />
 
           {/* Estimated Minutes Input */}
-          <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Estimated Focus (Minutes)</Text>
-          <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl py-2 mb-4 items-center justify-center">
+          <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Estimated Focus (Minutes)</Text>
+          <View style={{ backgroundColor: '#151517', borderColor: '#2C2C2E', borderWidth: 1 }} className="rounded-2xl py-2 mb-6 items-center justify-center">
             <DialPicker 
               value={estimatedMinutes} 
               onChange={setEstimatedMinutes} 
@@ -105,22 +105,28 @@ export default function TasksScreen() {
           </View>
 
           {/* Tag Selection */}
-          <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Category Tag</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
+          <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Category Tag</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
             {tags.map((tag) => {
               const isSelected = selectedTagId === tag.id;
               return (
                 <Pressable
                   key={tag.id}
                   onPress={() => setSelectedTagId(tag.id)}
-                  style={{
-                    backgroundColor: isSelected ? 'rgba(191,90,242,0.2)' : '#1C1C1E',
-                    borderColor: isSelected ? '#BF5AF2' : 'rgba(255,255,255,0.08)',
+                  style={({ hovered }: any) => ({
+                    backgroundColor: isSelected ? (hovered ? '#3A2053' : '#2C183E') : (hovered ? '#2C2C2E' : '#1C1C1E'),
+                    borderColor: isSelected ? (hovered ? '#5A3382' : '#4D2A6B') : '#2C2C2E',
                     borderWidth: 1,
-                  }}
-                  className="px-4 py-2.5 rounded-full mr-2 items-center justify-center"
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    marginRight: 8,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.15s ease-in-out',
+                  })}
                 >
-                  <Text className={`font-bold text-xs ${isSelected ? 'text-[#BF5AF2]' : 'text-[#8E8E93]'}`}>
+                  <Text style={{ color: isSelected ? '#FFF' : '#8E8E93', fontWeight: isSelected ? '700' : '600', fontSize: 13 }}>
                     {tag.name} ({tag.bucket})
                   </Text>
                 </Pressable>
@@ -131,18 +137,24 @@ export default function TasksScreen() {
           {/* Link to Macro Goal */}
           {macroGoals.length > 0 && (
             <>
-              <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Link to Pyramid Goal (Optional)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
+              <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Link to Pyramid Goal (Optional)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
                 <Pressable
                   onPress={() => setSelectedMacroId('')}
-                  style={{
-                    backgroundColor: !selectedMacroId ? 'rgba(191,90,242,0.2)' : '#1C1C1E',
-                    borderColor: !selectedMacroId ? '#BF5AF2' : 'rgba(255,255,255,0.08)',
+                  style={({ hovered }: any) => ({
+                    backgroundColor: !selectedMacroId ? (hovered ? '#3A2053' : '#2C183E') : (hovered ? '#2C2C2E' : '#1C1C1E'),
+                    borderColor: !selectedMacroId ? (hovered ? '#5A3382' : '#4D2A6B') : '#2C2C2E',
                     borderWidth: 1,
-                  }}
-                  className="px-4 py-2.5 rounded-full mr-2 items-center justify-center"
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    marginRight: 8,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.15s ease-in-out',
+                  })}
                 >
-                  <Text className={`font-bold text-xs ${!selectedMacroId ? 'text-[#BF5AF2]' : 'text-[#8E8E93]'}`}>
+                  <Text style={{ color: !selectedMacroId ? '#FFF' : '#8E8E93', fontWeight: !selectedMacroId ? '700' : '600', fontSize: 13 }}>
                     None
                   </Text>
                 </Pressable>
@@ -152,14 +164,20 @@ export default function TasksScreen() {
                     <Pressable
                       key={goal.id}
                       onPress={() => setSelectedMacroId(goal.id)}
-                      style={{
-                        backgroundColor: isSelected ? 'rgba(191,90,242,0.2)' : '#1C1C1E',
-                        borderColor: isSelected ? '#BF5AF2' : 'rgba(255,255,255,0.08)',
+                      style={({ hovered }: any) => ({
+                        backgroundColor: isSelected ? (hovered ? '#3A2053' : '#2C183E') : (hovered ? '#2C2C2E' : '#1C1C1E'),
+                        borderColor: isSelected ? (hovered ? '#5A3382' : '#4D2A6B') : '#2C2C2E',
                         borderWidth: 1,
-                      }}
-                      className="px-4 py-2.5 rounded-full mr-2 items-center justify-center"
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
+                        borderRadius: 12,
+                        marginRight: 8,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s ease-in-out',
+                      })}
                     >
-                      <Text className={`font-bold text-xs ${isSelected ? 'text-[#BF5AF2]' : 'text-[#8E8E93]'}`}>
+                      <Text style={{ color: isSelected ? '#FFF' : '#8E8E93', fontWeight: isSelected ? '700' : '600', fontSize: 13 }}>
                         {goal.title}
                       </Text>
                     </Pressable>
@@ -172,14 +190,14 @@ export default function TasksScreen() {
           {/* Send Directly to Icebox Toggle */}
           <Pressable
             onPress={() => setSendDirectlyToIcebox(!sendDirectlyToIcebox)}
-            style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }}
-            className="flex-row items-center p-4 rounded-2xl justify-between mb-6"
+            style={{ backgroundColor: '#151517', borderColor: '#2C2C2E', borderWidth: 1 }}
+            className="flex-row items-center p-4 rounded-2xl justify-between mb-8"
           >
             <View className="flex-row items-center gap-2.5">
               <Ionicons name="snow-outline" size={18} color="#8E8E93" />
               <View>
-                <Text className="text-white font-semibold text-sm">Defer directly to Icebox</Text>
-                <Text className="text-[#8E8E93] text-xs mt-0.5">Locks item out of today's focus list</Text>
+                <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '600' }}>Defer directly to Icebox</Text>
+                <Text style={{ color: '#8E8E93', fontSize: 12, marginTop: 2 }}>Locks item out of today's focus list</Text>
               </View>
             </View>
             <Ionicons
@@ -190,13 +208,11 @@ export default function TasksScreen() {
           </Pressable>
 
           {/* Submit Button */}
-          <Pressable
+          <PrimaryButton
             onPress={handleAddTask}
-            style={{ backgroundColor: '#AF52DE' }}
-            className="w-full py-4 rounded-2xl items-center justify-center"
-          >
-            <Text className="text-white font-extrabold text-base">Add Focus Item (+$0.02)</Text>
-          </Pressable>
+            title="Add Focus Item (+$0.02)"
+            style={{ width: '100%' }}
+          />
         </ScrollView>
       </SafeAreaView>
     );
@@ -218,11 +234,10 @@ export default function TasksScreen() {
           <Text className="text-white text-3xl font-extrabold tracking-tight">Manage Focus</Text>
           <Pressable
             onPress={() => setModalVisible(true)}
-            style={{ backgroundColor: '#AF52DE' }}
-            className="flex-row items-center px-4 py-2 rounded-full"
+            style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14, flexDirection: 'row', alignItems: 'center' }}
           >
-            <Ionicons name="add" size={18} color="white" />
-            <Text className="text-white font-bold ml-1 text-xs">Add Task</Text>
+            <Ionicons name="add" size={16} color="#BF5AF2" style={{ marginRight: 6 }} />
+            <Text style={{ color: '#BF5AF2', fontSize: 14, fontWeight: '700' }}>Add Task</Text>
           </Pressable>
         </View>
 
