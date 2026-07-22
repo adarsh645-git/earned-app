@@ -224,7 +224,7 @@ export default function CollectionsScreen() {
       triggerConfetti();
       setCelebrationInfo({
         title: 'SUB-QUEST CREATED!',
-        subtitle: `Bucket "${subGoalTitle.trim()}" added to your journey timeframe targets.`,
+        subtitle: `Sub-Goal "${subGoalTitle.trim()}" added to your journey targets.`,
         iconType: 'target',
         payoutText: `🎯 Target: ${isNaN(targetVal) ? 'Custom' : targetVal} units | Timeframe: ${subGoalMonth ? MONTH_NAMES[parseInt(subGoalMonth, 10) - 1] : ''} ${subGoalYear || 'Ongoing'}`,
         badgeLabel: 'SUB-QUEST INITIALIZED',
@@ -442,7 +442,7 @@ export default function CollectionsScreen() {
                   </View>
                 </View>
 
-                {/* Sub-Goal Buckets Section */}
+                {/* Sub-Goal Section */}
                 {collectionSubGoals.map(sg => {
                   const sgItems = collectionItems.filter(i => i.subGoalId === sg.id);
                   const sgCompleted = sgItems.filter(i => i.completed).length;
@@ -494,7 +494,7 @@ export default function CollectionsScreen() {
                   style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#2C2C2E', paddingVertical: 10, borderRadius: 10, marginBottom: 16 }}
                 >
                   <Ionicons name="pricetag-outline" size={16} color="#5AC8FA" style={{ marginRight: 6 }} />
-                  <Text style={{ color: '#5AC8FA', fontSize: 13, fontWeight: '700' }}>+ Add Sub-Goal Bucket (e.g. Fiction, Hikes)</Text>
+                  <Text style={{ color: '#5AC8FA', fontSize: 13, fontWeight: '700' }}>+ Add Sub-Goal (e.g. Fiction, Hikes)</Text>
                 </Pressable>
 
                 {/* Items List */}
@@ -548,8 +548,8 @@ export default function CollectionsScreen() {
 
       {/* Celebration Dopamine Modal */}
       <Modal visible={!!celebrationInfo} animationType="fade" transparent={true}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 24 }}>
-          <View style={{ backgroundColor: '#1C1C1E', borderRadius: 24, padding: 28, alignItems: 'center', borderWidth: 2, borderColor: '#AF52DE' }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+          <View style={{ backgroundColor: '#1C1C1E', borderRadius: 24, padding: 28, alignItems: 'center', borderWidth: 2, borderColor: '#AF52DE', maxWidth: 480, width: '100%' }}>
             <View style={{ backgroundColor: '#AF52DE22', width: 88, height: 88, borderRadius: 44, justifyContent: 'center', alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#AF52DE55' }}>
               {celebrationInfo && <CelebrationVectorIcon type={celebrationInfo.iconType} category={celebrationInfo.category} />}
             </View>
@@ -580,19 +580,19 @@ export default function CollectionsScreen() {
       </Modal>
 
       {/* Journey Create/Edit Modal */}
-      <Modal visible={isJourneyModalOpen} animationType="slide" transparent={true}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: '#1C1C1E', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, minHeight: 420 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '700' }}>{editingJourneyId ? 'Edit Journey' : 'New Journey Quest'}</Text>
+      <Modal visible={isJourneyModalOpen} animationType="fade" transparent={true}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+          <View style={{ backgroundColor: '#1C1C1E', borderRadius: 24, padding: 24, maxWidth: 480, width: '100%', borderWidth: 1, borderColor: '#3A3A3C' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '800' }}>{editingJourneyId ? 'Edit Journey' : 'New Journey'}</Text>
               <Pressable onPress={() => setIsJourneyModalOpen(false)}>
                 <Ionicons name="close" size={24} color="#8E8E93" />
               </Pressable>
             </View>
 
-            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 12, fontWeight: '600', textTransform: 'uppercase' }}>Title</Text>
+            <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Journey Title</Text>
             <TextInput
-              style={{ backgroundColor: '#2C2C2E', color: '#FFF', padding: 16, borderRadius: 12, fontSize: 16, marginBottom: 16 }}
+              style={{ backgroundColor: '#252528', color: '#FFF', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, fontSize: 15, marginBottom: 16, borderWidth: 1, borderColor: '#3A3A3C' }}
               placeholder="e.g., Reading List 2026, Fitness Quest"
               placeholderTextColor="#8E8E93"
               value={journeyTitle}
@@ -600,66 +600,72 @@ export default function CollectionsScreen() {
               autoFocus
             />
 
-            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 12, fontWeight: '600', textTransform: 'uppercase' }}>Category</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
+            <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Category</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
               {categories.map(c => (
                 <Pressable 
                   key={c}
                   onPress={() => setJourneyCategory(c)}
                   style={{ 
-                    backgroundColor: journeyCategory === c ? '#AF52DE' : '#2C2C2E',
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
-                    borderRadius: 20,
+                    backgroundColor: journeyCategory === c ? '#AF52DE' : '#252528',
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 14,
                     marginRight: 8,
                     flexDirection: 'row',
                     alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: journeyCategory === c ? '#AF52DE' : '#3A3A3C'
                   }}
                 >
-                  <View style={{ marginRight: 8 }}>
-                    <CategoryVectorIcon category={c} size={16} color="#FFF" />
+                  <View style={{ marginRight: 6 }}>
+                    <CategoryVectorIcon category={c} size={15} color="#FFF" />
                   </View>
-                  <Text style={{ color: '#FFF', fontWeight: '600', textTransform: 'capitalize' }}>{c}</Text>
+                  <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 13, textTransform: 'capitalize' }}>{c}</Text>
                 </Pressable>
               ))}
             </ScrollView>
 
-            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 12, fontWeight: '600', textTransform: 'uppercase' }}>Link to Macro Goal (Optional)</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 32 }}>
+            <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Linked Macro Goal (Optional)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
               <Pressable
                 onPress={() => setSelectedMacroId('')}
                 style={{
-                  backgroundColor: selectedMacroId === '' ? '#AF52DE' : '#2C2C2E',
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
+                  backgroundColor: selectedMacroId === '' ? '#AF52DE' : '#252528',
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
                   borderRadius: 12,
                   marginRight: 8,
+                  borderWidth: 1,
+                  borderColor: selectedMacroId === '' ? '#AF52DE' : '#3A3A3C'
                 }}
               >
-                <Text style={{ color: '#FFF', fontWeight: '600' }}>None</Text>
+                <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 13 }}>None</Text>
               </Pressable>
               {macroGoals.map((mg) => (
                 <Pressable
                   key={mg.id}
                   onPress={() => setSelectedMacroId(mg.id)}
                   style={{
-                    backgroundColor: selectedMacroId === mg.id ? '#AF52DE' : '#2C2C2E',
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
+                    backgroundColor: selectedMacroId === mg.id ? '#AF52DE' : '#252528',
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
                     borderRadius: 12,
                     marginRight: 8,
+                    borderWidth: 1,
+                    borderColor: selectedMacroId === mg.id ? '#AF52DE' : '#3A3A3C'
                   }}
                 >
-                  <Text style={{ color: '#FFF', fontWeight: '600' }}>{mg.title}</Text>
+                  <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 13 }}>{mg.title}</Text>
                 </Pressable>
               ))}
             </ScrollView>
 
             <Pressable
               onPress={handleSaveJourney}
-              style={{ backgroundColor: '#AF52DE', padding: 16, borderRadius: 16, alignItems: 'center' }}
+              style={{ backgroundColor: '#AF52DE', paddingVertical: 14, borderRadius: 16, alignItems: 'center' }}
             >
-              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '800' }}>{editingJourneyId ? 'Save Changes' : '🚀 Launch Journey Quest'}</Text>
+              <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '800' }}>{editingJourneyId ? 'Save Changes' : '🚀 Launch Journey'}</Text>
             </Pressable>
           </View>
         </View>
@@ -667,8 +673,8 @@ export default function CollectionsScreen() {
 
       {/* Delete Journey Confirmation Modal */}
       <Modal visible={!!deletingJourneyId} animationType="fade" transparent={true}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', padding: 24 }}>
-          <View style={{ backgroundColor: '#1C1C1E', borderRadius: 20, padding: 24 }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+          <View style={{ backgroundColor: '#1C1C1E', borderRadius: 20, padding: 24, maxWidth: 440, width: '100%', borderWidth: 1, borderColor: '#FF453A44' }}>
             <Ionicons name="warning-outline" size={36} color="#FF453A" style={{ alignSelf: 'center', marginBottom: 12 }} />
             <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '700', textAlign: 'center', marginBottom: 8 }}>
               Delete Journey?
@@ -722,20 +728,21 @@ export default function CollectionsScreen() {
         </View>
       </Modal>
 
-      {/* Sub-Goal Create/Edit Modal */}
-      <Modal visible={isSubGoalModalOpen} animationType="slide" transparent={true}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: '#1C1C1E', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, minHeight: 460 }}>
+      {/* Sub-Goal Create/Edit Modal - Centered Compact Card with 2-Row Month Grid */}
+      <Modal visible={isSubGoalModalOpen} animationType="fade" transparent={true}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+          <View style={{ backgroundColor: '#1C1C1E', borderRadius: 24, padding: 24, maxWidth: 480, width: '100%', borderWidth: 1, borderColor: '#3A3A3C' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '700' }}>{editingSubGoalId ? 'Edit Sub-Goal' : 'New Sub-Goal Bucket'}</Text>
+              <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '800' }}>{editingSubGoalId ? 'Edit Sub-Goal' : 'New Sub-Goal'}</Text>
               <Pressable onPress={() => setIsSubGoalModalOpen(false)}>
                 <Ionicons name="close" size={24} color="#8E8E93" />
               </Pressable>
             </View>
 
-            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 12, fontWeight: '600', textTransform: 'uppercase' }}>Sub-Goal Name / Category</Text>
+            {/* Goal Title Input */}
+            <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Goal Title</Text>
             <TextInput
-              style={{ backgroundColor: '#2C2C2E', color: '#FFF', padding: 16, borderRadius: 12, fontSize: 16, marginBottom: 16 }}
+              style={{ backgroundColor: '#252528', color: '#FFF', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, fontSize: 15, marginBottom: 14, borderWidth: 1, borderColor: '#3A3A3C' }}
               placeholder="e.g., Fiction, Self-Help, Economics, Hikes, Running"
               placeholderTextColor="#8E8E93"
               value={subGoalTitle}
@@ -743,84 +750,130 @@ export default function CollectionsScreen() {
               autoFocus
             />
 
-            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 12, fontWeight: '600', textTransform: 'uppercase' }}>Target Units / Count (Optional)</Text>
-            <TextInput
-              style={{ backgroundColor: '#2C2C2E', color: '#FFF', padding: 16, borderRadius: 12, fontSize: 16, marginBottom: 16 }}
-              placeholder="e.g., 3 (books or activities target)"
-              placeholderTextColor="#8E8E93"
-              value={subGoalTargetMetric}
-              onChangeText={setSubGoalTargetMetric}
-              keyboardType="numeric"
-            />
+            {/* Target Count & Year Row */}
+            <View style={{ flexDirection: 'row', marginBottom: 14 }}>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Target Count (Optional)</Text>
+                <TextInput
+                  style={{ backgroundColor: '#252528', color: '#FFF', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, fontSize: 15, borderWidth: 1, borderColor: '#3A3A3C' }}
+                  placeholder="e.g., 3 books"
+                  placeholderTextColor="#8E8E93"
+                  value={subGoalTargetMetric}
+                  onChangeText={setSubGoalTargetMetric}
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={{ width: 120 }}>
+                <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Target Year</Text>
+                <TextInput
+                  style={{ backgroundColor: '#252528', color: '#FFF', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, fontSize: 15, borderWidth: 1, borderColor: '#3A3A3C' }}
+                  placeholder={`e.g., ${currentYear}`}
+                  placeholderTextColor="#8E8E93"
+                  value={subGoalYear}
+                  onChangeText={setSubGoalYear}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
 
-            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 12, fontWeight: '600', textTransform: 'uppercase' }}>Target Year</Text>
-            <TextInput
-              style={{ backgroundColor: '#2C2C2E', color: '#FFF', padding: 16, borderRadius: 12, fontSize: 16, marginBottom: 16 }}
-              placeholder={`e.g., ${currentYear}`}
-              placeholderTextColor="#8E8E93"
-              value={subGoalYear}
-              onChangeText={setSubGoalYear}
-              keyboardType="numeric"
-            />
+            {/* Month Selection 2-Row Grid */}
+            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 12, fontWeight: '600' }}>Month</Text>
 
-            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 12, fontWeight: '600', textTransform: 'uppercase' }}>Target Month (1-12)</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
+            {/* Row 1: All Year + Jan-May */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
               <Pressable
                 onPress={() => setSubGoalMonth('')}
                 style={{
-                  backgroundColor: subGoalMonth === '' ? '#AF52DE' : '#2C2C2E',
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  borderRadius: 12,
-                  marginRight: 6,
+                  backgroundColor: subGoalMonth === '' ? '#AF52DE' : '#252528',
+                  paddingHorizontal: 10,
+                  paddingVertical: 7,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: subGoalMonth === '' ? '#AF52DE' : '#3A3A3C',
+                  flex: 1,
+                  alignItems: 'center',
+                  minWidth: 70
                 }}
               >
-                <Text style={{ color: '#FFF', fontWeight: '600' }}>All Year / None</Text>
+                <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>All Year</Text>
               </Pressable>
-              {MONTH_NAMES.map((mName, idx) => {
+              {MONTH_NAMES.slice(0, 5).map((mName, idx) => {
                 const mNum = (idx + 1).toString();
+                const isSel = subGoalMonth === mNum;
                 return (
                   <Pressable
                     key={mNum}
                     onPress={() => setSubGoalMonth(mNum)}
                     style={{
-                      backgroundColor: subGoalMonth === mNum ? '#AF52DE' : '#2C2C2E',
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 12,
-                      marginRight: 6,
+                      backgroundColor: isSel ? '#AF52DE' : '#252528',
+                      paddingHorizontal: 10,
+                      paddingVertical: 7,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: isSel ? '#AF52DE' : '#3A3A3C',
+                      flex: 1,
+                      alignItems: 'center',
+                      minWidth: 60
                     }}
                   >
-                    <Text style={{ color: '#FFF', fontWeight: '600' }}>{mName}</Text>
+                    <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>{mName.slice(0, 3)}</Text>
                   </Pressable>
                 );
               })}
-            </ScrollView>
+            </View>
 
+            {/* Row 2: Jun-Dec */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
+              {MONTH_NAMES.slice(5).map((mName, idx) => {
+                const mNum = (idx + 6).toString();
+                const isSel = subGoalMonth === mNum;
+                return (
+                  <Pressable
+                    key={mNum}
+                    onPress={() => setSubGoalMonth(mNum)}
+                    style={{
+                      backgroundColor: isSel ? '#AF52DE' : '#252528',
+                      paddingHorizontal: 10,
+                      paddingVertical: 7,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: isSel ? '#AF52DE' : '#3A3A3C',
+                      flex: 1,
+                      alignItems: 'center',
+                      minWidth: 50
+                    }}
+                  >
+                    <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>{mName.slice(0, 3)}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Action Button */}
             <Pressable
               onPress={handleSaveSubGoal}
-              style={{ backgroundColor: '#AF52DE', padding: 16, borderRadius: 16, alignItems: 'center' }}
+              style={{ backgroundColor: '#AF52DE', paddingVertical: 14, borderRadius: 16, alignItems: 'center' }}
             >
-              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '800' }}>{editingSubGoalId ? 'Save Sub-Goal' : '🎯 Create Sub-Goal Bucket'}</Text>
+              <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '800' }}>{editingSubGoalId ? 'Save Sub-Goal' : 'Create Sub-Goal'}</Text>
             </Pressable>
           </View>
         </View>
       </Modal>
 
       {/* Item Create Modal */}
-      <Modal visible={isItemModalOpen} animationType="slide" transparent={true}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: '#1C1C1E', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, minHeight: 380 }}>
+      <Modal visible={isItemModalOpen} animationType="fade" transparent={true}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+          <View style={{ backgroundColor: '#1C1C1E', borderRadius: 24, padding: 24, maxWidth: 480, width: '100%', borderWidth: 1, borderColor: '#3A3A3C' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '700' }}>Add Item</Text>
+              <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '800' }}>Add Item</Text>
               <Pressable onPress={() => setIsItemModalOpen(false)}>
                 <Ionicons name="close" size={24} color="#8E8E93" />
               </Pressable>
             </View>
 
-            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 12, fontWeight: '600', textTransform: 'uppercase' }}>Item Name</Text>
+            <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Item Name</Text>
             <TextInput
-              style={{ backgroundColor: '#2C2C2E', color: '#FFF', padding: 16, borderRadius: 12, fontSize: 16, marginBottom: 16 }}
+              style={{ backgroundColor: '#252528', color: '#FFF', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, fontSize: 15, marginBottom: 14, borderWidth: 1, borderColor: '#3A3A3C' }}
               placeholder="e.g., The Great Gatsby, 5km Morning Run"
               placeholderTextColor="#8E8E93"
               value={itemTitle}
@@ -828,39 +881,43 @@ export default function CollectionsScreen() {
               autoFocus
             />
 
-            {/* Sub-Goal Bucket Selector */}
+            {/* Sub-Goal Assignment Selector */}
             {(() => {
               const availableSubGoals = (subGoals || []).filter(s => s.collectionId === activeCollectionId);
               if (availableSubGoals.length > 0) {
                 return (
-                  <View style={{ marginBottom: 16 }}>
-                    <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 12, fontWeight: '600', textTransform: 'uppercase' }}>Assign to Sub-Goal Bucket</Text>
+                  <View style={{ marginBottom: 14 }}>
+                    <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Sub-Goal Assignment</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                       <Pressable
                         onPress={() => setSelectedSubGoalId('')}
                         style={{
-                          backgroundColor: selectedSubGoalId === '' ? '#AF52DE' : '#2C2C2E',
-                          paddingHorizontal: 14,
-                          paddingVertical: 8,
-                          borderRadius: 12,
+                          backgroundColor: selectedSubGoalId === '' ? '#AF52DE' : '#252528',
+                          paddingHorizontal: 12,
+                          paddingVertical: 7,
+                          borderRadius: 10,
                           marginRight: 6,
+                          borderWidth: 1,
+                          borderColor: selectedSubGoalId === '' ? '#AF52DE' : '#3A3A3C'
                         }}
                       >
-                        <Text style={{ color: '#FFF', fontWeight: '600' }}>General (None)</Text>
+                        <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>General (None)</Text>
                       </Pressable>
                       {availableSubGoals.map((sg) => (
                         <Pressable
                           key={sg.id}
                           onPress={() => setSelectedSubGoalId(sg.id)}
                           style={{
-                            backgroundColor: selectedSubGoalId === sg.id ? '#AF52DE' : '#2C2C2E',
-                            paddingHorizontal: 14,
-                            paddingVertical: 8,
-                            borderRadius: 12,
+                            backgroundColor: selectedSubGoalId === sg.id ? '#AF52DE' : '#252528',
+                            paddingHorizontal: 12,
+                            paddingVertical: 7,
+                            borderRadius: 10,
                             marginRight: 6,
+                            borderWidth: 1,
+                            borderColor: selectedSubGoalId === sg.id ? '#AF52DE' : '#3A3A3C'
                           }}
                         >
-                          <Text style={{ color: '#FFF', fontWeight: '600' }}>{sg.title}</Text>
+                          <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>{sg.title}</Text>
                         </Pressable>
                       ))}
                     </ScrollView>
@@ -870,9 +927,9 @@ export default function CollectionsScreen() {
               return null;
             })()}
 
-            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 12, fontWeight: '600', textTransform: 'uppercase' }}>Estimated Time (Minutes) [Optional]</Text>
+            <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Estimated Time (Minutes) [Optional]</Text>
             <TextInput
-              style={{ backgroundColor: '#2C2C2E', color: '#FFF', padding: 16, borderRadius: 12, fontSize: 16, marginBottom: 24 }}
+              style={{ backgroundColor: '#252528', color: '#FFF', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, fontSize: 15, marginBottom: 20, borderWidth: 1, borderColor: '#3A3A3C' }}
               placeholder="e.g., 480"
               placeholderTextColor="#8E8E93"
               value={itemEstimatedMinutes}
@@ -882,9 +939,9 @@ export default function CollectionsScreen() {
 
             <Pressable
               onPress={handleCreateItem}
-              style={{ backgroundColor: '#AF52DE', padding: 16, borderRadius: 16, alignItems: 'center' }}
+              style={{ backgroundColor: '#AF52DE', paddingVertical: 14, borderRadius: 16, alignItems: 'center' }}
             >
-              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>Add Item</Text>
+              <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '800' }}>Add Item</Text>
             </Pressable>
           </View>
         </View>
