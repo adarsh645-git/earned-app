@@ -302,7 +302,7 @@ export default function StoreScreen() {
         <View style={{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }} className="flex-row p-1 rounded-xl mb-4 mt-2">
           {(['time', 'material'] as const).map((tab) => {
             const isActive = activeTab === tab;
-            const label = tab === 'time' ? 'Guilt-Free Media' : 'Material Rewards';
+            const label = tab === 'time' ? 'Media' : 'Material Rewards';
             return (
               <Pressable
                 key={tab}
@@ -558,6 +558,9 @@ export default function StoreScreen() {
           )}
         </ScrollView>
       </View>
+
+      {/* Modals */}
+      {renderAddModal()}
 
       {/* Custom Dialog */}
       {dialog && (
