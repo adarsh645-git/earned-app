@@ -48,6 +48,8 @@ export const getMilestoneDollars = (targetMinutes: number, milestone: number): n
 interface MacroGoalState {
   macroGoals: MacroGoal[];
   addMacroGoal: (goal: Omit<MacroGoal, 'id' | 'completedMinutes' | 'completedMetric' | 'unlockedMilestones'>) => void;
+  updateMacroGoal: (id: string, updates: Partial<MacroGoal>) => void;
+  deleteMacroGoal: (id: string) => void;
   addProgress: (id: string, amount: number) => UnlockedMilestoneInfo[];
 }
 
@@ -65,6 +67,12 @@ export const useMacroGoalStore = create<MacroGoalState>()(
           metricType: goal.metricType || 'minutes',
           unlockedMilestones: [],
         }]
+      })),
+      updateMacroGoal: (id, updates) => set((state) => ({
+        macroGoals: state.macroGoals.map(g => g.id === id ? { ...g, ...updates } : g)
+      })),
+      deleteMacroGoal: (id) => set((state) => ({
+        macroGoals: state.macroGoals.filter(g => g.id !== id)
       })),
       addProgress: (id, amount) => {
         // Block progress updates if currently in default

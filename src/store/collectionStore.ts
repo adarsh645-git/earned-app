@@ -7,6 +7,16 @@ import { v4 as uuidv4 } from 'uuid';
 
 export type CollectionCategory = 'books' | 'games' | 'stocks' | 'fitness' | 'courses' | 'travel' | 'other';
 
+export type JourneySubGoal = {
+  id: string;
+  collectionId: string;
+  title: string; // e.g. "Fiction", "Economics", "Hikes", "Running"
+  targetMetric?: number;
+  year?: number;
+  month?: number; // 1-12
+  dateCreated: string;
+};
+
 export type Collection = {
   id: string;
   title: string;
@@ -18,6 +28,7 @@ export type Collection = {
 export type CollectionItem = {
   id: string;
   collectionId: string;
+  subGoalId?: string;
   title: string;
   estimatedMinutes?: number;
   completed: boolean;
@@ -27,10 +38,14 @@ export type CollectionItem = {
 
 interface CollectionState {
   collections: Collection[];
+  subGoals: JourneySubGoal[];
   items: CollectionItem[];
   addCollection: (collection: Omit<Collection, 'id' | 'dateCreated'>) => string;
   updateCollection: (id: string, updates: Partial<Collection>) => void;
   deleteCollection: (id: string) => void;
+  addSubGoal: (subGoal: Omit<JourneySubGoal, 'id' | 'dateCreated'>) => string;
+  updateSubGoal: (id: string, updates: Partial<JourneySubGoal>) => void;
+  deleteSubGoal: (id: string) => void;
   addItem: (item: Omit<CollectionItem, 'id' | 'completed' | 'dateCreated'>) => string;
   updateItem: (id: string, updates: Partial<CollectionItem>) => void;
   toggleItemCompletion: (id: string) => void;
@@ -41,6 +56,7 @@ export const useCollectionStore = create<CollectionState>()(
   persist(
     (set, get) => ({
       collections: [],
+      subGoals: [],
       items: [],
 
       addCollection: (collectionData) => {
@@ -63,7 +79,32 @@ export const useCollectionStore = create<CollectionState>()(
       deleteCollection: (id) => {
         set((state) => ({
           collections: state.collections.filter((c) => c.id !== id),
+          subGoals: (state.subGoals || []).filter((s) => s.collectionId !== id),
           items: state.items.filter((i) => i.collectionId !== id),
+        }));
+      },
+
+      addSubGoal: (subGoalData) => {
+        const id = uuidv4();
+        set((state) => ({
+          subGoals: [
+            ...(state.subGoals || []),
+            { ...subGoalData, id, dateCreated: new Date().toISOString() },
+          ],
+        }));
+        return id;
+      },
+
+      updateSubGoal: (id, updates) => {
+        set((state) => ({
+          subGoals: (state.subGoals || []).map((s) => (s.id === id ? { ...s, ...updates } : s)),
+        }));
+      },
+
+      deleteSubGoal: (id) => {
+        set((state) => ({
+          subGoals: (state.subGoals || []).filter((s) => s.id !== id),
+          items: state.items.map((i) => (i.subGoalId === id ? { ...i, subGoalId: undefined } : i)),
         }));
       },
 

@@ -165,6 +165,25 @@ export async function pullCloudData(userId: string) {
         dateCreated: c.date_created,
       }));
       useCollectionStore.setState((s) => ({ ...s, collections: formattedCollections }));
+
+      // Fetch Journey Sub Goals
+      const { data: subGoals } = await supabase
+        .from('journey_sub_goals')
+        .select('*')
+        .in('collection_id', collections.map(c => c.id));
+
+      if (subGoals && subGoals.length > 0) {
+        const formattedSubGoals = subGoals.map((s: any) => ({
+          id: s.id,
+          collectionId: s.collection_id,
+          title: s.title,
+          targetMetric: s.target_metric,
+          year: s.year,
+          month: s.month,
+          dateCreated: s.date_created,
+        }));
+        useCollectionStore.setState((s) => ({ ...s, subGoals: formattedSubGoals }));
+      }
     }
 
     // Fetch Collection Items
@@ -178,6 +197,7 @@ export async function pullCloudData(userId: string) {
         const formattedItems = items.map((i: any) => ({
           id: i.id,
           collectionId: i.collection_id,
+          subGoalId: i.sub_goal_id || undefined,
           title: i.title,
           estimatedMinutes: i.estimated_minutes,
           completed: i.completed,
@@ -266,7 +286,7 @@ export async function pushAllMacroGoalsToCloud(userId: string, goals: MacroGoal[
   }
 }
 
-export async function pushAllCollectionsToCloud(userId: string, collections: Collection[], items: CollectionItem[]) {
+export async function pushAllCollectionsToCloud(userId: string, collections: Collection[], items: CollectionItem[], subGoals?: any[]) {
   if (!isSupabaseConfigured()) return;
   try {
     if (collections.length > 0) {
@@ -281,10 +301,25 @@ export async function pushAllCollectionsToCloud(userId: string, collections: Col
       await supabase.from('collections').upsert(cPayload, { onConflict: 'id' });
     }
 
+    if (subGoals && subGoals.length > 0) {
+      const sPayload = subGoals.map((s) => ({
+        id: s.id,
+        collection_id: s.collectionId,
+        user_id: userId,
+        title: s.title,
+        target_metric: s.targetMetric || null,
+        year: s.year || null,
+        month: s.month || null,
+        date_created: s.dateCreated,
+      }));
+      await supabase.from('journey_sub_goals').upsert(sPayload, { onConflict: 'id' });
+    }
+
     if (items.length > 0) {
       const iPayload = items.map((i) => ({
         id: i.id,
         collection_id: i.collectionId,
+        sub_goal_id: i.subGoalId || null,
         title: i.title,
         estimated_minutes: i.estimatedMinutes || null,
         completed: i.completed,
