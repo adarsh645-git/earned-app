@@ -11,15 +11,23 @@ Transforms Journey creation and progress into an addictive, habit-forming feedba
 ## 2. Technical Architecture & Data Schema
 - **Confetti Engine (`src/store/confettiStore.ts`)**:
   - Integrate `triggerConfetti()` call on Journey creation, Sub-Goal creation, and 100% item/goal completion.
-- **UI Components & Gamification Utilities**:
+- **UI Components & Multi-Set Vector Icon Systems**:
   - `JourneyCelebrationModal`: Popup modal with animated badge, projected bounty calculation, and "Launch Quest" celebration.
-  - `CompletionPayoutBanner`: Animated payout alert when completing sub-goals or milestones.
-  - Category icon mapping: `books` -> 📚, `games` -> 🎮, `fitness` -> 🏋️, `stocks` -> 📈, `courses` -> 🎓, `travel` -> ✈️, `other` -> ⭐️.
+  - Multi-set vector icon rendering using `@expo/vector-icons` (`Ionicons`, `FontAwesome5`, `MaterialCommunityIcons`).
+  - Category icon mapping:
+    - `books`: `<FontAwesome5 name="book-open" />`
+    - `games`: `<Ionicons name="game-controller" />`
+    - `fitness`: `<FontAwesome5 name="dumbbell" />`
+    - `stocks`: `<Ionicons name="trending-up" />`
+    - `courses`: `<FontAwesome5 name="graduation-cap" />`
+    - `travel`: `<Ionicons name="airplane" />`
+    - `other`: `<Ionicons name="star" />`
 
 ## 3. Implementation Checklist
 - [x] Create `JourneyCelebrationModal` component for creation dopamine feedback
-- [x] Add category emoji icons and RPG Quest Log badges to `CollectionsScreen.tsx`
+- [x] Replace emojis with custom multi-set `@expo/vector-icons` (`Ionicons`, `FontAwesome5`, `MaterialCommunityIcons`) in duotone badge containers
 - [x] Trigger `confettiStore` explosion upon Journey & Sub-Goal creation
 - [x] Implement completion payout banner / haptic glow when completing 100% sub-goals
 - [x] Verify typechecking with `npx tsc --noEmit`
+
 

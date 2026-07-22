@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, Pressable, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useCollectionStore, CollectionCategory, JourneySubGoal } from '../store/collectionStore';
 import { useMacroGoalStore } from '../store/macroGoalStore';
 import { useConfettiStore } from '../store/confettiStore';
@@ -11,25 +13,53 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-const CATEGORY_ICONS: Record<CollectionCategory, string> = {
-  books: '📚',
-  games: '🎮',
-  fitness: '🏋️',
-  stocks: '📈',
-  courses: '🎓',
-  travel: '✈️',
-  other: '⭐️',
-};
-
 type TimeframeFilter = 'all' | 'year' | 'month';
 
 type CelebrationInfo = {
   title: string;
   subtitle: string;
-  categoryIcon: string;
   payoutText: string;
   badgeLabel: string;
-} | null;
+  iconType: 'rocket' | 'award' | 'crown' | 'target' | 'category';
+  category?: CollectionCategory;
+};
+
+function CategoryVectorIcon({ category, size = 20, color = '#AF52DE' }: { category: CollectionCategory; size?: number; color?: string }) {
+  switch (category) {
+    case 'books':
+      return <FontAwesome5 name="book-open" size={size} color={color} />;
+    case 'games':
+      return <Ionicons name="game-controller" size={size + 2} color={color} />;
+    case 'fitness':
+      return <FontAwesome5 name="dumbbell" size={size - 2} color={color} />;
+    case 'stocks':
+      return <Ionicons name="trending-up" size={size + 2} color={color} />;
+    case 'courses':
+      return <FontAwesome5 name="graduation-cap" size={size - 2} color={color} />;
+    case 'travel':
+      return <Ionicons name="airplane" size={size + 2} color={color} />;
+    case 'other':
+    default:
+      return <Ionicons name="star" size={size} color={color} />;
+  }
+}
+
+function CelebrationVectorIcon({ type, category }: { type: CelebrationInfo['iconType']; category?: CollectionCategory }) {
+  if (type === 'category' && category) {
+    return <CategoryVectorIcon category={category} size={48} color="#AF52DE" />;
+  }
+  switch (type) {
+    case 'rocket':
+      return <Ionicons name="rocket-sharp" size={48} color="#AF52DE" />;
+    case 'award':
+      return <FontAwesome5 name="award" size={48} color="#FFD700" />;
+    case 'crown':
+      return <FontAwesome5 name="crown" size={48} color="#FFD700" />;
+    case 'target':
+    default:
+      return <FontAwesome5 name="crosshairs" size={44} color="#5AC8FA" />;
+  }
+}
 
 export default function CollectionsScreen() {
   const {
@@ -56,7 +86,7 @@ export default function CollectionsScreen() {
   const currentMonth = new Date().getMonth() + 1; // 1-12
 
   // Celebration Dopamine Modal
-  const [celebrationInfo, setCelebrationInfo] = useState<CelebrationInfo>(null);
+  const [celebrationInfo, setCelebrationInfo] = useState<CelebrationInfo | null>(null);
 
   // Create/Edit Journey Modal
   const [isJourneyModalOpen, setIsJourneyModalOpen] = useState(false);
@@ -125,9 +155,10 @@ export default function CollectionsScreen() {
       // Trigger Celebration Dopamine Feedback
       triggerConfetti();
       setCelebrationInfo({
-        title: '🚀 QUEST LAUNCHED!',
-        subtitle: `Journey "${journeyTitle.trim()}" is now active in your Discipline Economy.`,
-        categoryIcon: CATEGORY_ICONS[journeyCategory] || '🎯',
+        title: 'QUEST LAUNCHED!',
+        subtitle: `Journey "${journeyTitle.trim()}" is live in your Discipline Economy.`,
+        iconType: 'rocket',
+        category: journeyCategory,
         payoutText: '🎁 Estimated Rewards: Milestone keys & cash bonus multipliers upon completion!',
         badgeLabel: 'MAIN QUEST UNLOCKED',
       });
@@ -192,9 +223,9 @@ export default function CollectionsScreen() {
       // Trigger Celebration Dopamine Feedback for Sub-Goal creation
       triggerConfetti();
       setCelebrationInfo({
-        title: '🎯 SUB-QUEST CREATED!',
+        title: 'SUB-QUEST CREATED!',
         subtitle: `Bucket "${subGoalTitle.trim()}" added to your journey timeframe targets.`,
-        categoryIcon: '⚔️',
+        iconType: 'target',
         payoutText: `🎯 Target: ${isNaN(targetVal) ? 'Custom' : targetVal} units | Timeframe: ${subGoalMonth ? MONTH_NAMES[parseInt(subGoalMonth, 10) - 1] : ''} ${subGoalYear || 'Ongoing'}`,
         badgeLabel: 'SUB-QUEST INITIALIZED',
       });
@@ -244,9 +275,9 @@ export default function CollectionsScreen() {
         if (sgCompletedCount >= targetVal && targetVal > 0) {
           triggerConfetti();
           setCelebrationInfo({
-            title: '🏆 SUB-GOAL CONQUERED!',
+            title: 'SUB-GOAL CONQUERED!',
             subtitle: `You completed 100% of "${sg?.title || 'Sub-Goal'}"!`,
-            categoryIcon: '🌟',
+            iconType: 'award',
             payoutText: '💰 Milestone Payout Credited! Progress synced to Macro Goal.',
             badgeLabel: 'SUB-GOAL COMPLETE 100%',
           });
@@ -260,9 +291,9 @@ export default function CollectionsScreen() {
       if (colCompletedCount >= colItems.length && colItems.length > 0) {
         triggerConfetti();
         setCelebrationInfo({
-          title: '👑 JOURNEY MASTERED!',
+          title: 'JOURNEY MASTERED!',
           subtitle: `Congratulations! You conquered all tasks in this Journey!`,
-          categoryIcon: '👑',
+          iconType: 'crown',
           payoutText: '🔥 Discipline Booster unlocked! +1 Completed Journey logged.',
           badgeLabel: 'JOURNEY COMPLETED 🏆',
         });
@@ -283,8 +314,9 @@ export default function CollectionsScreen() {
       {/* Header Bar */}
       <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={{ fontSize: 32, fontWeight: '800', color: '#FFFFFF', marginRight: 8 }}>Journeys</Text>
-          <View style={{ backgroundColor: '#AF52DE22', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#AF52DE55' }}>
+          <Text style={{ fontSize: 32, fontWeight: '800', color: '#FFFFFF', marginRight: 10 }}>Journeys</Text>
+          <View style={{ backgroundColor: '#AF52DE22', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#AF52DE55', flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="map-outline" size={12} color="#AF52DE" style={{ marginRight: 4 }} />
             <Text style={{ color: '#AF52DE', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 }}>QUEST LOG</Text>
           </View>
         </View>
@@ -338,7 +370,9 @@ export default function CollectionsScreen() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
         {collections.length === 0 ? (
           <View style={{ alignItems: 'center', marginTop: 40, backgroundColor: '#1C1C1E', borderRadius: 20, padding: 32, borderWidth: 1, borderColor: '#2C2C2E' }}>
-            <Text style={{ fontSize: 48, marginBottom: 12 }}>🗺️</Text>
+            <View style={{ backgroundColor: '#AF52DE22', width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+              <FontAwesome5 name="compass" size={32} color="#AF52DE" />
+            </View>
             <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '700', textAlign: 'center' }}>No Active Journeys</Text>
             <Text style={{ color: '#8E8E93', marginTop: 8, fontSize: 14, textAlign: 'center', lineHeight: 20 }}>
               Launch your first RPG-style Journey to track reading targets, fitness quests, and multi-month discipline milestones!
@@ -354,7 +388,6 @@ export default function CollectionsScreen() {
             const completedCount = collectionItems.filter(i => i.completed).length;
             const progress = collectionItems.length > 0 ? Math.round((completedCount / collectionItems.length) * 100) : 0;
             const linkedMacro = macroGoals.find(g => g.id === collection.macroGoalId);
-            const catIcon = CATEGORY_ICONS[collection.category] || '⭐️';
             const isFullyComplete = progress === 100 && collectionItems.length > 0;
 
             return (
@@ -363,18 +396,21 @@ export default function CollectionsScreen() {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <View style={{ flex: 1, marginRight: 8 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 22, marginRight: 8 }}>{catIcon}</Text>
+                      <View style={{ backgroundColor: '#2C2C2E', width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 10, borderWidth: 1, borderColor: '#3A3A3C' }}>
+                        <CategoryVectorIcon category={collection.category} size={18} color="#AF52DE" />
+                      </View>
                       <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '800' }}>{collection.title}</Text>
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
                       <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginRight: 6 }}>
                         <Text style={{ color: '#AF52DE', fontSize: 11, textTransform: 'uppercase', fontWeight: '700' }}>
                           {collection.category}
                         </Text>
                       </View>
                       {linkedMacro && (
-                        <View style={{ backgroundColor: '#5AC8FA15', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#5AC8FA44' }}>
-                          <Text style={{ color: '#5AC8FA', fontSize: 11, fontWeight: '700' }}>🎯 {linkedMacro.title}</Text>
+                        <View style={{ backgroundColor: '#5AC8FA15', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#5AC8FA44', flexDirection: 'row', alignItems: 'center' }}>
+                          <FontAwesome5 name="bullseye" size={10} color="#5AC8FA" style={{ marginRight: 4 }} />
+                          <Text style={{ color: '#5AC8FA', fontSize: 11, fontWeight: '700' }}>{linkedMacro.title}</Text>
                         </View>
                       )}
                     </View>
@@ -394,9 +430,12 @@ export default function CollectionsScreen() {
                 <View style={{ backgroundColor: '#252528', padding: 12, borderRadius: 14, marginBottom: 16, borderWidth: 1, borderColor: '#3A3A3C' }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>QUEST PROGRESS</Text>
-                    <Text style={{ color: isFullyComplete ? '#30D158' : '#AF52DE', fontSize: 14, fontWeight: '800' }}>
-                      {completedCount}/{collectionItems.length} ({progress}%) {isFullyComplete ? '🏆' : ''}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      {isFullyComplete && <FontAwesome5 name="crown" size={12} color="#FFD700" style={{ marginRight: 4 }} />}
+                      <Text style={{ color: isFullyComplete ? '#30D158' : '#AF52DE', fontSize: 14, fontWeight: '800' }}>
+                        {completedCount}/{collectionItems.length} ({progress}%)
+                      </Text>
+                    </View>
                   </View>
                   <View style={{ height: 6, backgroundColor: '#1C1C1E', borderRadius: 3 }}>
                     <View style={{ height: 6, width: `${progress}%`, backgroundColor: isFullyComplete ? '#30D158' : '#AF52DE', borderRadius: 3 }} />
@@ -420,7 +459,11 @@ export default function CollectionsScreen() {
                     <View key={sg.id} style={{ backgroundColor: '#252528', borderRadius: 14, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: isSgComplete ? '#30D15866' : '#3A3A3C' }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                          <Text style={{ fontSize: 14, marginRight: 6 }}>{isSgComplete ? '🌟' : '⚔️'}</Text>
+                          {isSgComplete ? (
+                            <Ionicons name="trophy" size={15} color="#FFD700" style={{ marginRight: 6 }} />
+                          ) : (
+                            <FontAwesome5 name="crosshairs" size={13} color="#5AC8FA" style={{ marginRight: 6 }} />
+                          )}
                           <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '700' }}>{sg.title}</Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -439,7 +482,7 @@ export default function CollectionsScreen() {
                         <View style={{ height: 5, width: `${sgPct}%`, backgroundColor: isSgComplete ? '#30D158' : '#AF52DE', borderRadius: 3 }} />
                       </View>
                       <Text style={{ color: '#8E8E93', fontSize: 11, textAlign: 'right', fontWeight: '600' }}>
-                        {sgCompleted}/{sg.targetMetric ? sg.targetMetric : sgItems.length} completed ({sgPct}%) {isSgComplete ? '🎯' : ''}
+                        {sgCompleted}/{sg.targetMetric ? sg.targetMetric : sgItems.length} completed ({sgPct}%)
                       </Text>
                     </View>
                   );
@@ -507,7 +550,9 @@ export default function CollectionsScreen() {
       <Modal visible={!!celebrationInfo} animationType="fade" transparent={true}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 24 }}>
           <View style={{ backgroundColor: '#1C1C1E', borderRadius: 24, padding: 28, alignItems: 'center', borderWidth: 2, borderColor: '#AF52DE' }}>
-            <Text style={{ fontSize: 56, marginBottom: 12 }}>{celebrationInfo?.categoryIcon}</Text>
+            <View style={{ backgroundColor: '#AF52DE22', width: 88, height: 88, borderRadius: 44, justifyContent: 'center', alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#AF52DE55' }}>
+              {celebrationInfo && <CelebrationVectorIcon type={celebrationInfo.iconType} category={celebrationInfo.category} />}
+            </View>
             <View style={{ backgroundColor: '#AF52DE22', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#AF52DE' }}>
               <Text style={{ color: '#AF52DE', fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>
                 {celebrationInfo?.badgeLabel}
@@ -564,14 +609,16 @@ export default function CollectionsScreen() {
                   style={{ 
                     backgroundColor: journeyCategory === c ? '#AF52DE' : '#2C2C2E',
                     paddingHorizontal: 16,
-                    paddingVertical: 8,
+                    paddingVertical: 10,
                     borderRadius: 20,
                     marginRight: 8,
                     flexDirection: 'row',
                     alignItems: 'center',
                   }}
                 >
-                  <Text style={{ marginRight: 6 }}>{CATEGORY_ICONS[c]}</Text>
+                  <View style={{ marginRight: 8 }}>
+                    <CategoryVectorIcon category={c} size={16} color="#FFF" />
+                  </View>
                   <Text style={{ color: '#FFF', fontWeight: '600', textTransform: 'capitalize' }}>{c}</Text>
                 </Pressable>
               ))}
