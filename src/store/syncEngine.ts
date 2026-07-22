@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAuthStore } from './authStore';
 import { useEconomyStore } from './economyStore';
-import { useTaskStore, Task } from './taskStore';
+import { useTaskStore, Task, Pillar, Tag } from './taskStore';
 import { useRewardStore, Reward } from './rewardStore';
 import { useMacroGoalStore, MacroGoal } from './macroGoalStore';
 import { useCollectionStore, Collection, CollectionItem } from './collectionStore';
@@ -28,6 +28,8 @@ export function useCloudSync() {
 
     const unsubTasks = useTaskStore.subscribe((state) => {
       pushAllTasksToCloud(user.id, state.tasks);
+      pushAllPillarsToCloud(user.id, state.pillars);
+      pushAllTagsToCloud(user.id, state.tags);
     });
 
     const unsubRewards = useRewardStore.subscribe((state) => {
@@ -110,7 +112,37 @@ export async function pullCloudData(userId: string) {
         isIcebox: t.is_icebox,
         dateCreated: t.date_created,
       }));
-      useTaskStore.setState({ tasks: formattedTasks });
+      useTaskStore.setState((s) => ({ ...s, tasks: formattedTasks }));
+    }
+
+    // Fetch Pillars
+    const { data: pillars } = await supabase
+      .from('pillars')
+      .select('*')
+      .eq('user_id', userId);
+
+    // Fetch Tags
+    const { data: tags } = await supabase
+      .from('tags')
+      .select('*')
+      .eq('user_id', userId);
+
+    if ((pillars && pillars.length > 0) || (tags && tags.length > 0)) {
+      useTaskStore.setState((s) => ({
+        ...s,
+        pillars: pillars && pillars.length > 0 ? pillars.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          isArchived: p.is_archived
+        })) : s.pillars,
+        tags: tags && tags.length > 0 ? tags.map((t: any) => ({
+          id: t.id,
+          pillarId: t.pillar_id,
+          name: t.name,
+          type: t.type,
+          isArchived: t.is_archived
+        })) : s.tags
+      }));
     }
 
     // Fetch Rewards
@@ -247,6 +279,38 @@ export async function pushAllTasksToCloud(userId: string, tasks: Task[]) {
     await supabase.from('tasks').upsert(payload, { onConflict: 'id' });
   } catch (err) {
     console.log('Error pushing tasks to cloud:', err);
+  }
+}
+
+export async function pushAllPillarsToCloud(userId: string, pillars: Pillar[]) {
+  if (!isSupabaseConfigured() || pillars.length === 0) return;
+  try {
+    const payload = pillars.map((p) => ({
+      id: p.id,
+      user_id: userId,
+      name: p.name,
+      is_archived: p.isArchived || false,
+    }));
+    await supabase.from('pillars').upsert(payload, { onConflict: 'id' });
+  } catch (err) {
+    console.log('Error pushing pillars to cloud:', err);
+  }
+}
+
+export async function pushAllTagsToCloud(userId: string, tags: Tag[]) {
+  if (!isSupabaseConfigured() || tags.length === 0) return;
+  try {
+    const payload = tags.map((t) => ({
+      id: t.id,
+      user_id: userId,
+      pillar_id: t.pillarId,
+      name: t.name,
+      type: t.type,
+      is_archived: t.isArchived || false,
+    }));
+    await supabase.from('tags').upsert(payload, { onConflict: 'id' });
+  } catch (err) {
+    console.log('Error pushing tags to cloud:', err);
   }
 }
 
