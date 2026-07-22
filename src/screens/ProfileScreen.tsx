@@ -247,7 +247,7 @@ export default function ProfileScreen() {
         {/* Cloud Sync & Account Status Card */}
         <View className="mb-6">
           <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3">
-            Cloud Sync & Account
+            Account Status
           </Text>
           <Pressable
             onPress={openModal}
@@ -269,17 +269,17 @@ export default function ProfileScreen() {
                 className="items-center justify-center mr-3"
               >
                 <Ionicons
-                  name={user ? 'cloud-done' : 'cloud-upload-outline'}
-                  size={22}
+                  name={user ? 'person-circle' : 'log-in-outline'}
+                  size={24}
                   color={user ? '#30D158' : '#BF5AF2'}
                 />
               </View>
               <View className="flex-1">
                 <Text className="text-white font-bold text-sm">
-                  {user ? 'Cloud Sync Active' : 'Enable Multi-Device Cloud Sync'}
+                  {user ? user.user_metadata?.name || user.user_metadata?.full_name || 'Logged In' : 'Login'}
                 </Text>
                 <Text className="text-[#8E8E93] text-xs font-medium mt-0.5" numberOfLines={1}>
-                  {user ? user.email : 'Tap to sign in with Google & sync all devices'}
+                  {user ? user.email : 'Tap to sign in with Google'}
                 </Text>
               </View>
             </View>

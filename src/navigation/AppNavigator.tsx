@@ -71,16 +71,16 @@ function DesktopSidebar({ currentTab, onSelectTab }: SidebarProps) {
       {/* Cloud Devices Sync Pill Button */}
       <Pressable onPress={openModal} style={styles.cloudSyncPill}>
         <Ionicons
-          name={user ? 'cloud-done' : 'cloud-upload-outline'}
-          size={16}
+          name={user ? 'person-circle' : 'log-in-outline'}
+          size={20}
           color={user ? '#30D158' : '#BF5AF2'}
         />
         <View style={{ marginLeft: 8, flex: 1 }}>
           <Text style={styles.cloudSyncTitle}>
-            {user ? 'Cloud Synced' : 'Sync Devices'}
+            {user ? user.user_metadata?.name || user.user_metadata?.full_name || 'Logged In' : 'Login'}
           </Text>
           <Text style={styles.cloudSyncSub} numberOfLines={1}>
-            {user ? user.email : 'Sign in to link devices'}
+            {user ? user.email : 'Sign in to sync your progress'}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={14} color="#8E8E93" />
@@ -163,24 +163,9 @@ export default function AppNavigator() {
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [navRef, setNavRef] = useState<any>(null);
 
+  // Removed automatic daily check-in popup
   useEffect(() => {
-    const runCheckIn = () => {
-      const result = useEconomyStore.getState().checkInDaily();
-      if (result.rewarded) {
-        setCheckInResult(result);
-        hapticSuccess();
-        useConfettiStore.getState().triggerConfetti();
-      }
-    };
-
-    if (useEconomyStore.persist.hasHydrated()) {
-      runCheckIn();
-    } else {
-      const unsub = useEconomyStore.persist.onFinishHydration(() => {
-        runCheckIn();
-      });
-      return () => unsub();
-    }
+    // Just handling hydration if needed elsewhere, but auto check-in is removed
   }, []);
 
   const handleSelectTab = (tabName: string) => {
@@ -190,8 +175,21 @@ export default function AppNavigator() {
     }
   };
 
+  const linking = {
+    prefixes: [],
+    config: {
+      screens: {
+        Dashboard: '',
+        Tasks: 'tasks',
+        Collections: 'collections',
+        Store: 'store',
+        Profile: 'profile',
+      },
+    },
+  };
+
   return (
-    <NavigationContainer ref={(ref) => setNavRef(ref)}>
+    <NavigationContainer linking={linking} ref={(ref) => setNavRef(ref)}>
       <View style={[styles.appWrapper, isDesktop && styles.appWrapperDesktop]}>
         {/* Desktop Sidebar (Only rendered on desktop) */}
         {isDesktop && (

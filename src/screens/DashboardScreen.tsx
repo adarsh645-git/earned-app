@@ -7,10 +7,11 @@ import { useEconomyStore } from '../store/economyStore';
 import { useTaskStore, Bucket, Task } from '../store/taskStore';
 import { useMacroGoalStore } from '../store/macroGoalStore';
 import { useTimerStore } from '../store/timerStore';
-import { hapticSelection } from '../utils/haptics';
+import { hapticSelection, hapticSuccess } from '../utils/haptics';
 import ConfirmModal from '../components/ConfirmModal';
 import AnimatedTaskRow from '../components/AnimatedTaskRow';
 import AnimatedMacroGoalCard from '../components/AnimatedMacroGoalCard';
+import { useConfettiStore } from '../store/confettiStore';
 
 // ─── Animated Task Row & Macro Goal Card imported from components ─────────────
 
@@ -131,12 +132,33 @@ export default function DashboardScreen() {
               </View>
               
               {/* Check-in Badge */}
-              <View style={{ backgroundColor: isCheckedInToday ? 'rgba(48,209,88,0.15)' : '#2C2C2E', borderColor: isCheckedInToday ? 'rgba(48,209,88,0.4)' : 'rgba(255,255,255,0.05)', borderWidth: 1 }} className="flex-row items-center px-2.5 py-1.5 rounded-full">
+              <Pressable 
+                onPress={() => {
+                  if (!isCheckedInToday) {
+                    const result = useEconomyStore.getState().checkInDaily();
+                    if (result.rewarded) {
+                      useConfettiStore.getState().triggerConfetti();
+                      hapticSuccess();
+                    }
+                  }
+                }}
+                style={({ pressed }) => ({ 
+                  backgroundColor: isCheckedInToday ? 'rgba(48,209,88,0.15)' : '#2C2C2E', 
+                  borderColor: isCheckedInToday ? 'rgba(48,209,88,0.4)' : 'rgba(255,255,255,0.05)', 
+                  borderWidth: 1,
+                  opacity: pressed ? 0.7 : 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: 9999
+                })} 
+              >
                 <Ionicons name={isCheckedInToday ? "checkmark-circle" : "ellipse-outline"} size={11} color={isCheckedInToday ? '#30D158' : '#8E8E93'} />
                 <Text style={{ color: isCheckedInToday ? '#30D158' : '#8E8E93' }} className="text-[10px] font-bold ml-1">
-                  {isCheckedInToday ? 'Claimed' : 'Unclaimed'}
+                  {isCheckedInToday ? 'Claimed' : 'Claim'}
                 </Text>
-              </View>
+              </Pressable>
             </View>
           </View>
         </View>
