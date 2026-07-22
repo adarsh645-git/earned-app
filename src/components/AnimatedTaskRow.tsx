@@ -196,7 +196,7 @@ export default function AnimatedTaskRow({
                 className="px-3 justify-center items-center bg-transparent hover:bg-[#2C2C2E]"
                 style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
               >
-                <Ionicons name="play" size={16} color="#BF5AF2" />
+                <Ionicons name="play" size={20} color="#BF5AF2" />
               </Pressable>
               {onEdit && <View className="self-center" style={{ width: 1, height: 16, backgroundColor: '#3A3A3C' }} />}
             </>
@@ -209,7 +209,7 @@ export default function AnimatedTaskRow({
                 className="px-3 justify-center items-center bg-transparent hover:bg-[#2C2C2E]"
                 style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
               >
-                <Ionicons name="pencil" size={16} color="#8E8E93" />
+                <Ionicons name="pencil" size={20} color="#8E8E93" />
               </Pressable>
               {showIceboxButton && onMoveToIcebox && <View className="self-center" style={{ width: 1, height: 16, backgroundColor: '#3A3A3C' }} />}
             </>
@@ -222,7 +222,7 @@ export default function AnimatedTaskRow({
                 className="px-3 justify-center items-center bg-transparent hover:bg-[#2C2C2E]"
                 style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
               >
-                <Ionicons name="snow-outline" size={16} color="#8E8E93" />
+                <Ionicons name="snow-outline" size={20} color="#8E8E93" />
               </Pressable>
               {onDelete && <View className="self-center" style={{ width: 1, height: 16, backgroundColor: '#3A3A3C' }} />}
             </>
@@ -234,7 +234,7 @@ export default function AnimatedTaskRow({
               className="px-3 justify-center items-center bg-transparent hover:bg-[rgba(255,69,58,0.1)]"
               style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
             >
-              <Ionicons name="trash-outline" size={16} color="#FF453A" />
+              <Ionicons name="trash-outline" size={20} color="#FF453A" />
             </Pressable>
           )}
         </View>
