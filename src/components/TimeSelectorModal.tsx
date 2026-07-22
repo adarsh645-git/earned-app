@@ -57,7 +57,7 @@ export default function TimeSelectorModal({
     label: string
   ) => {
     return (
-      <View style={{ flex: 1, height: 200, backgroundColor: '#18181B', borderRadius: 12, overflow: 'hidden' }}>
+      <View style={{ flex: 1, height: 160, overflow: 'hidden' }}>
         <Text style={{ textAlign: 'center', color: '#A1A1AA', fontSize: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#27272A' }}>
           {label}
         </Text>
@@ -102,19 +102,25 @@ export default function TimeSelectorModal({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.8)' }}
       >
-        <View style={{ margin: 24, backgroundColor: '#09090B', borderRadius: 24, padding: 24, borderWidth: 1, borderColor: '#27272A' }}>
+        <View style={{ width: '100%', maxWidth: 320, alignSelf: 'center', backgroundColor: '#09090B', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#27272A' }}>
           {/* Header */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-            <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '700' }}>{title}</Text>
-            <Pressable onPress={onClose} style={{ padding: 4 }}>
-              <Ionicons name="close" size={24} color="#A1A1AA" />
-            </Pressable>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '600' }}>{title}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Pressable onPress={() => setMode(m => m === 'carousel' ? 'manual' : 'carousel')} style={{ padding: 4 }}>
+                <Ionicons name={mode === 'carousel' ? 'keypad-outline' : 'list-outline'} size={20} color="#A1A1AA" />
+              </Pressable>
+              <Pressable onPress={onClose} style={{ padding: 4 }}>
+                <Ionicons name="close" size={24} color="#A1A1AA" />
+              </Pressable>
+            </View>
           </View>
 
           {/* Body */}
           {mode === 'carousel' ? (
-            <View style={{ flexDirection: 'row', gap: 16 }}>
+            <View style={{ flexDirection: 'row', backgroundColor: '#18181B', borderRadius: 12, borderWidth: 1, borderColor: '#27272A' }}>
               {renderCarouselWheel(Array.from({length: 25}, (_, i) => i), hours, setHours, 'Hours')}
+              <View style={{ width: 1, backgroundColor: '#27272A' }} />
               {renderCarouselWheel(Array.from({length: 60}, (_, i) => i), minutes, setMinutes, 'Minutes')}
             </View>
           ) : (
@@ -162,17 +168,8 @@ export default function TimeSelectorModal({
             </View>
           )}
 
-          {/* Mode Toggle & Confirm */}
-          <View style={{ marginTop: 24, gap: 12 }}>
-            <Pressable 
-              onPress={() => setMode(m => m === 'carousel' ? 'manual' : 'carousel')}
-              style={{ paddingVertical: 12, alignItems: 'center' }}
-            >
-              <Text style={{ color: '#0A84FF', fontSize: 14, fontWeight: '600' }}>
-                {mode === 'carousel' ? '⌨️ Type Manually' : '🔄 Use Wheel Selector'}
-              </Text>
-            </Pressable>
-            
+          {/* Confirm Button */}
+          <View style={{ marginTop: 20 }}>
             <PrimaryButton title="Confirm" onPress={handleConfirm} />
           </View>
         </View>
