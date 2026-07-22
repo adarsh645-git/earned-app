@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable } from 'react-native';
+import { View, Text, ScrollView, TextInput, Pressable, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEconomyStore } from '../store/economyStore';
@@ -9,6 +9,7 @@ import { hapticSuccess, hapticError } from '../utils/haptics';
 import { useConfettiStore } from '../store/confettiStore';
 import ConfirmModal, { ConfirmAction } from '../components/ConfirmModal';
 import AnimatedMacroGoalCard from '../components/AnimatedMacroGoalCard';
+import { PrimaryButton } from '../components/PrimaryButton';
 
 type DialogConfig = {
   icon: string;
@@ -40,8 +41,8 @@ export default function StoreScreen() {
   // Tab state ('time' vs 'material')
   const [activeTab, setActiveTab] = useState<'time' | 'material'>('time');
 
-  // Form states
-  const [formMode, setFormMode] = useState<'none' | 'material' | 'entertainment'>('none');
+  // Modal states
+  const [showAddModal, setShowAddModal] = useState(false);
   const [title, setTitle] = useState('');
   const [costOrHours, setCostOrHours] = useState('');
   const [validationError, setValidationError] = useState('');
@@ -72,7 +73,7 @@ export default function StoreScreen() {
 
     setTitle('');
     setCostOrHours('');
-    setFormMode('none');
+    setShowAddModal(false);
   };
 
   const handleAddEntertainmentProject = () => {
@@ -98,7 +99,7 @@ export default function StoreScreen() {
 
     setTitle('');
     setCostOrHours('');
-    setFormMode('none');
+    setShowAddModal(false);
   };
 
   const handleRedeem = (reward: Reward) => {
@@ -214,65 +215,61 @@ export default function StoreScreen() {
     });
   };
 
-  // Add Item form screens
-  if (formMode !== 'none') {
-    const isMaterial = formMode === 'material';
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }}>
-        <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 40, maxWidth: 900, width: '100%', alignSelf: 'center' }}>
-
-          {/* Form Header */}
-          <View className="flex-row justify-between items-center mt-3 mb-6">
-            <Text className="text-white text-xl font-extrabold tracking-tight">
-              {isMaterial ? 'Add Material Reward' : 'Add Entertainment Project'}
+  // Render Add Item Modal (Shadcn style)
+  const renderAddModal = () => (
+    <Modal visible={showAddModal} transparent animationType="fade">
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <View style={{ width: '100%', maxWidth: 400, backgroundColor: '#09090B', borderWidth: 1, borderColor: '#27272A', borderRadius: 16, padding: 24 }}>
+          <View className="flex-row justify-between items-center mb-6">
+            <Text className="text-white text-xl font-bold">
+              {activeTab === 'material' ? 'Add Material Reward' : 'Add Entertainment Project'}
             </Text>
-            <Pressable onPress={() => setFormMode('none')} style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 }} className="p-2 rounded-full">
+            <Pressable onPress={() => setShowAddModal(false)} className="p-2 -mr-2 rounded-full">
               <Ionicons name="close" size={20} color="#8E8E93" />
             </Pressable>
           </View>
 
           {validationError ? (
-            <View style={{ backgroundColor: 'rgba(255,69,58,0.15)', borderColor: 'rgba(255,69,58,0.4)', borderWidth: 1 }} className="p-3.5 rounded-2xl mb-4">
-              <Text className="text-[#FF453A] text-xs font-semibold text-center">{validationError}</Text>
+            <View style={{ backgroundColor: 'rgba(255,69,58,0.1)', borderColor: 'rgba(255,69,58,0.3)', borderWidth: 1 }} className="p-3 rounded-lg mb-4">
+              <Text className="text-[#FF453A] text-xs font-medium text-center">{validationError}</Text>
             </View>
           ) : null}
 
-          <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Title</Text>
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            placeholder={isMaterial ? "e.g. Mechanical Keyboard, Headphones, Sneakers" : "e.g. Play Elden Ring, Watch Breaking Bad"}
-            placeholderTextColor="#8E8E93"
-            style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }}
-            className="text-white rounded-2xl p-4 mb-4 text-sm font-semibold"
-          />
+          <View className="mb-4">
+            <Text className="text-[#8E8E93] text-xs font-semibold mb-2">Title</Text>
+            <TextInput
+              value={title}
+              onChangeText={setTitle}
+              placeholder={activeTab === 'material' ? "e.g. Mechanical Keyboard" : "e.g. Play Elden Ring"}
+              placeholderTextColor="#52525B"
+              style={{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }}
+              className="text-white rounded-lg p-3 text-sm"
+            />
+          </View>
 
-          <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">
-            {isMaterial ? 'Cost ($ Dollars)' : 'Target Duration (Total Hours)'}
-          </Text>
-          <TextInput
-            value={costOrHours}
-            onChangeText={setCostOrHours}
-            placeholder={isMaterial ? "e.g. 150.00" : "e.g. 60"}
-            placeholderTextColor="#8E8E93"
-            keyboardType="numeric"
-            style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }}
-            className="text-white rounded-2xl p-4 mb-6 text-sm font-semibold"
-          />
-
-          <Pressable
-            onPress={isMaterial ? handleAddMaterialReward : handleAddEntertainmentProject}
-            style={{ backgroundColor: isMaterial ? '#30D158' : '#5AC8FA' }}
-            className="w-full py-4 rounded-2xl items-center justify-center"
-          >
-            <Text className="text-black font-extrabold text-base">
-              {isMaterial ? 'Add Material Item' : 'Create Entertainment Project'}
+          <View className="mb-6">
+            <Text className="text-[#8E8E93] text-xs font-semibold mb-2">
+              {activeTab === 'material' ? 'Cost ($)' : 'Target Duration (Hours)'}
             </Text>
-          </Pressable>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
+            <TextInput
+              value={costOrHours}
+              onChangeText={setCostOrHours}
+              placeholder={activeTab === 'material' ? "e.g. 150.00" : "e.g. 60"}
+              placeholderTextColor="#52525B"
+              keyboardType="numeric"
+              style={{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }}
+              className="text-white rounded-lg p-3 text-sm"
+            />
+          </View>
+
+          <PrimaryButton
+            onPress={activeTab === 'material' ? handleAddMaterialReward : handleAddEntertainmentProject}
+            title={activeTab === 'material' ? 'Add Item' : 'Create Project'}
+          />
+        </View>
+      </View>
+    </Modal>
+  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }}>
@@ -283,10 +280,10 @@ export default function StoreScreen() {
           <Text className="text-white text-3xl font-extrabold tracking-tight">Reward Store</Text>
           
           <Pressable
-            onPress={() => setFormMode(activeTab === 'time' ? 'entertainment' : 'material')}
+            onPress={() => setShowAddModal(true)}
             style={{
-              backgroundColor: activeTab === 'time' ? 'rgba(90,200,250,0.15)' : 'rgba(48,209,88,0.15)',
-              borderColor: activeTab === 'time' ? 'rgba(90,200,250,0.4)' : 'rgba(48,209,88,0.4)',
+              backgroundColor: activeTab === 'time' ? 'rgba(90,200,250,0.1)' : 'rgba(48,209,88,0.1)',
+              borderColor: activeTab === 'time' ? 'rgba(90,200,250,0.3)' : 'rgba(48,209,88,0.3)',
               borderWidth: 1,
             }}
             className="flex-row items-center px-4 py-2 rounded-full"
@@ -301,32 +298,28 @@ export default function StoreScreen() {
           </Pressable>
         </View>
 
-        {/* Apple Segmented Control Tab Picker */}
-        <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="flex-row p-1 rounded-xl my-3">
+        {/* Shadcn Tabs */}
+        <View style={{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }} className="flex-row p-1 rounded-xl mb-4 mt-2">
           {(['time', 'material'] as const).map((tab) => {
             const isActive = activeTab === tab;
-            const label = tab === 'time' ? 'Time Rewards' : 'Material Rewards';
-            const activeColor = tab === 'time' ? '#5AC8FA' : '#30D158';
-
+            const label = tab === 'time' ? 'Guilt-Free Media' : 'Material Rewards';
             return (
               <Pressable
                 key={tab}
                 onPress={() => setActiveTab(tab)}
                 style={{
                   flex: 1,
-                  paddingVertical: 8,
+                  paddingVertical: 10,
                   borderRadius: 8,
                   alignItems: 'center',
-                  backgroundColor: isActive ? '#2C2C2E' : 'transparent',
-                  borderWidth: isActive ? 1 : 0,
-                  borderColor: isActive ? 'rgba(255,255,255,0.15)' : 'transparent',
+                  backgroundColor: isActive ? '#27272A' : 'transparent',
                 }}
               >
                 <Text
                   style={{
-                    fontWeight: isActive ? '700' : '500',
-                    fontSize: 13,
-                    color: isActive ? activeColor : '#8E8E93',
+                    fontWeight: isActive ? '600' : '500',
+                    fontSize: 14,
+                    color: isActive ? '#FFFFFF' : '#A1A1AA',
                   }}
                 >
                   {label}
@@ -370,26 +363,69 @@ export default function StoreScreen() {
                 Active Entertainment Projects
               </Text>
 
-              {/* Active Entertainment Projects */}
-              {entertainmentGoals.length === 0 ? (
-                <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl p-8 items-center justify-center my-2 border-dashed">
-                  <Ionicons name="game-controller-outline" size={32} color="#8E8E93" />
-                  <Text className="text-white text-center font-semibold text-sm mt-3">No entertainment projects tracked</Text>
-                  <Text className="text-[#8E8E93] text-xs text-center mt-1">Add games or series to track completion and earn milestone dollars.</Text>
-                </View>
-              ) : (
-                <View className="my-1">
-                  {entertainmentGoals.map((goal) => (
-                    <AnimatedMacroGoalCard
-                      key={goal.id}
-                      goal={goal}
-                      accentColor="#5AC8FA"
-                      showIcon
-                      iconName="game-controller"
-                    />
-                  ))}
-                </View>
-              )}
+              {/* Active Entertainment Projects Grid */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 }}>
+                {entertainmentGoals.map((goal) => (
+                  <View
+                    key={goal.id}
+                    style={{
+                      flex: 1,
+                      minWidth: 160,
+                      backgroundColor: '#09090B',
+                      borderColor: '#27272A',
+                      borderWidth: 1,
+                      borderRadius: 12,
+                      padding: 16,
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <Text style={{ color: '#FAFAFA', fontWeight: '600', fontSize: 15, flex: 1 }} numberOfLines={2}>
+                          {goal.title}
+                        </Text>
+                      </View>
+                      <Text style={{ color: '#A1A1AA', fontSize: 11, marginTop: 4 }}>Time Reward</Text>
+                    </View>
+                    <View style={{ marginTop: 24, marginBottom: 16, alignItems: 'center' }}>
+                      <Text style={{ color: '#FFFFFF', fontSize: 28, fontWeight: '800' }}>
+                        {(goal.targetMinutes / 60).toFixed(1)}h
+                      </Text>
+                    </View>
+                    <Pressable
+                      style={({ pressed, hovered }: any) => ({
+                        backgroundColor: hovered ? '#47A3D1' : '#5AC8FA',
+                        paddingVertical: 10,
+                        borderRadius: 8,
+                        alignItems: 'center',
+                        opacity: pressed ? 0.9 : 1,
+                      })}
+                    >
+                      <Text style={{ color: '#000000', fontWeight: '700', fontSize: 14 }}>Indulge</Text>
+                    </Pressable>
+                  </View>
+                ))}
+
+                {/* Add New Project Card */}
+                <Pressable
+                  onPress={() => setShowAddModal(true)}
+                  style={({ hovered }: any) => ({
+                    flex: 1,
+                    minWidth: 160,
+                    backgroundColor: hovered ? '#18181B' : '#09090B',
+                    borderColor: '#27272A',
+                    borderWidth: 1,
+                    borderStyle: 'dashed',
+                    borderRadius: 12,
+                    padding: 24,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  })}
+                >
+                  <Ionicons name="add" size={28} color="#A1A1AA" />
+                  <Text style={{ color: '#A1A1AA', fontWeight: '500', fontSize: 13, marginTop: 8 }}>Add Project</Text>
+                </Pressable>
+              </View>
             </View>
           )}
 
@@ -424,90 +460,100 @@ export default function StoreScreen() {
                 Store Items & Indulgences
               </Text>
 
-              {/* Material Store Items List */}
-              {rewards.length === 0 ? (
-                <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl p-8 items-center justify-center my-2 border-dashed">
-                  <Ionicons name="gift-outline" size={32} color="#8E8E93" />
-                  <Text className="text-white text-center font-semibold text-sm mt-3">No material items in store</Text>
-                  <Text className="text-[#8E8E93] text-xs text-center mt-1">Add tech, gear, or physical rewards to buy with your earned dollars.</Text>
-                </View>
-              ) : (
-                <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl overflow-hidden mb-3">
-                  {rewards.map((reward, index) => {
-                    const canAffordCash = dollarBalance >= reward.cost;
-                    const currentScore = getCreditScore();
-                    const limit = getCreditLimit(currentScore);
-                    const remainingLimit = limit - debt;
-                    const deficit = reward.cost - dollarBalance;
-                    const canAffordCredit = !canAffordCash && deficit <= remainingLimit;
-                    const isLast = index === rewards.length - 1;
+              {/* Material Store Items Grid */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 }}>
+                {rewards.map((reward) => {
+                  const canAffordCash = dollarBalance >= reward.cost;
+                  const currentScore = getCreditScore();
+                  const limit = getCreditLimit(currentScore);
+                  const remainingLimit = limit - debt;
+                  const deficit = reward.cost - dollarBalance;
+                  const canAffordCredit = !canAffordCash && deficit <= remainingLimit;
 
-                    return (
-                      <View
-                        key={reward.id}
-                        style={{
-                          borderBottomWidth: isLast ? 0 : 0.5,
-                          borderBottomColor: 'rgba(255,255,255,0.08)',
-                        }}
-                        className="p-4 flex-row items-center justify-between"
-                      >
-                        <View className="flex-1 pr-4">
-                          <Text className="text-white text-base font-semibold">{reward.title}</Text>
-                          <Text className="text-[#8E8E93] text-xs mt-0.5">Material Reward</Text>
-                        </View>
-
-                        <View className="flex-row items-center gap-2">
-                          <Pressable
-                            onPress={() => handleRedeem(reward)}
-                            style={{
-                              backgroundColor: canAffordCash
-                                ? 'rgba(48,209,88,0.15)'
-                                : canAffordCredit
-                                ? 'rgba(10,132,255,0.15)'
-                                : '#2C2C2E',
-                              borderColor: canAffordCash
-                                ? '#30D158'
-                                : canAffordCredit
-                                ? '#0A84FF'
-                                : 'transparent',
-                              borderWidth: 1,
-                              borderRadius: 18,
-                              paddingHorizontal: 16,
-                              paddingVertical: 6,
-                            }}
-                            className="items-center justify-center"
-                          >
-                            <Text
-                              style={{
-                                color: canAffordCash
-                                  ? '#30D158'
-                                  : canAffordCredit
-                                  ? '#0A84FF'
-                                  : '#8E8E93',
-                              }}
-                              className="font-bold text-xs uppercase"
-                            >
-                              {canAffordCash
-                                ? `$${reward.cost.toFixed(2)}`
-                                : canAffordCredit
-                                ? `Credit: $${reward.cost.toFixed(2)}`
-                                : `$${reward.cost.toFixed(2)}`}
-                            </Text>
-                          </Pressable>
-
-                          <Pressable
-                            onPress={() => handleDelete(reward.id, reward.title)}
-                            style={{ backgroundColor: '#2C2C2E' }}
-                            className="p-2.5 rounded-full"
-                          >
-                            <Ionicons name="trash-outline" size={15} color="#FF453A" />
+                  return (
+                    <View
+                      key={reward.id}
+                      style={{
+                        flex: 1,
+                        minWidth: 160,
+                        backgroundColor: '#09090B',
+                        borderColor: '#27272A',
+                        borderWidth: 1,
+                        borderRadius: 12,
+                        padding: 16,
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <Text style={{ color: '#FAFAFA', fontWeight: '600', fontSize: 15, flex: 1, paddingRight: 8 }} numberOfLines={2}>
+                            {reward.title}
+                          </Text>
+                          <Pressable onPress={() => handleDelete(reward.id, reward.title)} style={{ padding: 2 }}>
+                            <Ionicons name="trash-outline" size={16} color="#52525B" />
                           </Pressable>
                         </View>
+                        <Text style={{ color: '#A1A1AA', fontSize: 11, marginTop: 4 }}>Material Item</Text>
                       </View>
-                    );
+
+                      <View style={{ marginTop: 24, marginBottom: 16, alignItems: 'center' }}>
+                        <Text style={{ color: '#FFFFFF', fontSize: 28, fontWeight: '800', letterSpacing: -0.5 }}>
+                          ${reward.cost.toFixed(2)}
+                        </Text>
+                      </View>
+
+                      <Pressable
+                        onPress={() => handleRedeem(reward)}
+                        style={({ pressed, hovered }: any) => ({
+                          backgroundColor: canAffordCash
+                            ? (hovered ? '#28B84B' : '#30D158')
+                            : canAffordCredit
+                            ? (hovered ? '#0974E3' : '#0A84FF')
+                            : '#27272A',
+                          paddingVertical: 10,
+                          borderRadius: 8,
+                          alignItems: 'center',
+                          opacity: pressed ? 0.9 : 1,
+                        })}
+                      >
+                        <Text
+                          style={{
+                            color: canAffordCash || canAffordCredit ? '#FFFFFF' : '#A1A1AA',
+                            fontWeight: '700',
+                            fontSize: 14,
+                          }}
+                        >
+                          {canAffordCash
+                            ? 'Purchase'
+                            : canAffordCredit
+                            ? 'Use Credit'
+                            : 'Insufficient'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  );
+                })}
+
+                {/* Add New Material Item Card */}
+                <Pressable
+                  onPress={() => setShowAddModal(true)}
+                  style={({ hovered }: any) => ({
+                    flex: 1,
+                    minWidth: 160,
+                    backgroundColor: hovered ? '#18181B' : '#09090B',
+                    borderColor: '#27272A',
+                    borderWidth: 1,
+                    borderStyle: 'dashed',
+                    borderRadius: 12,
+                    padding: 24,
+                    justifyContent: 'center',
+                    alignItems: 'center',
                   })}
-                </View>
-              )}
+                >
+                  <Ionicons name="add" size={28} color="#A1A1AA" />
+                  <Text style={{ color: '#A1A1AA', fontWeight: '500', fontSize: 13, marginTop: 8 }}>Add Item</Text>
+                </Pressable>
+              </View>
             </View>
           )}
         </ScrollView>
