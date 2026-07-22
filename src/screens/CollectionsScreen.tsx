@@ -114,6 +114,10 @@ export default function CollectionsScreen() {
   const [itemTitle, setItemTitle] = useState('');
   const [itemEstimatedMinutes, setItemEstimatedMinutes] = useState('');
 
+  // Accordion State
+  const [expandedSubGoals, setExpandedSubGoals] = useState<Record<string, boolean>>({});
+  const toggleSubGoal = (id: string) => setExpandedSubGoals(prev => ({ ...prev, [id]: !prev[id] }));
+
   const categories: CollectionCategory[] = ['books', 'games', 'stocks', 'fitness', 'courses', 'travel', 'other'];
 
   // Journey CRUD
@@ -309,61 +313,68 @@ export default function CollectionsScreen() {
     return true;
   });
 
+  const totalQuests = collections.length;
+  const activeSubGoalsCount = filteredSubGoals.length;
+  const totalItems = items.length;
+  const completedItems = items.filter(i => i.completed).length;
+  const overallCompletionRate = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }} edges={['top']}>
-      {/* Header Bar */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={{ fontSize: 32, fontWeight: '800', color: '#FFFFFF', marginRight: 10 }}>Journeys</Text>
-          <View style={{ backgroundColor: '#AF52DE22', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#AF52DE55', flexDirection: 'row', alignItems: 'center' }}>
-            <Ionicons name="map-outline" size={12} color="#AF52DE" style={{ marginRight: 4 }} />
-            <Text style={{ color: '#AF52DE', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 }}>QUEST LOG</Text>
+      {/* Executive Summary Header Stats Bar (Shadcn-inspired) */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <Text style={{ fontSize: 32, fontWeight: '800', color: '#FFFFFF' }}>Journeys</Text>
+          <Pressable onPress={handleOpenNewJourney} style={{ backgroundColor: '#AF52DE', width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', shadowColor: '#AF52DE', shadowRadius: 10, shadowOpacity: 0.4 }}>
+            <Ionicons name="add" size={28} color="#FFF" />
+          </Pressable>
+        </View>
+
+        {/* Shadcn Stats Grid */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <View style={{ flex: 1, backgroundColor: '#1C1C1E', borderRadius: 16, padding: 16, marginRight: 8, borderWidth: 1, borderColor: '#2C2C2E' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={{ color: '#8E8E93', fontSize: 13, fontWeight: '600' }}>Total Quests</Text>
+              <Ionicons name="map-outline" size={16} color="#8E8E93" />
+            </View>
+            <Text style={{ color: '#FFF', fontSize: 28, fontWeight: '800' }}>{totalQuests}</Text>
+          </View>
+          <View style={{ flex: 1, backgroundColor: '#1C1C1E', borderRadius: 16, padding: 16, marginLeft: 8, borderWidth: 1, borderColor: '#2C2C2E' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={{ color: '#8E8E93', fontSize: 13, fontWeight: '600' }}>Completion</Text>
+              <Ionicons name="stats-chart" size={16} color="#8E8E93" />
+            </View>
+            <Text style={{ color: '#FFF', fontSize: 28, fontWeight: '800' }}>{overallCompletionRate}%</Text>
           </View>
         </View>
-        <Pressable onPress={handleOpenNewJourney} style={{ backgroundColor: '#AF52DE', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', shadowColor: '#AF52DE', shadowRadius: 8, shadowOpacity: 0.5 }}>
-          <Ionicons name="add" size={26} color="#FFF" />
-        </Pressable>
       </View>
 
-      {/* Timeframe Filter Tabs */}
-      <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 12 }}>
-        <Pressable
-          onPress={() => setTimeframeFilter('all')}
-          style={{
-            backgroundColor: timeframeFilter === 'all' ? '#AF52DE' : '#1C1C1E',
-            paddingHorizontal: 14,
-            paddingVertical: 6,
-            borderRadius: 16,
-            marginRight: 8,
-          }}
-        >
-          <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '600' }}>All Quests</Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => setTimeframeFilter('year')}
-          style={{
-            backgroundColor: timeframeFilter === 'year' ? '#AF52DE' : '#1C1C1E',
-            paddingHorizontal: 14,
-            paddingVertical: 6,
-            borderRadius: 16,
-            marginRight: 8,
-          }}
-        >
-          <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '600' }}>{currentYear} (Year)</Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => setTimeframeFilter('month')}
-          style={{
-            backgroundColor: timeframeFilter === 'month' ? '#AF52DE' : '#1C1C1E',
-            paddingHorizontal: 14,
-            paddingVertical: 6,
-            borderRadius: 16,
-          }}
-        >
-          <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '600' }}>{MONTH_NAMES[currentMonth - 1]} {currentYear}</Text>
-        </Pressable>
+      {/* Timeframe Filter Tabs (Shadcn TabsList) */}
+      <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 16 }}>
+        <View style={{ backgroundColor: '#1C1C1E', borderRadius: 12, padding: 4, flexDirection: 'row', borderWidth: 1, borderColor: '#2C2C2E' }}>
+          {(['all', 'year', 'month'] as TimeframeFilter[]).map((filter) => {
+            const isActive = timeframeFilter === filter;
+            const label = filter === 'all' ? 'All Quests' : filter === 'year' ? currentYear.toString() : `${MONTH_NAMES[currentMonth - 1]} ${currentYear}`;
+            return (
+              <Pressable
+                key={filter}
+                onPress={() => setTimeframeFilter(filter)}
+                style={{
+                  backgroundColor: isActive ? '#2C2C2E' : 'transparent',
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: isActive ? '#3A3A3C' : 'transparent',
+                }}
+              >
+                <Text style={{ color: isActive ? '#FFF' : '#8E8E93', fontSize: 13, fontWeight: isActive ? '700' : '500' }}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
       {/* Journeys List */}
@@ -391,155 +402,180 @@ export default function CollectionsScreen() {
             const isFullyComplete = progress === 100 && collectionItems.length > 0;
 
             return (
-              <View key={collection.id} style={{ marginBottom: 24, backgroundColor: '#1C1C1E', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: isFullyComplete ? '#AF52DE' : '#2C2C2E', shadowColor: isFullyComplete ? '#AF52DE' : '#000', shadowRadius: 10, shadowOpacity: isFullyComplete ? 0.3 : 0.1 }}>
+              <View key={collection.id} style={{ marginBottom: 24, backgroundColor: '#1C1C1E', borderRadius: 20, padding: 0, borderWidth: 1, borderColor: isFullyComplete ? '#AF52DE55' : '#2C2C2E', shadowColor: isFullyComplete ? '#AF52DE' : '#000', shadowRadius: 10, shadowOpacity: isFullyComplete ? 0.2 : 0.1, overflow: 'hidden' }}>
                 {/* Journey Card Header */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <View style={{ flex: 1, marginRight: 8 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <View style={{ backgroundColor: '#2C2C2E', width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 10, borderWidth: 1, borderColor: '#3A3A3C' }}>
-                        <CategoryVectorIcon category={collection.category} size={18} color="#AF52DE" />
-                      </View>
-                      <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '800' }}>{collection.title}</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
-                      <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginRight: 6 }}>
-                        <Text style={{ color: '#AF52DE', fontSize: 11, textTransform: 'uppercase', fontWeight: '700' }}>
-                          {collection.category}
-                        </Text>
-                      </View>
-                      {linkedMacro && (
-                        <View style={{ backgroundColor: '#5AC8FA15', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#5AC8FA44', flexDirection: 'row', alignItems: 'center' }}>
-                          <FontAwesome5 name="bullseye" size={10} color="#5AC8FA" style={{ marginRight: 4 }} />
-                          <Text style={{ color: '#5AC8FA', fontSize: 11, fontWeight: '700' }}>{linkedMacro.title}</Text>
+                <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                    <View style={{ flex: 1, marginRight: 12 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                        <View style={{ backgroundColor: '#AF52DE15', width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 12, borderWidth: 1, borderColor: '#AF52DE33' }}>
+                          <CategoryVectorIcon category={collection.category} size={20} color="#AF52DE" />
                         </View>
-                      )}
-                    </View>
-                  </View>
-
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Pressable onPress={() => handleOpenEditJourney(collection.id)} style={{ padding: 6, marginRight: 4 }}>
-                      <Ionicons name="pencil-outline" size={18} color="#8E8E93" />
-                    </Pressable>
-                    <Pressable onPress={() => setDeletingJourneyId(collection.id)} style={{ padding: 6 }}>
-                      <Ionicons name="trash-outline" size={18} color="#FF453A" />
-                    </Pressable>
-                  </View>
-                </View>
-
-                {/* Journey Overall Progress Level Bar */}
-                <View style={{ backgroundColor: '#252528', padding: 12, borderRadius: 14, marginBottom: 16, borderWidth: 1, borderColor: '#3A3A3C' }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>QUEST PROGRESS</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      {isFullyComplete && <FontAwesome5 name="crown" size={12} color="#FFD700" style={{ marginRight: 4 }} />}
-                      <Text style={{ color: isFullyComplete ? '#30D158' : '#AF52DE', fontSize: 14, fontWeight: '800' }}>
-                        {completedCount}/{collectionItems.length} ({progress}%)
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={{ height: 6, backgroundColor: '#1C1C1E', borderRadius: 3 }}>
-                    <View style={{ height: 6, width: `${progress}%`, backgroundColor: isFullyComplete ? '#30D158' : '#AF52DE', borderRadius: 3 }} />
-                  </View>
-                </View>
-
-                {/* Sub-Goal Section */}
-                {collectionSubGoals.map(sg => {
-                  const sgItems = collectionItems.filter(i => i.subGoalId === sg.id);
-                  const sgCompleted = sgItems.filter(i => i.completed).length;
-                  const targetMetric = sg.targetMetric || sgItems.length || 1;
-                  const sgPct = Math.min(100, Math.round((sgCompleted / targetMetric) * 100));
-                  const isSgComplete = sgPct === 100;
-                  const timeframeLabel = sg.month && sg.year
-                    ? `${MONTH_NAMES[sg.month - 1]} ${sg.year}`
-                    : sg.year
-                    ? `${sg.year}`
-                    : 'Ongoing';
-
-                  return (
-                    <View key={sg.id} style={{ backgroundColor: '#252528', borderRadius: 14, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: isSgComplete ? '#30D15866' : '#3A3A3C' }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                          {isSgComplete ? (
-                            <Ionicons name="trophy" size={15} color="#FFD700" style={{ marginRight: 6 }} />
-                          ) : (
-                            <FontAwesome5 name="crosshairs" size={13} color="#5AC8FA" style={{ marginRight: 6 }} />
-                          )}
-                          <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '700' }}>{sg.title}</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <Text style={{ color: '#5AC8FA', fontSize: 11, fontWeight: '700', marginRight: 8 }}>{timeframeLabel}</Text>
-                          <Pressable onPress={() => handleOpenEditSubGoal(sg)} style={{ marginRight: 6 }}>
-                            <Ionicons name="ellipsis-horizontal" size={16} color="#8E8E93" />
-                          </Pressable>
-                          <Pressable onPress={() => deleteSubGoal(sg.id)}>
-                            <Ionicons name="close-circle-outline" size={16} color="#FF453A" />
-                          </Pressable>
-                        </View>
+                        <Text style={{ color: '#FFF', fontSize: 22, fontWeight: '800' }}>{collection.title}</Text>
                       </View>
-
-                      {/* Sub-Goal Progress Bar */}
-                      <View style={{ height: 5, backgroundColor: '#1C1C1E', borderRadius: 3, marginVertical: 6 }}>
-                        <View style={{ height: 5, width: `${sgPct}%`, backgroundColor: isSgComplete ? '#30D158' : '#AF52DE', borderRadius: 3 }} />
-                      </View>
-                      <Text style={{ color: '#8E8E93', fontSize: 11, textAlign: 'right', fontWeight: '600' }}>
-                        {sgCompleted}/{sg.targetMetric ? sg.targetMetric : sgItems.length} completed ({sgPct}%)
-                      </Text>
-                    </View>
-                  );
-                })}
-
-                {/* Add Sub-Goal Creator Button */}
-                <Pressable
-                  onPress={() => handleOpenNewSubGoal(collection.id)}
-                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#2C2C2E', paddingVertical: 10, borderRadius: 10, marginBottom: 16 }}
-                >
-                  <Ionicons name="pricetag-outline" size={16} color="#5AC8FA" style={{ marginRight: 6 }} />
-                  <Text style={{ color: '#5AC8FA', fontSize: 13, fontWeight: '700' }}>+ Add Sub-Goal (e.g. Fiction, Hikes)</Text>
-                </Pressable>
-
-                {/* Items List */}
-                {collectionItems.map(item => {
-                  const itemSubGoal = (subGoals || []).find(s => s.id === item.subGoalId);
-
-                  return (
-                    <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#2C2C2E' }}>
-                      <Pressable onPress={() => handleToggleItem(item.id, collection.id, item.subGoalId)} style={{ marginRight: 12 }}>
-                        <Ionicons 
-                          name={item.completed ? "checkmark-circle" : "ellipse-outline"} 
-                          size={24} 
-                          color={item.completed ? "#AF52DE" : "#8E8E93"} 
-                        />
-                      </Pressable>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
-                          <Text style={{ color: item.completed ? '#8E8E93' : '#FFF', fontSize: 16, textDecorationLine: item.completed ? 'line-through' : 'none', marginRight: 6 }}>
-                            {item.title}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginRight: 8 }}>
+                          <Text style={{ color: '#AF52DE', fontSize: 11, textTransform: 'uppercase', fontWeight: '700' }}>
+                            {collection.category}
                           </Text>
-                          {itemSubGoal && (
-                            <View style={{ backgroundColor: '#AF52DE22', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginRight: 6 }}>
-                              <Text style={{ color: '#AF52DE', fontSize: 10, fontWeight: '700' }}>{itemSubGoal.title}</Text>
-                            </View>
-                          )}
                         </View>
-                        {item.isAddedLater && (
-                          <Text style={{ color: '#5AC8FA', fontSize: 10, marginTop: 2 }}>Added Later</Text>
+                        {linkedMacro && (
+                          <View style={{ backgroundColor: '#5AC8FA15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#5AC8FA44', flexDirection: 'row', alignItems: 'center' }}>
+                            <FontAwesome5 name="bullseye" size={10} color="#5AC8FA" style={{ marginRight: 6 }} />
+                            <Text style={{ color: '#5AC8FA', fontSize: 11, fontWeight: '700' }}>{linkedMacro.title}</Text>
+                          </View>
                         )}
                       </View>
-                      <Pressable onPress={() => deleteItem(item.id)}>
-                        <Ionicons name="trash-outline" size={18} color="#FF453A" />
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Pressable onPress={() => handleOpenEditJourney(collection.id)} style={{ padding: 6, marginRight: 4, backgroundColor: '#2C2C2E', borderRadius: 8 }}>
+                        <Ionicons name="pencil" size={16} color="#8E8E93" />
+                      </Pressable>
+                      <Pressable onPress={() => setDeletingJourneyId(collection.id)} style={{ padding: 6, backgroundColor: '#FF453A15', borderRadius: 8 }}>
+                        <Ionicons name="trash" size={16} color="#FF453A" />
                       </Pressable>
                     </View>
-                  );
-                })}
+                  </View>
 
-                {/* Add Item Button */}
-                <Pressable 
-                  onPress={() => handleOpenNewItem(collection.id)}
-                  style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#2C2C2E' }}
-                >
-                  <Ionicons name="add-circle-outline" size={20} color="#AF52DE" style={{ marginRight: 8 }} />
-                  <Text style={{ color: '#AF52DE', fontSize: 14, fontWeight: '700' }}>Add Item</Text>
-                </Pressable>
+                  {/* Journey Progress Bar */}
+                  <View style={{ marginTop: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600' }}>Progress</Text>
+                      <Text style={{ color: isFullyComplete ? '#30D158' : '#FFF', fontSize: 13, fontWeight: '700' }}>
+                        {completedCount} / {collectionItems.length} ({progress}%)
+                      </Text>
+                    </View>
+                    <View style={{ height: 8, backgroundColor: '#2C2C2E', borderRadius: 4 }}>
+                      <View style={{ height: 8, width: `${progress}%`, backgroundColor: isFullyComplete ? '#30D158' : '#AF52DE', borderRadius: 4 }} />
+                    </View>
+                  </View>
+                </View>
+
+                {/* Sub-Goals Area (Shadcn Accordion Style) */}
+                <View style={{ padding: 16, backgroundColor: '#1C1C1E' }}>
+                  {collectionSubGoals.map(sg => {
+                    const sgItems = collectionItems.filter(i => i.subGoalId === sg.id);
+                    const sgCompleted = sgItems.filter(i => i.completed).length;
+                    const targetMetric = sg.targetMetric || sgItems.length || 1;
+                    const sgPct = Math.min(100, Math.round((sgCompleted / targetMetric) * 100));
+                    const isSgComplete = sgPct === 100;
+                    const timeframeLabel = sg.month && sg.year
+                      ? `${MONTH_NAMES[sg.month - 1]} ${sg.year}`
+                      : sg.year
+                      ? `${sg.year}`
+                      : 'Ongoing';
+
+                    const isExpanded = !!expandedSubGoals[sg.id];
+
+                    return (
+                      <View key={sg.id} style={{ marginBottom: 12, backgroundColor: '#252528', borderRadius: 12, borderWidth: 1, borderColor: isSgComplete ? '#30D15844' : '#3A3A3C', overflow: 'hidden' }}>
+                        <Pressable 
+                          onPress={() => toggleSubGoal(sg.id)}
+                          style={{ padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                              {isSgComplete ? (
+                                <Ionicons name="checkmark-circle" size={18} color="#30D158" style={{ marginRight: 8 }} />
+                              ) : (
+                                <Ionicons name="flag" size={18} color="#5AC8FA" style={{ marginRight: 8 }} />
+                              )}
+                              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>{sg.title}</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '500', marginRight: 12 }}>
+                                {sgCompleted} / {sg.targetMetric ? sg.targetMetric : sgItems.length} ({sgPct}%)
+                              </Text>
+                              <View style={{ backgroundColor: '#1C1C1E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                <Text style={{ color: '#5AC8FA', fontSize: 10, fontWeight: '600' }}>{timeframeLabel}</Text>
+                              </View>
+                            </View>
+                          </View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Pressable onPress={() => handleOpenEditSubGoal(sg)} style={{ padding: 8, marginRight: 4 }}>
+                              <Ionicons name="ellipsis-horizontal" size={18} color="#8E8E93" />
+                            </Pressable>
+                            <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color="#8E8E93" />
+                          </View>
+                        </Pressable>
+
+                        {/* Accordion Content */}
+                        {isExpanded && (
+                          <View style={{ paddingHorizontal: 16, paddingBottom: 16, borderTopWidth: 1, borderTopColor: '#3A3A3C' }}>
+                            {sgItems.length > 0 ? (
+                              sgItems.map(item => (
+                                <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}>
+                                  <Pressable onPress={() => handleToggleItem(item.id, collection.id, item.subGoalId)} style={{ marginRight: 12 }}>
+                                    <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: item.completed ? '#AF52DE' : '#8E8E93', backgroundColor: item.completed ? '#AF52DE' : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                                      {item.completed && <Ionicons name="checkmark" size={16} color="#FFF" />}
+                                    </View>
+                                  </Pressable>
+                                  <Text style={{ flex: 1, color: item.completed ? '#8E8E93' : '#FFF', fontSize: 15, textDecorationLine: item.completed ? 'line-through' : 'none' }}>
+                                    {item.title}
+                                  </Text>
+                                  <Pressable onPress={() => deleteItem(item.id)} style={{ padding: 4 }}>
+                                    <Ionicons name="trash-outline" size={16} color="#FF453A" />
+                                  </Pressable>
+                                </View>
+                              ))
+                            ) : (
+                              <Text style={{ color: '#8E8E93', fontSize: 13, marginTop: 12, fontStyle: 'italic' }}>No tasks added yet.</Text>
+                            )}
+
+                            {/* Shadcn Quick-Add Task Chip */}
+                            <Pressable 
+                              onPress={() => {
+                                handleOpenNewItem(collection.id);
+                                setSelectedSubGoalId(sg.id);
+                              }}
+                              style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, alignSelf: 'flex-start', backgroundColor: '#1C1C1E', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#2C2C2E' }}
+                            >
+                              <Ionicons name="add" size={16} color="#AF52DE" style={{ marginRight: 6 }} />
+                              <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '600' }}>Add Task</Text>
+                            </Pressable>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+
+                  {/* Root-Level Items (Items without a Sub-Goal) */}
+                  {collectionItems.filter(i => !i.subGoalId).map(item => (
+                    <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' }}>
+                      <Pressable onPress={() => handleToggleItem(item.id, collection.id)} style={{ marginRight: 12 }}>
+                        <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: item.completed ? '#AF52DE' : '#8E8E93', backgroundColor: item.completed ? '#AF52DE' : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                          {item.completed && <Ionicons name="checkmark" size={16} color="#FFF" />}
+                        </View>
+                      </Pressable>
+                      <Text style={{ flex: 1, color: item.completed ? '#8E8E93' : '#FFF', fontSize: 15, textDecorationLine: item.completed ? 'line-through' : 'none' }}>
+                        {item.title}
+                      </Text>
+                      <Pressable onPress={() => deleteItem(item.id)} style={{ padding: 4 }}>
+                        <Ionicons name="trash-outline" size={16} color="#FF453A" />
+                      </Pressable>
+                    </View>
+                  ))}
+
+                  {/* Quick Action Chips Footer */}
+                  <View style={{ flexDirection: 'row', marginTop: 16 }}>
+                    <Pressable
+                      onPress={() => handleOpenNewSubGoal(collection.id)}
+                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#252528', paddingVertical: 12, borderRadius: 10, marginRight: 6, borderWidth: 1, borderColor: '#3A3A3C' }}
+                    >
+                      <Ionicons name="folder-open" size={16} color="#5AC8FA" style={{ marginRight: 8 }} />
+                      <Text style={{ color: '#5AC8FA', fontSize: 13, fontWeight: '700' }}>+ Sub-Goal</Text>
+                    </Pressable>
+                    
+                    <Pressable 
+                      onPress={() => handleOpenNewItem(collection.id)}
+                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#AF52DE15', paddingVertical: 12, borderRadius: 10, marginLeft: 6, borderWidth: 1, borderColor: '#AF52DE33' }}
+                    >
+                      <Ionicons name="list" size={16} color="#AF52DE" style={{ marginRight: 8 }} />
+                      <Text style={{ color: '#AF52DE', fontSize: 13, fontWeight: '700' }}>+ Task</Text>
+                    </Pressable>
+                  </View>
+
+                </View>
               </View>
             );
           })

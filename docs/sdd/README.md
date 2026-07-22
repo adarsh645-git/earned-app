@@ -10,5 +10,7 @@ This directory contains the feature specification documents and task checklists 
 - **[004-dual-currency-reward-economy.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/004-dual-currency-reward-economy.md)**: Dual-currency economy (Hours + Dollars), streak-based focus conversion, entertainment macro goals, and hard-block timer enforcement.
 - **[005-journey-editing-and-timeframe-allocation.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/005-journey-editing-and-timeframe-allocation.md)**: Editable and deletable Journeys, Year/Month timeframe allocation, and sub-category tag breakdown.
 - **[006-journey-dopamine-and-gamification.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/006-journey-dopamine-and-gamification.md)**: Gamified Journey creation, anticipatory bounty calculation, confetti particle celebrations, RPG quest badges, and completion payout toasts.
+- **[007-journeys-tab-redesign.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/007-journeys-tab-redesign.md)**: High-density RPG quest cards, glassmorphic executive summary header stats, collapsible sub-goal accordions, and quick-add task chips.
+
 
 
