@@ -93,6 +93,8 @@ export default function EditTaskModal({
                 onChangeText={setTitle}
                 placeholder="What needs to be done?"
                 placeholderTextColor="#52525B"
+                spellCheck={true}
+                autoCorrect={true}
                 style={{
                   backgroundColor: '#18181B',
                   color: '#FFFFFF',

@@ -128,6 +128,8 @@ export default function ProfileScreen() {
             onChangeText={setTitle}
             placeholder="e.g. Hike 100 miles, Write a Novel, Learn French"
             placeholderTextColor="#8E8E93"
+            spellCheck={true}
+            autoCorrect={true}
             style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }}
             className="text-white rounded-2xl p-4 mb-4 text-sm font-semibold"
           />

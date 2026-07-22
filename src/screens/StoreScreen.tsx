@@ -245,6 +245,8 @@ export default function StoreScreen() {
               onChangeText={setTitle}
               placeholder={activeTab === 'material' ? "e.g. Mechanical Keyboard" : "e.g. Play Elden Ring"}
               placeholderTextColor="#52525B"
+              spellCheck={true}
+              autoCorrect={true}
               style={{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }}
               className="text-white rounded-lg p-3 text-sm"
             />

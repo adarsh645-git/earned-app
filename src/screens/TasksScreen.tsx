@@ -92,6 +92,8 @@ export default function TasksScreen() {
             onChangeText={setTitle}
             placeholder="e.g. Code Review, Bike Ride, Read Book"
             placeholderTextColor="#5C5C5E"
+            spellCheck={true}
+            autoCorrect={true}
             style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 16, borderRadius: 16, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2C2C2E' }}
           />
 
