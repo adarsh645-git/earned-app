@@ -226,6 +226,7 @@ export default function AppNavigator() {
                 let iconName: any = 'help';
                 if (route.name === 'Dashboard') iconName = focused ? 'home' : 'home-outline';
                 if (route.name === 'Tasks') iconName = focused ? 'list' : 'list-outline';
+                if (route.name === 'Collections') iconName = focused ? 'map' : 'map-outline';
                 if (route.name === 'Store') iconName = focused ? 'cart' : 'cart-outline';
                 if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
 
@@ -235,6 +236,7 @@ export default function AppNavigator() {
           >
             <Tab.Screen name="Dashboard" component={DashboardWithBoundary} />
             <Tab.Screen name="Tasks" component={TasksWithBoundary} />
+            <Tab.Screen name="Collections" component={CollectionsWithBoundary} />
             <Tab.Screen name="Store" component={StoreWithBoundary} />
             <Tab.Screen name="Profile" component={ProfileWithBoundary} />
           </Tab.Navigator>
