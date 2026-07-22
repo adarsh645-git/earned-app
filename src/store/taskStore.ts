@@ -4,13 +4,18 @@ import { safeStorage } from './safeStorage';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 
-export type Bucket = 'office' | 'health' | 'personal';
+export type Pillar = {
+  id: string;
+  name: string;
+  isArchived?: boolean;
+};
 
 export type Tag = {
   id: string;
-  bucket: Bucket;
+  pillarId: string;
   name: string; 
   type: 'earner' | 'burner';
+  isArchived?: boolean;
 }
 
 export type Task = {
@@ -27,24 +32,42 @@ export type Task = {
 interface TaskState {
   tasks: Task[];
   tags: Tag[];
+  pillars: Pillar[];
+  
+  // Task Actions
   addTask: (task: Omit<Task, 'id' | 'completed' | 'dateCreated'>) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
   toggleTask: (id: string) => void;
   moveToIcebox: (id: string) => void;
   activateFromIcebox: (id: string) => void;
+  
+  // Pillar Actions
+  addPillar: (name: string) => void;
+  updatePillarName: (id: string, name: string) => void;
+  archivePillar: (id: string) => void;
+  
+  // Tag (Journey) Actions
   addTag: (tag: Omit<Tag, 'id'>) => void;
+  updateTag: (id: string, updates: Partial<Tag>) => void;
+  archiveTag: (id: string) => void;
 }
 
 export const useTaskStore = create<TaskState>()(
   persist(
     (set) => ({
       tasks: [],
-      tags: [
-        { id: uuidv4(), bucket: 'office', name: 'Deep Work', type: 'earner' },
-        { id: uuidv4(), bucket: 'health', name: 'Fitness', type: 'earner' },
-        { id: uuidv4(), bucket: 'personal', name: 'Gaming', type: 'burner' }
+      pillars: [
+        { id: 'office', name: 'Office' },
+        { id: 'health', name: 'Health' },
+        { id: 'personal', name: 'Personal' }
       ],
+      tags: [
+        { id: uuidv4(), pillarId: 'office', name: 'Deep Work', type: 'earner' },
+        { id: uuidv4(), pillarId: 'health', name: 'Fitness', type: 'earner' },
+        { id: uuidv4(), pillarId: 'personal', name: 'Gaming', type: 'burner' }
+      ],
+      
       addTask: (task) => set((state) => ({
         tasks: [...state.tasks, { 
           ...task, 
@@ -68,8 +91,34 @@ export const useTaskStore = create<TaskState>()(
       activateFromIcebox: (id) => set((state) => ({
         tasks: state.tasks.map(t => t.id === id ? { ...t, isIcebox: false, dateCreated: new Date().toISOString().split('T')[0] } : t)
       })),
+      
+      // Pillar Actions
+      addPillar: (name) => set((state) => {
+        const activePillars = state.pillars.filter(p => !p.isArchived);
+        if (activePillars.length >= 5) {
+          console.warn("Max 5 active pillars allowed.");
+          return state; // Do nothing if limit reached
+        }
+        return {
+          pillars: [...state.pillars, { id: uuidv4(), name }]
+        };
+      }),
+      updatePillarName: (id, name) => set((state) => ({
+        pillars: state.pillars.map(p => p.id === id ? { ...p, name } : p)
+      })),
+      archivePillar: (id) => set((state) => ({
+        pillars: state.pillars.map(p => p.id === id ? { ...p, isArchived: true } : p)
+      })),
+
+      // Tag Actions
       addTag: (tag) => set((state) => ({
         tags: [...state.tags, { ...tag, id: uuidv4() }]
+      })),
+      updateTag: (id, updates) => set((state) => ({
+        tags: state.tags.map(t => t.id === id ? { ...t, ...updates } : t)
+      })),
+      archiveTag: (id) => set((state) => ({
+        tags: state.tags.map(t => t.id === id ? { ...t, isArchived: true } : t)
       }))
     }),
     {

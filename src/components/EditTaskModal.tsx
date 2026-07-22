@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { PrimaryButton } from './PrimaryButton';
-import { Task, Tag, Bucket } from '../store/taskStore';
+import { Task, Tag, Pillar } from '../store/taskStore';
 import TimeSelectorModal from './TimeSelectorModal';
 
 interface EditTaskModalProps {
@@ -12,6 +12,7 @@ interface EditTaskModalProps {
   onSave: (id: string, updates: Partial<Task>) => void;
   onDelete: (id: string) => void;
   tags: Tag[];
+  pillars: Pillar[];
 }
 
 export default function EditTaskModal({
@@ -20,14 +21,15 @@ export default function EditTaskModal({
   onClose,
   onSave,
   onDelete,
-  tags
+  tags,
+  pillars
 }: EditTaskModalProps) {
   const [title, setTitle] = useState('');
   const [tagId, setTagId] = useState('');
   const [estimatedMinutes, setEstimatedMinutes] = useState(0);
   const [showTimeSelector, setShowTimeSelector] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-  const [selectedBucket, setSelectedBucket] = useState<Bucket | ''>('');
+  const [selectedPillarId, setSelectedPillarId] = useState<string>('');
 
   useEffect(() => {
     if (task && visible) {
@@ -37,7 +39,7 @@ export default function EditTaskModal({
       
       const tag = tags.find(t => t.id === task.tagId);
       if (tag) {
-        setSelectedBucket(tag.bucket);
+        setSelectedPillarId(tag.pillarId);
       }
     }
   }, [task, visible, tags]);
@@ -131,11 +133,11 @@ export default function EditTaskModal({
               </Text>
               
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
-                {(['office', 'health', 'personal'] as Bucket[]).map(bucket => (
+                {pillars.filter(p => !p.isArchived).map(pillar => (
                   <Pressable
-                    key={bucket}
+                    key={pillar.id}
                     onPress={() => {
-                      setSelectedBucket(bucket);
+                      setSelectedPillarId(pillar.id);
                       setTagId(''); // Reset specific journey when changing pillar
                     }}
                     style={{
@@ -143,23 +145,23 @@ export default function EditTaskModal({
                       paddingVertical: 8,
                       borderRadius: 9999,
                       borderWidth: 1,
-                      backgroundColor: selectedBucket === bucket ? '#FFFFFF' : '#18181B',
-                      borderColor: selectedBucket === bucket ? '#FFFFFF' : '#27272A'
+                      backgroundColor: selectedPillarId === pillar.id ? '#FFFFFF' : '#18181B',
+                      borderColor: selectedPillarId === pillar.id ? '#FFFFFF' : '#27272A'
                     }}
                   >
                     <Text style={{ 
-                      color: selectedBucket === bucket ? '#000000' : '#A1A1AA', 
+                      color: selectedPillarId === pillar.id ? '#000000' : '#A1A1AA', 
                       fontSize: 13, 
-                      fontWeight: selectedBucket === bucket ? '700' : '500',
+                      fontWeight: selectedPillarId === pillar.id ? '700' : '500',
                       textTransform: 'capitalize'
                     }}>
-                      {bucket}
+                      {pillar.name}
                     </Text>
                   </Pressable>
                 ))}
               </View>
 
-              {selectedBucket !== '' && (
+              {selectedPillarId !== '' && (
                 <>
                   <Text style={{ color: '#A1A1AA', fontSize: 13, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase' }}>
                     2. Select Journey
@@ -192,7 +194,7 @@ export default function EditTaskModal({
                       borderRadius: 8,
                       overflow: 'hidden'
                     }}>
-                      {tags.filter(t => t.bucket === selectedBucket).map(tag => (
+                      {tags.filter(t => t.pillarId === selectedPillarId && !t.isArchived).map(tag => (
                         <Pressable
                           key={tag.id}
                           onPress={() => {

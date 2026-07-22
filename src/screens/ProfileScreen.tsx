@@ -43,7 +43,7 @@ export default function ProfileScreen() {
     isInDefault,
     clearDebtForTesting 
   } = useEconomyStore();
-  const { tasks } = useTaskStore();
+  const { tasks, pillars, tags, addPillar, archivePillar, addTag, archiveTag } = useTaskStore();
   const { macroGoals, addMacroGoal } = useMacroGoalStore();
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -51,6 +51,13 @@ export default function ProfileScreen() {
   const [horizon, setHorizon] = useState<'monthly' | 'yearly'>('monthly');
   const [targetHours, setTargetHours] = useState('');
   const [validationError, setValidationError] = useState('');
+
+  // Taxonomy State
+  const [newPillarName, setNewPillarName] = useState('');
+  const [expandedPillarId, setExpandedPillarId] = useState<string | null>(null);
+  const [newTagName, setNewTagName] = useState('');
+  const [newTagType, setNewTagType] = useState<'earner' | 'burner'>('earner');
+  const activePillars = pillars.filter(p => !p.isArchived);
 
   // Total focused time calculations
   const totalCompletedMinutes = tasks
@@ -365,6 +372,129 @@ export default function ProfileScreen() {
               </Pressable>
             )}
           </View>
+        </View>
+
+        {/* Taxonomy Architecture Section */}
+        <View className="flex-row justify-between items-center mb-3 mt-6">
+          <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px]">
+            Taxonomy Architecture
+          </Text>
+        </View>
+        <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl overflow-hidden mb-8 p-4">
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <PremiumInput
+              value={newPillarName}
+              onChangeText={setNewPillarName}
+              placeholder="New Pillar Name"
+              placeholderTextColor="#8E8E93"
+              style={{ flex: 1, color: '#FFF', backgroundColor: '#000', padding: 12, borderRadius: 8, fontSize: 14 }}
+            />
+            <Pressable
+              onPress={() => {
+                if (newPillarName.trim() && activePillars.length < 5) {
+                  addPillar(newPillarName.trim());
+                  setNewPillarName('');
+                }
+              }}
+              disabled={activePillars.length >= 5 || !newPillarName.trim()}
+              style={{ 
+                backgroundColor: activePillars.length >= 5 ? '#2C2C2E' : '#BF5AF2', 
+                marginLeft: 8, 
+                padding: 12, 
+                borderRadius: 8,
+                opacity: (activePillars.length >= 5 || !newPillarName.trim()) ? 0.5 : 1
+              }}
+            >
+              <Ionicons name="add" size={18} color="#FFF" />
+            </Pressable>
+          </View>
+          {activePillars.length >= 5 && (
+            <Text style={{ color: '#FF453A', fontSize: 10, marginBottom: 12, fontWeight: '600' }}>Max limit of 5 Pillars reached.</Text>
+          )}
+
+          {activePillars.map((pillar, index) => {
+            const isExpanded = expandedPillarId === pillar.id;
+            const pillarTags = tags.filter(t => t.pillarId === pillar.id && !t.isArchived);
+            const isLast = index === activePillars.length - 1;
+            
+            return (
+              <View key={pillar.id} style={{ borderBottomWidth: isLast && !isExpanded ? 0 : 0.5, borderBottomColor: 'rgba(255,255,255,0.08)' }}>
+                <Pressable 
+                  onPress={() => setExpandedPillarId(isExpanded ? null : pillar.id)}
+                  style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 }}
+                >
+                  <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '600' }}>{pillar.name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Text style={{ color: '#8E8E93', fontSize: 12 }}>{pillarTags.length} Categories</Text>
+                    <Pressable onPress={() => {
+                        Alert.alert('Archive Pillar', 'This will hide this Pillar and its Categories from active selection. Historical data remains intact.', [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Archive', style: 'destructive', onPress: () => archivePillar(pillar.id) }
+                        ]);
+                      }}>
+                      <Ionicons name="archive-outline" size={16} color="#FF453A" />
+                    </Pressable>
+                  </View>
+                </Pressable>
+
+                {isExpanded && (
+                  <View style={{ backgroundColor: '#09090B', borderRadius: 8, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#27272A' }}>
+                    {pillarTags.map(tag => (
+                      <View key={tag.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: '#27272A' }}>
+                        <Text style={{ color: '#E4E4E7', fontSize: 13 }}>{tag.name}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Text style={{ color: tag.type === 'earner' ? '#30D158' : '#FF453A', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>
+                            {tag.type}
+                          </Text>
+                          <Pressable onPress={() => archiveTag(tag.id)}>
+                            <Ionicons name="close-circle" size={16} color="#52525B" />
+                          </Pressable>
+                        </View>
+                      </View>
+                    ))}
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+                      <PremiumInput
+                        value={newTagName}
+                        onChangeText={setNewTagName}
+                        placeholder="New Category"
+                        placeholderTextColor="#52525B"
+                        style={{ flex: 1, color: '#FFF', backgroundColor: '#000', padding: 8, borderRadius: 6, fontSize: 12, borderWidth: 1, borderColor: '#27272A' }}
+                      />
+                      <Pressable
+                        onPress={() => setNewTagType(newTagType === 'earner' ? 'burner' : 'earner')}
+                        style={{ 
+                          backgroundColor: newTagType === 'earner' ? 'rgba(48,209,88,0.15)' : 'rgba(255,69,58,0.15)', 
+                          paddingHorizontal: 12, 
+                          paddingVertical: 9, 
+                          borderRadius: 6, 
+                          marginLeft: 8,
+                          borderWidth: 1,
+                          borderColor: newTagType === 'earner' ? 'rgba(48,209,88,0.3)' : 'rgba(255,69,58,0.3)'
+                        }}
+                      >
+                        <Text style={{ color: newTagType === 'earner' ? '#30D158' : '#FF453A', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>
+                          {newTagType}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => {
+                          if (newTagName.trim()) {
+                            addTag({ name: newTagName.trim(), type: newTagType, pillarId: pillar.id });
+                            setNewTagName('');
+                          }
+                        }}
+                        disabled={!newTagName.trim()}
+                        style={{ backgroundColor: newTagName.trim() ? '#E4E4E7' : '#27272A', marginLeft: 8, padding: 8, borderRadius: 6 }}
+                      >
+                        <Ionicons name="add" size={14} color={newTagName.trim() ? '#000' : '#52525B'} />
+                      </Pressable>
+                    </View>
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </View>
 
         {/* Macro Goals Section */}

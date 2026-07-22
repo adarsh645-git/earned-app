@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Svg, { Circle } from 'react-native-svg';
 import { useEconomyStore } from '../store/economyStore';
-import { useTaskStore, Bucket, Task } from '../store/taskStore';
+import { useTaskStore, Task } from '../store/taskStore';
 import { useMacroGoalStore } from '../store/macroGoalStore';
 import { useTimerStore } from '../store/timerStore';
 import { hapticSelection, hapticSuccess } from '../utils/haptics';
@@ -25,11 +25,13 @@ export default function DashboardScreen() {
   const radius = (ringSize - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
-  const [activeBucket, setActiveBucket] = useState<Bucket>('office');
+  const [activePillarId, setActivePillarId] = useState<string>('');
   const [blockedModal, setBlockedModal] = useState<{ title: string; message: string } | null>(null);
   
   const { dollarBalance, hoursBalanceMinutes, debt, streak, lastCheckInDate } = useEconomyStore();
-  const { tasks, tags, toggleTask, moveToIcebox } = useTaskStore();
+  const { tasks, tags, pillars, toggleTask, moveToIcebox } = useTaskStore();
+  const activePillars = pillars.filter(p => !p.isArchived);
+  const currentPillarId = activePillarId || activePillars[0]?.id;
   const { macroGoals } = useMacroGoalStore();
   const { startTimer } = useTimerStore();
 
@@ -38,10 +40,10 @@ export default function DashboardScreen() {
   const today = new Date().toISOString().split('T')[0];
   const isCheckedInToday = lastCheckInDate === today;
 
-  // Filter tasks for the active bucket that are NOT in the icebox
+  // Filter tasks for the active pillar that are NOT in the icebox
   const activeBucketTasks = tasks.filter(t => {
     const tag = tags.find(tag => tag.id === t.tagId);
-    return tag?.bucket === activeBucket && !t.isIcebox;
+    return tag?.pillarId === currentPillarId && !t.isIcebox;
   });
 
   const incompleteTasks = activeBucketTasks.filter(t => !t.completed);
@@ -163,37 +165,38 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Apple Segmented Control Picker */}
-        <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="flex-row p-1 rounded-xl my-4">
-          {(['office', 'health', 'personal'] as Bucket[]).map((bucket) => {
-            const isActive = activeBucket === bucket;
-            const label = bucket.charAt(0).toUpperCase() + bucket.slice(1);
-            return (
-              <Pressable
-                key={bucket}
-                onPress={() => setActiveBucket(bucket)}
-                style={{
-                  flex: 1,
-                  paddingVertical: 8,
-                  borderRadius: 8,
-                  alignItems: 'center',
-                  backgroundColor: isActive ? '#2C2C2E' : 'transparent',
-                  borderWidth: isActive ? 1 : 0,
-                  borderColor: isActive ? 'rgba(255,255,255,0.15)' : 'transparent',
-                }}
-              >
-                <Text
+        {/* Dynamic Pillar Segmented Control Picker */}
+        <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderRadius: 12, marginVertical: 16 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 4 }}>
+            {activePillars.map((pillar) => {
+              const isActive = currentPillarId === pillar.id;
+              return (
+                <Pressable
+                  key={pillar.id}
+                  onPress={() => setActivePillarId(pillar.id)}
                   style={{
-                    fontWeight: isActive ? '700' : '500',
-                    fontSize: 13,
-                    color: isActive ? '#FFFFFF' : '#8E8E93',
+                    paddingHorizontal: 20,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                    backgroundColor: isActive ? '#2C2C2E' : 'transparent',
+                    borderWidth: isActive ? 1 : 0,
+                    borderColor: isActive ? 'rgba(255,255,255,0.15)' : 'transparent',
                   }}
                 >
-                  {label}
-                </Text>
-              </Pressable>
-            );
-          })}
+                  <Text
+                    style={{
+                      fontWeight: isActive ? '700' : '500',
+                      fontSize: 13,
+                      color: isActive ? '#FFFFFF' : '#8E8E93',
+                    }}
+                  >
+                    {pillar.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         </View>
 
         {/* Apple Activity Progress Ring Badge */}

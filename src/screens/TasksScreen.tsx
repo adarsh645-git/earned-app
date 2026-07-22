@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useTaskStore, Bucket, Task } from '../store/taskStore';
+import { useTaskStore, Task } from '../store/taskStore';
 import { useMacroGoalStore } from '../store/macroGoalStore';
 import { useEconomyStore } from '../store/economyStore';
 import { PrimaryButton } from '../components/PrimaryButton';
@@ -13,7 +13,7 @@ import EditTaskModal from '../components/EditTaskModal';
 import TimeSelectorModal from '../components/TimeSelectorModal';
 
 export default function TasksScreen() {
-  const { tasks, tags, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox } = useTaskStore();
+  const { tasks, tags, pillars, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox } = useTaskStore();
   const { macroGoals } = useMacroGoalStore();
   
   const [modalVisible, setModalVisible] = useState(false);
@@ -123,8 +123,9 @@ export default function TasksScreen() {
           {/* Tag Selection */}
           <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Category Tag</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
-            {tags.map((tag) => {
+            {tags.filter(t => !t.isArchived).map((tag) => {
               const isSelected = selectedTagId === tag.id;
+              const pillar = pillars.find(p => p.id === tag.pillarId);
               return (
                 <Pressable
                   key={tag.id}
@@ -143,7 +144,7 @@ export default function TasksScreen() {
                   })}
                 >
                   <Text style={{ color: isSelected ? '#FFF' : '#8E8E93', fontWeight: isSelected ? '700' : '600', fontSize: 13 }}>
-                    {tag.name} ({tag.bucket})
+                    {tag.name} {pillar ? `(${pillar.name})` : ''}
                   </Text>
                 </Pressable>
               );
@@ -385,7 +386,7 @@ export default function TasksScreen() {
         </ScrollView>
       </View>
 
-      <EditTaskModal 
+      <EditTaskModal pillars={pillars} 
         task={editTask}
         visible={!!editTask}
         tags={tags}
