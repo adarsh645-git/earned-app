@@ -4,13 +4,32 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCollectionStore, CollectionCategory, JourneySubGoal } from '../store/collectionStore';
 import { useMacroGoalStore } from '../store/macroGoalStore';
+import { useConfettiStore } from '../store/confettiStore';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
+const CATEGORY_ICONS: Record<CollectionCategory, string> = {
+  books: '📚',
+  games: '🎮',
+  fitness: '🏋️',
+  stocks: '📈',
+  courses: '🎓',
+  travel: '✈️',
+  other: '⭐️',
+};
+
 type TimeframeFilter = 'all' | 'year' | 'month';
+
+type CelebrationInfo = {
+  title: string;
+  subtitle: string;
+  categoryIcon: string;
+  payoutText: string;
+  badgeLabel: string;
+} | null;
 
 export default function CollectionsScreen() {
   const {
@@ -29,11 +48,15 @@ export default function CollectionsScreen() {
   } = useCollectionStore();
 
   const { macroGoals, deleteMacroGoal } = useMacroGoalStore();
+  const { triggerConfetti } = useConfettiStore();
 
   // Timeframe filter state
   const [timeframeFilter, setTimeframeFilter] = useState<TimeframeFilter>('all');
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1; // 1-12
+
+  // Celebration Dopamine Modal
+  const [celebrationInfo, setCelebrationInfo] = useState<CelebrationInfo>(null);
 
   // Create/Edit Journey Modal
   const [isJourneyModalOpen, setIsJourneyModalOpen] = useState(false);
@@ -90,14 +113,25 @@ export default function CollectionsScreen() {
         category: journeyCategory,
         macroGoalId: selectedMacroId || undefined,
       });
+      setIsJourneyModalOpen(false);
     } else {
       addCollection({
         title: journeyTitle.trim(),
         category: journeyCategory,
         macroGoalId: selectedMacroId || undefined,
       });
+      setIsJourneyModalOpen(false);
+
+      // Trigger Celebration Dopamine Feedback
+      triggerConfetti();
+      setCelebrationInfo({
+        title: '🚀 QUEST LAUNCHED!',
+        subtitle: `Journey "${journeyTitle.trim()}" is now active in your Discipline Economy.`,
+        categoryIcon: CATEGORY_ICONS[journeyCategory] || '🎯',
+        payoutText: '🎁 Estimated Rewards: Milestone keys & cash bonus multipliers upon completion!',
+        badgeLabel: 'MAIN QUEST UNLOCKED',
+      });
     }
-    setIsJourneyModalOpen(false);
   };
 
   const handleConfirmDeleteJourney = (alsoDeleteMacroGoal: boolean) => {
@@ -144,6 +178,7 @@ export default function CollectionsScreen() {
         year: isNaN(yrVal) ? undefined : yrVal,
         month: isNaN(moVal) ? undefined : moVal,
       });
+      setIsSubGoalModalOpen(false);
     } else {
       addSubGoal({
         collectionId: activeSubGoalCollectionId,
@@ -152,8 +187,18 @@ export default function CollectionsScreen() {
         year: isNaN(yrVal) ? undefined : yrVal,
         month: isNaN(moVal) ? undefined : moVal,
       });
+      setIsSubGoalModalOpen(false);
+
+      // Trigger Celebration Dopamine Feedback for Sub-Goal creation
+      triggerConfetti();
+      setCelebrationInfo({
+        title: '🎯 SUB-QUEST CREATED!',
+        subtitle: `Bucket "${subGoalTitle.trim()}" added to your journey timeframe targets.`,
+        categoryIcon: '⚔️',
+        payoutText: `🎯 Target: ${isNaN(targetVal) ? 'Custom' : targetVal} units | Timeframe: ${subGoalMonth ? MONTH_NAMES[parseInt(subGoalMonth, 10) - 1] : ''} ${subGoalYear || 'Ongoing'}`,
+        badgeLabel: 'SUB-QUEST INITIALIZED',
+      });
     }
-    setIsSubGoalModalOpen(false);
   };
 
   // Item CRUD
@@ -181,6 +226,50 @@ export default function CollectionsScreen() {
     setIsItemModalOpen(false);
   };
 
+  const handleToggleItem = (itemId: string, collectionId: string, subGoalId?: string) => {
+    const targetItem = items.find(i => i.id === itemId);
+    if (!targetItem) return;
+
+    const wasCompleted = targetItem.completed;
+    toggleItemCompletion(itemId);
+
+    // If completing (not uncompleting), check if it completes a Sub-Goal or Journey!
+    if (!wasCompleted) {
+      if (subGoalId) {
+        const sgItems = items.filter(i => i.subGoalId === subGoalId);
+        const sgCompletedCount = sgItems.filter(i => i.completed).length + 1; // including current
+        const sg = subGoals.find(s => s.id === subGoalId);
+        const targetVal = sg?.targetMetric || sgItems.length;
+
+        if (sgCompletedCount >= targetVal && targetVal > 0) {
+          triggerConfetti();
+          setCelebrationInfo({
+            title: '🏆 SUB-GOAL CONQUERED!',
+            subtitle: `You completed 100% of "${sg?.title || 'Sub-Goal'}"!`,
+            categoryIcon: '🌟',
+            payoutText: '💰 Milestone Payout Credited! Progress synced to Macro Goal.',
+            badgeLabel: 'SUB-GOAL COMPLETE 100%',
+          });
+          return;
+        }
+      }
+
+      // Check entire Journey completion
+      const colItems = items.filter(i => i.collectionId === collectionId);
+      const colCompletedCount = colItems.filter(i => i.completed).length + 1;
+      if (colCompletedCount >= colItems.length && colItems.length > 0) {
+        triggerConfetti();
+        setCelebrationInfo({
+          title: '👑 JOURNEY MASTERED!',
+          subtitle: `Congratulations! You conquered all tasks in this Journey!`,
+          categoryIcon: '👑',
+          payoutText: '🔥 Discipline Booster unlocked! +1 Completed Journey logged.',
+          badgeLabel: 'JOURNEY COMPLETED 🏆',
+        });
+      }
+    }
+  };
+
   // Filter collections and sub-goals by timeframe filter
   const filteredSubGoals = (subGoals || []).filter(sg => {
     if (timeframeFilter === 'all') return true;
@@ -193,9 +282,14 @@ export default function CollectionsScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }} edges={['top']}>
       {/* Header Bar */}
       <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 32, fontWeight: '800', color: '#FFFFFF' }}>Journeys</Text>
-        <Pressable onPress={handleOpenNewJourney} style={{ backgroundColor: '#AF52DE', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' }}>
-          <Ionicons name="add" size={24} color="#FFF" />
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={{ fontSize: 32, fontWeight: '800', color: '#FFFFFF', marginRight: 8 }}>Journeys</Text>
+          <View style={{ backgroundColor: '#AF52DE22', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#AF52DE55' }}>
+            <Text style={{ color: '#AF52DE', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 }}>QUEST LOG</Text>
+          </View>
+        </View>
+        <Pressable onPress={handleOpenNewJourney} style={{ backgroundColor: '#AF52DE', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', shadowColor: '#AF52DE', shadowRadius: 8, shadowOpacity: 0.5 }}>
+          <Ionicons name="add" size={26} color="#FFF" />
         </Pressable>
       </View>
 
@@ -211,7 +305,7 @@ export default function CollectionsScreen() {
             marginRight: 8,
           }}
         >
-          <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '600' }}>All</Text>
+          <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '600' }}>All Quests</Text>
         </Pressable>
 
         <Pressable
@@ -243,11 +337,15 @@ export default function CollectionsScreen() {
       {/* Journeys List */}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
         {collections.length === 0 ? (
-          <View style={{ alignItems: 'center', marginTop: 40 }}>
-            <Ionicons name="compass-outline" size={48} color="#3A3A3C" />
-            <Text style={{ color: '#8E8E93', marginTop: 16, fontSize: 16, textAlign: 'center' }}>
-              No journeys yet. Create one to start tracking books, fitness goals, or macro journeys.
+          <View style={{ alignItems: 'center', marginTop: 40, backgroundColor: '#1C1C1E', borderRadius: 20, padding: 32, borderWidth: 1, borderColor: '#2C2C2E' }}>
+            <Text style={{ fontSize: 48, marginBottom: 12 }}>🗺️</Text>
+            <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '700', textAlign: 'center' }}>No Active Journeys</Text>
+            <Text style={{ color: '#8E8E93', marginTop: 8, fontSize: 14, textAlign: 'center', lineHeight: 20 }}>
+              Launch your first RPG-style Journey to track reading targets, fitness quests, and multi-month discipline milestones!
             </Text>
+            <Pressable onPress={handleOpenNewJourney} style={{ backgroundColor: '#AF52DE', marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14 }}>
+              <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '700' }}>+ Launch First Journey</Text>
+            </Pressable>
           </View>
         ) : (
           collections.map(collection => {
@@ -256,20 +354,27 @@ export default function CollectionsScreen() {
             const completedCount = collectionItems.filter(i => i.completed).length;
             const progress = collectionItems.length > 0 ? Math.round((completedCount / collectionItems.length) * 100) : 0;
             const linkedMacro = macroGoals.find(g => g.id === collection.macroGoalId);
+            const catIcon = CATEGORY_ICONS[collection.category] || '⭐️';
+            const isFullyComplete = progress === 100 && collectionItems.length > 0;
 
             return (
-              <View key={collection.id} style={{ marginBottom: 24, backgroundColor: '#1C1C1E', borderRadius: 16, padding: 16 }}>
-                {/* Journey Header */}
+              <View key={collection.id} style={{ marginBottom: 24, backgroundColor: '#1C1C1E', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: isFullyComplete ? '#AF52DE' : '#2C2C2E', shadowColor: isFullyComplete ? '#AF52DE' : '#000', shadowRadius: 10, shadowOpacity: isFullyComplete ? 0.3 : 0.1 }}>
+                {/* Journey Card Header */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <View style={{ flex: 1, marginRight: 8 }}>
-                    <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '700' }}>{collection.title}</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                      <Text style={{ color: '#AF52DE', fontSize: 12, textTransform: 'capitalize', fontWeight: '600', marginRight: 8 }}>
-                        {collection.category}
-                      </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 22, marginRight: 8 }}>{catIcon}</Text>
+                      <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '800' }}>{collection.title}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+                      <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginRight: 6 }}>
+                        <Text style={{ color: '#AF52DE', fontSize: 11, textTransform: 'uppercase', fontWeight: '700' }}>
+                          {collection.category}
+                        </Text>
+                      </View>
                       {linkedMacro && (
-                        <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                          <Text style={{ color: '#5AC8FA', fontSize: 10, fontWeight: '600' }}>🎯 {linkedMacro.title}</Text>
+                        <View style={{ backgroundColor: '#5AC8FA15', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#5AC8FA44' }}>
+                          <Text style={{ color: '#5AC8FA', fontSize: 11, fontWeight: '700' }}>🎯 {linkedMacro.title}</Text>
                         </View>
                       )}
                     </View>
@@ -285,10 +390,17 @@ export default function CollectionsScreen() {
                   </View>
                 </View>
 
-                {/* Journey Overall Progress */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, backgroundColor: '#2C2C2E', padding: 10, borderRadius: 10 }}>
-                  <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600' }}>Overall Progress</Text>
-                  <Text style={{ color: '#AF52DE', fontSize: 14, fontWeight: '700' }}>{completedCount}/{collectionItems.length} ({progress}%)</Text>
+                {/* Journey Overall Progress Level Bar */}
+                <View style={{ backgroundColor: '#252528', padding: 12, borderRadius: 14, marginBottom: 16, borderWidth: 1, borderColor: '#3A3A3C' }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>QUEST PROGRESS</Text>
+                    <Text style={{ color: isFullyComplete ? '#30D158' : '#AF52DE', fontSize: 14, fontWeight: '800' }}>
+                      {completedCount}/{collectionItems.length} ({progress}%) {isFullyComplete ? '🏆' : ''}
+                    </Text>
+                  </View>
+                  <View style={{ height: 6, backgroundColor: '#1C1C1E', borderRadius: 3 }}>
+                    <View style={{ height: 6, width: `${progress}%`, backgroundColor: isFullyComplete ? '#30D158' : '#AF52DE', borderRadius: 3 }} />
+                  </View>
                 </View>
 
                 {/* Sub-Goal Buckets Section */}
@@ -297,6 +409,7 @@ export default function CollectionsScreen() {
                   const sgCompleted = sgItems.filter(i => i.completed).length;
                   const targetMetric = sg.targetMetric || sgItems.length || 1;
                   const sgPct = Math.min(100, Math.round((sgCompleted / targetMetric) * 100));
+                  const isSgComplete = sgPct === 100;
                   const timeframeLabel = sg.month && sg.year
                     ? `${MONTH_NAMES[sg.month - 1]} ${sg.year}`
                     : sg.year
@@ -304,14 +417,14 @@ export default function CollectionsScreen() {
                     : 'Ongoing';
 
                   return (
-                    <View key={sg.id} style={{ backgroundColor: '#252528', borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#3A3A3C' }}>
+                    <View key={sg.id} style={{ backgroundColor: '#252528', borderRadius: 14, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: isSgComplete ? '#30D15866' : '#3A3A3C' }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                          <Ionicons name="folder-open-outline" size={16} color="#AF52DE" style={{ marginRight: 6 }} />
+                          <Text style={{ fontSize: 14, marginRight: 6 }}>{isSgComplete ? '🌟' : '⚔️'}</Text>
                           <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '700' }}>{sg.title}</Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <Text style={{ color: '#5AC8FA', fontSize: 11, fontWeight: '600', marginRight: 8 }}>{timeframeLabel}</Text>
+                          <Text style={{ color: '#5AC8FA', fontSize: 11, fontWeight: '700', marginRight: 8 }}>{timeframeLabel}</Text>
                           <Pressable onPress={() => handleOpenEditSubGoal(sg)} style={{ marginRight: 6 }}>
                             <Ionicons name="ellipsis-horizontal" size={16} color="#8E8E93" />
                           </Pressable>
@@ -321,24 +434,24 @@ export default function CollectionsScreen() {
                         </View>
                       </View>
 
-                      {/* Progress Bar */}
-                      <View style={{ height: 4, backgroundColor: '#3A3A3C', borderRadius: 2, marginVertical: 6 }}>
-                        <View style={{ height: 4, width: `${sgPct}%`, backgroundColor: '#AF52DE', borderRadius: 2 }} />
+                      {/* Sub-Goal Progress Bar */}
+                      <View style={{ height: 5, backgroundColor: '#1C1C1E', borderRadius: 3, marginVertical: 6 }}>
+                        <View style={{ height: 5, width: `${sgPct}%`, backgroundColor: isSgComplete ? '#30D158' : '#AF52DE', borderRadius: 3 }} />
                       </View>
-                      <Text style={{ color: '#8E8E93', fontSize: 11, textAlign: 'right', marginBottom: 6 }}>
-                        {sgCompleted}/{sg.targetMetric ? sg.targetMetric : sgItems.length} completed ({sgPct}%)
+                      <Text style={{ color: '#8E8E93', fontSize: 11, textAlign: 'right', fontWeight: '600' }}>
+                        {sgCompleted}/{sg.targetMetric ? sg.targetMetric : sgItems.length} completed ({sgPct}%) {isSgComplete ? '🎯' : ''}
                       </Text>
                     </View>
                   );
                 })}
 
-                {/* Sub-Goal Creator Button */}
+                {/* Add Sub-Goal Creator Button */}
                 <Pressable
                   onPress={() => handleOpenNewSubGoal(collection.id)}
-                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#2C2C2E', paddingVertical: 8, borderRadius: 8, marginBottom: 16 }}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#2C2C2E', paddingVertical: 10, borderRadius: 10, marginBottom: 16 }}
                 >
                   <Ionicons name="pricetag-outline" size={16} color="#5AC8FA" style={{ marginRight: 6 }} />
-                  <Text style={{ color: '#5AC8FA', fontSize: 12, fontWeight: '600' }}>+ Add Sub-Goal Bucket (e.g. Fiction, Hikes)</Text>
+                  <Text style={{ color: '#5AC8FA', fontSize: 13, fontWeight: '700' }}>+ Add Sub-Goal Bucket (e.g. Fiction, Hikes)</Text>
                 </Pressable>
 
                 {/* Items List */}
@@ -347,7 +460,7 @@ export default function CollectionsScreen() {
 
                   return (
                     <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#2C2C2E' }}>
-                      <Pressable onPress={() => toggleItemCompletion(item.id)} style={{ marginRight: 12 }}>
+                      <Pressable onPress={() => handleToggleItem(item.id, collection.id, item.subGoalId)} style={{ marginRight: 12 }}>
                         <Ionicons 
                           name={item.completed ? "checkmark-circle" : "ellipse-outline"} 
                           size={24} 
@@ -361,7 +474,7 @@ export default function CollectionsScreen() {
                           </Text>
                           {itemSubGoal && (
                             <View style={{ backgroundColor: '#AF52DE22', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginRight: 6 }}>
-                              <Text style={{ color: '#AF52DE', fontSize: 10, fontWeight: '600' }}>{itemSubGoal.title}</Text>
+                              <Text style={{ color: '#AF52DE', fontSize: 10, fontWeight: '700' }}>{itemSubGoal.title}</Text>
                             </View>
                           )}
                         </View>
@@ -382,7 +495,7 @@ export default function CollectionsScreen() {
                   style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#2C2C2E' }}
                 >
                   <Ionicons name="add-circle-outline" size={20} color="#AF52DE" style={{ marginRight: 8 }} />
-                  <Text style={{ color: '#AF52DE', fontSize: 14, fontWeight: '600' }}>Add Item</Text>
+                  <Text style={{ color: '#AF52DE', fontSize: 14, fontWeight: '700' }}>Add Item</Text>
                 </Pressable>
               </View>
             );
@@ -390,12 +503,43 @@ export default function CollectionsScreen() {
         )}
       </ScrollView>
 
+      {/* Celebration Dopamine Modal */}
+      <Modal visible={!!celebrationInfo} animationType="fade" transparent={true}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 24 }}>
+          <View style={{ backgroundColor: '#1C1C1E', borderRadius: 24, padding: 28, alignItems: 'center', borderWidth: 2, borderColor: '#AF52DE' }}>
+            <Text style={{ fontSize: 56, marginBottom: 12 }}>{celebrationInfo?.categoryIcon}</Text>
+            <View style={{ backgroundColor: '#AF52DE22', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#AF52DE' }}>
+              <Text style={{ color: '#AF52DE', fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>
+                {celebrationInfo?.badgeLabel}
+              </Text>
+            </View>
+            <Text style={{ color: '#FFF', fontSize: 24, fontWeight: '900', textAlign: 'center', marginBottom: 8 }}>
+              {celebrationInfo?.title}
+            </Text>
+            <Text style={{ color: '#8E8E93', fontSize: 14, textAlign: 'center', marginBottom: 16, lineHeight: 20 }}>
+              {celebrationInfo?.subtitle}
+            </Text>
+            <View style={{ backgroundColor: '#252528', padding: 14, borderRadius: 14, width: '100%', marginBottom: 24, borderWidth: 1, borderColor: '#3A3A3C' }}>
+              <Text style={{ color: '#5AC8FA', fontSize: 13, fontWeight: '700', textAlign: 'center' }}>
+                {celebrationInfo?.payoutText}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => setCelebrationInfo(null)}
+              style={{ backgroundColor: '#AF52DE', width: '100%', padding: 16, borderRadius: 16, alignItems: 'center' }}
+            >
+              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '800' }}>Claim & Continue 🔥</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       {/* Journey Create/Edit Modal */}
       <Modal visible={isJourneyModalOpen} animationType="slide" transparent={true}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' }}>
           <View style={{ backgroundColor: '#1C1C1E', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, minHeight: 420 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '700' }}>{editingJourneyId ? 'Edit Journey' : 'New Journey'}</Text>
+              <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '700' }}>{editingJourneyId ? 'Edit Journey' : 'New Journey Quest'}</Text>
               <Pressable onPress={() => setIsJourneyModalOpen(false)}>
                 <Ionicons name="close" size={24} color="#8E8E93" />
               </Pressable>
@@ -404,7 +548,7 @@ export default function CollectionsScreen() {
             <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 12, fontWeight: '600', textTransform: 'uppercase' }}>Title</Text>
             <TextInput
               style={{ backgroundColor: '#2C2C2E', color: '#FFF', padding: 16, borderRadius: 12, fontSize: 16, marginBottom: 16 }}
-              placeholder="e.g., Reading List 2026, Fitness"
+              placeholder="e.g., Reading List 2026, Fitness Quest"
               placeholderTextColor="#8E8E93"
               value={journeyTitle}
               onChangeText={setJourneyTitle}
@@ -422,9 +566,12 @@ export default function CollectionsScreen() {
                     paddingHorizontal: 16,
                     paddingVertical: 8,
                     borderRadius: 20,
-                    marginRight: 8
+                    marginRight: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
                   }}
                 >
+                  <Text style={{ marginRight: 6 }}>{CATEGORY_ICONS[c]}</Text>
                   <Text style={{ color: '#FFF', fontWeight: '600', textTransform: 'capitalize' }}>{c}</Text>
                 </Pressable>
               ))}
@@ -465,7 +612,7 @@ export default function CollectionsScreen() {
               onPress={handleSaveJourney}
               style={{ backgroundColor: '#AF52DE', padding: 16, borderRadius: 16, alignItems: 'center' }}
             >
-              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>{editingJourneyId ? 'Save Changes' : 'Create Journey'}</Text>
+              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '800' }}>{editingJourneyId ? 'Save Changes' : '🚀 Launch Journey Quest'}</Text>
             </Pressable>
           </View>
         </View>
@@ -607,7 +754,7 @@ export default function CollectionsScreen() {
               onPress={handleSaveSubGoal}
               style={{ backgroundColor: '#AF52DE', padding: 16, borderRadius: 16, alignItems: 'center' }}
             >
-              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>{editingSubGoalId ? 'Save Sub-Goal' : 'Create Sub-Goal'}</Text>
+              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '800' }}>{editingSubGoalId ? 'Save Sub-Goal' : '🎯 Create Sub-Goal Bucket'}</Text>
             </Pressable>
           </View>
         </View>
