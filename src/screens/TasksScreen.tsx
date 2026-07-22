@@ -5,16 +5,19 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTaskStore, Task } from '../store/taskStore';
 import { useMacroGoalStore } from '../store/macroGoalStore';
 import { useEconomyStore } from '../store/economyStore';
+import { useTimerStore } from '../store/timerStore';
 import { PrimaryButton } from '../components/PrimaryButton';
 import RewardToast from '../components/RewardToast';
 import AnimatedTaskRow from '../components/AnimatedTaskRow';
 import DialPicker from '../components/DialPicker';
 import EditTaskModal from '../components/EditTaskModal';
 import TimeSelectorModal from '../components/TimeSelectorModal';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function TasksScreen() {
   const { tasks, tags, pillars, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox } = useTaskStore();
   const { macroGoals } = useMacroGoalStore();
+  const { startTimer } = useTimerStore();
   
   const [modalVisible, setModalVisible] = useState(false);
   const [title, setTitle] = useState('');
@@ -23,6 +26,18 @@ export default function TasksScreen() {
   const [selectedMacroId, setSelectedMacroId] = useState('');
   const [sendDirectlyToIcebox, setSendDirectlyToIcebox] = useState(false);
   const [validationError, setValidationError] = useState('');
+  const [blockedModal, setBlockedModal] = useState<{ title: string; message: string } | null>(null);
+
+  const handleStartTimer = (taskId: string, mins: number) => {
+    const res = startTimer(taskId, mins);
+    if (res && res.success === false && res.reason === 'insufficient_hours') {
+      const missingHours = ((res.missingMinutes || 0) / 60).toFixed(1);
+      setBlockedModal({
+        title: 'Not Enough Time Earned',
+        message: `You need ${missingHours} more hours of focus to earn this entertainment session. Focus on productive tasks to earn leisure time!`,
+      });
+    }
+  };
 
   // Reward toast state
   const [toastVisible, setToastVisible] = useState(false);
@@ -296,6 +311,7 @@ export default function TasksScreen() {
                     onMoveToIcebox={moveToIcebox}
                     onEdit={setEditTask}
                     onDelete={deleteTask}
+                    onStartTimer={handleStartTimer}
                     showStartButton
                   />
                 );
@@ -396,6 +412,22 @@ export default function TasksScreen() {
         onSave={(id, updates) => updateTask(id, updates)}
         onDelete={(id) => deleteTask(id)}
       />
+
+      {/* Blocked Timer Modal */}
+      {blockedModal && (
+        <ConfirmModal
+          visible={!!blockedModal}
+          onClose={() => setBlockedModal(null)}
+          icon="time-outline"
+          iconColor="#FF9F0A"
+          accentColor="#FF9F0A"
+          title={blockedModal.title}
+          message={blockedModal.message}
+          actions={[
+            { label: 'Got It', onPress: () => setBlockedModal(null), style: 'default' },
+          ]}
+        />
+      )}
     </SafeAreaView>
   );
 }

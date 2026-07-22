@@ -118,8 +118,8 @@ export default function AnimatedTaskRow({
         transform: [{ translateX: rowTranslateX }],
       }}
     >
-      <View className="p-4 flex-row items-center justify-between">
-        <View className="flex-row items-center flex-1 pr-4">
+      <View className="flex-row items-stretch justify-between min-h-[72px]">
+        <View className="flex-row items-center flex-1 py-4 pl-4 pr-2">
           {/* Checkbox with glow ring */}
           <Pressable onPress={handleToggle} style={{ position: 'relative' }}>
             {/* Green glow ring (behind checkbox) */}
@@ -188,17 +188,17 @@ export default function AnimatedTaskRow({
         </View>
 
         {/* Actions - Shadcn-style ghost buttons */}
-        <View className="flex-row items-center gap-1">
+        <View className="flex-row items-stretch">
           {showStartButton && !localCompleted && onStartTimer && (
             <>
               <Pressable
                 onPress={() => onStartTimer(task.id, task.estimatedMinutes)}
-                className="p-2 rounded-md bg-transparent hover:bg-[#2C2C2E]"
+                className="px-3 justify-center items-center bg-transparent hover:bg-[#2C2C2E]"
                 style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
               >
                 <Ionicons name="play" size={16} color="#BF5AF2" />
               </Pressable>
-              {onEdit && <View style={{ width: 1, height: 16, backgroundColor: '#3A3A3C' }} />}
+              {onEdit && <View className="self-center" style={{ width: 1, height: 16, backgroundColor: '#3A3A3C' }} />}
             </>
           )}
 
@@ -206,12 +206,12 @@ export default function AnimatedTaskRow({
             <>
               <Pressable
                 onPress={() => onEdit(task)}
-                className="p-2 rounded-md bg-transparent hover:bg-[#2C2C2E]"
+                className="px-3 justify-center items-center bg-transparent hover:bg-[#2C2C2E]"
                 style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
               >
                 <Ionicons name="pencil" size={16} color="#8E8E93" />
               </Pressable>
-              {showIceboxButton && onMoveToIcebox && <View style={{ width: 1, height: 16, backgroundColor: '#3A3A3C' }} />}
+              {showIceboxButton && onMoveToIcebox && <View className="self-center" style={{ width: 1, height: 16, backgroundColor: '#3A3A3C' }} />}
             </>
           )}
 
@@ -219,19 +219,19 @@ export default function AnimatedTaskRow({
             <>
               <Pressable
                 onPress={() => onMoveToIcebox(task.id)}
-                className="p-2 rounded-md bg-transparent hover:bg-[#2C2C2E]"
+                className="px-3 justify-center items-center bg-transparent hover:bg-[#2C2C2E]"
                 style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
               >
                 <Ionicons name="snow-outline" size={16} color="#8E8E93" />
               </Pressable>
-              {onDelete && <View style={{ width: 1, height: 16, backgroundColor: '#3A3A3C' }} />}
+              {onDelete && <View className="self-center" style={{ width: 1, height: 16, backgroundColor: '#3A3A3C' }} />}
             </>
           )}
 
           {onDelete && (
             <Pressable
               onPress={() => onDelete(task.id)}
-              className="p-2 rounded-md bg-transparent hover:bg-[rgba(255,69,58,0.1)]"
+              className="px-3 justify-center items-center bg-transparent hover:bg-[rgba(255,69,58,0.1)]"
               style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
             >
               <Ionicons name="trash-outline" size={16} color="#FF453A" />
