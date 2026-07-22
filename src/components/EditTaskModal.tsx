@@ -164,7 +164,7 @@ export default function EditTaskModal({
               {selectedPillarId !== '' && (
                 <>
                   <Text style={{ color: '#A1A1AA', fontSize: 13, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase' }}>
-                    2. Select Journey
+                    2. Select Category
                   </Text>
                   <Pressable
                     onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
@@ -180,7 +180,7 @@ export default function EditTaskModal({
                     }}
                   >
                     <Text style={{ color: tagId ? '#FFFFFF' : '#52525B', fontSize: 14 }}>
-                      {tagId ? tags.find(t => t.id === tagId)?.name : 'Select a specific journey...'}
+                      {tagId ? tags.find(t => t.id === tagId)?.name : 'Select a specific category...'}
                     </Text>
                     <Ionicons name={showCategoryDropdown ? "chevron-up" : "chevron-down"} size={16} color="#A1A1AA" />
                   </Pressable>
