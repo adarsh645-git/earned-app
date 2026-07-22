@@ -222,6 +222,49 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Cloud Sync & Account Status Card */}
+        <View className="mb-6">
+          <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3">
+            Cloud Sync & Account
+          </Text>
+          <Pressable
+            onPress={openModal}
+            style={{
+              backgroundColor: '#1C1C1E',
+              borderColor: user ? 'rgba(48,209,88,0.3)' : 'rgba(191,90,242,0.3)',
+              borderWidth: 1,
+            }}
+            className="p-4 rounded-2xl flex-row items-center justify-between"
+          >
+            <View className="flex-row items-center flex-1 pr-3">
+              <View
+                style={{
+                  backgroundColor: user ? 'rgba(48,209,88,0.15)' : 'rgba(191,90,242,0.15)',
+                  width: 40,
+                  height: 40,
+                  borderRadius: 12,
+                }}
+                className="items-center justify-center mr-3"
+              >
+                <Ionicons
+                  name={user ? 'cloud-done' : 'cloud-upload-outline'}
+                  size={22}
+                  color={user ? '#30D158' : '#BF5AF2'}
+                />
+              </View>
+              <View className="flex-1">
+                <Text className="text-white font-bold text-sm">
+                  {user ? 'Cloud Sync Active' : 'Enable Multi-Device Cloud Sync'}
+                </Text>
+                <Text className="text-[#8E8E93] text-xs font-medium mt-0.5" numberOfLines={1}>
+                  {user ? user.email : 'Tap to sign in with Google & sync all devices'}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#8E8E93" />
+          </Pressable>
+        </View>
+
         {/* Credit Score & Debt Dashboard - Apple Widget */}
         <View className="mb-6">
           <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3">
