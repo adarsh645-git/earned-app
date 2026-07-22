@@ -8,6 +8,7 @@ import DashboardScreen from '../screens/DashboardScreen';
 import TasksScreen from '../screens/TasksScreen';
 import StoreScreen from '../screens/StoreScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import CollectionsScreen from '../screens/CollectionsScreen';
 import TimerOverlay from '../components/TimerOverlay';
 import ErrorBoundary from '../components/ErrorBoundary';
 import CheckInModal from '../components/CheckInModal';
@@ -32,6 +33,9 @@ const StoreWithBoundary = () => (
 const ProfileWithBoundary = () => (
   <ErrorBoundary><ProfileScreen /></ErrorBoundary>
 );
+const CollectionsWithBoundary = () => (
+  <ErrorBoundary><CollectionsScreen /></ErrorBoundary>
+);
 
 // ─── Desktop Sidebar Component ────────────────────────────────────────────────
 interface SidebarProps {
@@ -46,6 +50,7 @@ function DesktopSidebar({ currentTab, onSelectTab }: SidebarProps) {
   const navItems = [
     { name: 'Dashboard', label: 'Summary', icon: 'home-outline', activeIcon: 'home' },
     { name: 'Tasks', label: 'Tasks & Icebox', icon: 'list-outline', activeIcon: 'list' },
+    { name: 'Collections', label: 'Journeys', icon: 'map-outline', activeIcon: 'map' },
     { name: 'Store', label: 'Reward Store', icon: 'cart-outline', activeIcon: 'cart' },
     { name: 'Profile', label: 'Profile & Credit', icon: 'person-outline', activeIcon: 'person' },
   ];

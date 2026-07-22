@@ -13,10 +13,6 @@ ALTER TABLE public.profiles
   DROP COLUMN IF EXISTS creation_dollars_earned_today;
 
 -- 3. Add Goal Type ('productive' vs 'entertainment') to Macro Goals table
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS goal_type TEXT DEFAULT 'productive';
-
--- Add check constraint for goal_type on macro_goals table
 ALTER TABLE public.macro_goals
   ADD COLUMN IF NOT EXISTS goal_type TEXT DEFAULT 'productive' CHECK (goal_type IN ('productive', 'entertainment'));
 

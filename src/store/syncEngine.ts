@@ -4,6 +4,8 @@ import { useAuthStore } from './authStore';
 import { useEconomyStore } from './economyStore';
 import { useTaskStore, Task } from './taskStore';
 import { useRewardStore, Reward } from './rewardStore';
+import { useMacroGoalStore, MacroGoal } from './macroGoalStore';
+import { useCollectionStore, Collection, CollectionItem } from './collectionStore';
 
 export function useCloudSync() {
   const { user, initializeAuth } = useAuthStore();
@@ -32,6 +34,14 @@ export function useCloudSync() {
       pushAllRewardsToCloud(user.id, state.rewards);
     });
 
+    const unsubMacroGoals = useMacroGoalStore.subscribe((state) => {
+      pushAllMacroGoalsToCloud(user.id, state.macroGoals);
+    });
+
+    const unsubCollections = useCollectionStore.subscribe((state) => {
+      pushAllCollectionsToCloud(user.id, state.collections, state.items);
+    });
+
     // 3. Subscribe to Realtime remote database changes
     const channel = supabase
       .channel(`user_sync_${user.id}`)
@@ -48,6 +58,8 @@ export function useCloudSync() {
       unsubEconomy();
       unsubTasks();
       unsubRewards();
+      unsubMacroGoals();
+      unsubCollections();
       supabase.removeChannel(channel);
     };
   }, [user]);
@@ -116,6 +128,65 @@ export async function pullCloudData(userId: string) {
       }));
       useRewardStore.setState({ rewards: formattedRewards });
     }
+
+    // Fetch Macro Goals
+    const { data: macroGoals } = await supabase
+      .from('macro_goals')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (macroGoals && macroGoals.length > 0) {
+      const formattedMacroGoals = macroGoals.map((g: any) => ({
+        id: g.id,
+        title: g.title,
+        horizon: 'monthly' as 'monthly' | 'yearly', // simplified for now
+        targetMinutes: g.target_minutes || 0,
+        completedMinutes: g.completed_minutes || 0,
+        metricType: g.metric_type || 'minutes',
+        targetMetric: g.target_metric || 0,
+        completedMetric: g.completed_metric || 0,
+        unlockedMilestones: g.unlocked_milestones || [],
+      }));
+      useMacroGoalStore.setState({ macroGoals: formattedMacroGoals });
+    }
+
+    // Fetch Collections
+    const { data: collections } = await supabase
+      .from('collections')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (collections && collections.length > 0) {
+      const formattedCollections = collections.map((c: any) => ({
+        id: c.id,
+        title: c.title,
+        category: c.category,
+        macroGoalId: c.macro_goal_id,
+        dateCreated: c.date_created,
+      }));
+      useCollectionStore.setState((s) => ({ ...s, collections: formattedCollections }));
+    }
+
+    // Fetch Collection Items
+    if (collections && collections.length > 0) {
+      const { data: items } = await supabase
+        .from('collection_items')
+        .select('*')
+        .in('collection_id', collections.map(c => c.id));
+
+      if (items && items.length > 0) {
+        const formattedItems = items.map((i: any) => ({
+          id: i.id,
+          collectionId: i.collection_id,
+          title: i.title,
+          estimatedMinutes: i.estimated_minutes,
+          completed: i.completed,
+          isAddedLater: i.is_added_later,
+          dateCreated: i.date_created,
+        }));
+        useCollectionStore.setState((s) => ({ ...s, items: formattedItems }));
+      }
+    }
   } catch (err) {
     console.log('Cloud sync info:', err);
   }
@@ -172,5 +243,57 @@ export async function pushAllRewardsToCloud(userId: string, rewards: Reward[]) {
     await supabase.from('rewards').upsert(payload, { onConflict: 'id' });
   } catch (err) {
     console.log('Error pushing rewards to cloud:', err);
+  }
+}
+
+export async function pushAllMacroGoalsToCloud(userId: string, goals: MacroGoal[]) {
+  if (!isSupabaseConfigured() || goals.length === 0) return;
+  try {
+    const payload = goals.map((g) => ({
+      id: g.id,
+      user_id: userId,
+      title: g.title,
+      target_minutes: g.targetMinutes || 0,
+      completed_minutes: g.completedMinutes || 0,
+      metric_type: g.metricType || 'minutes',
+      target_metric: g.targetMetric || 0,
+      completed_metric: g.completedMetric || 0,
+      unlocked_milestones: g.unlockedMilestones || [],
+    }));
+    await supabase.from('macro_goals').upsert(payload, { onConflict: 'id' });
+  } catch (err) {
+    console.log('Error pushing macro goals to cloud:', err);
+  }
+}
+
+export async function pushAllCollectionsToCloud(userId: string, collections: Collection[], items: CollectionItem[]) {
+  if (!isSupabaseConfigured()) return;
+  try {
+    if (collections.length > 0) {
+      const cPayload = collections.map((c) => ({
+        id: c.id,
+        user_id: userId,
+        title: c.title,
+        category: c.category,
+        macro_goal_id: c.macroGoalId || null,
+        date_created: c.dateCreated,
+      }));
+      await supabase.from('collections').upsert(cPayload, { onConflict: 'id' });
+    }
+
+    if (items.length > 0) {
+      const iPayload = items.map((i) => ({
+        id: i.id,
+        collection_id: i.collectionId,
+        title: i.title,
+        estimated_minutes: i.estimatedMinutes || null,
+        completed: i.completed,
+        is_added_later: i.isAddedLater,
+        date_created: i.dateCreated,
+      }));
+      await supabase.from('collection_items').upsert(iPayload, { onConflict: 'id' });
+    }
+  } catch (err) {
+    console.log('Error pushing collections to cloud:', err);
   }
 }

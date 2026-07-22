@@ -17,8 +17,11 @@ export type MacroGoal = {
   id: string;
   title: string;
   horizon: 'monthly' | 'yearly';
-  targetMinutes: number; 
-  completedMinutes: number; 
+  targetMinutes: number; // legacy/fallback for economy math
+  completedMinutes: number; // legacy/fallback
+  metricType?: 'minutes' | 'units';
+  targetMetric?: number;
+  completedMetric?: number;
   unlockedMilestones: number[]; // e.g. [25, 50, 75, 100]
   type?: MacroGoalType;
 };
@@ -44,8 +47,8 @@ export const getMilestoneDollars = (targetMinutes: number, milestone: number): n
 
 interface MacroGoalState {
   macroGoals: MacroGoal[];
-  addMacroGoal: (goal: Omit<MacroGoal, 'id' | 'completedMinutes' | 'unlockedMilestones'>) => void;
-  addProgress: (id: string, minutes: number) => UnlockedMilestoneInfo[];
+  addMacroGoal: (goal: Omit<MacroGoal, 'id' | 'completedMinutes' | 'completedMetric' | 'unlockedMilestones'>) => void;
+  addProgress: (id: string, amount: number) => UnlockedMilestoneInfo[];
 }
 
 export const useMacroGoalStore = create<MacroGoalState>()(
@@ -58,10 +61,12 @@ export const useMacroGoalStore = create<MacroGoalState>()(
           id: uuidv4(),
           type: goal.type || 'productive',
           completedMinutes: 0,
+          completedMetric: 0,
+          metricType: goal.metricType || 'minutes',
           unlockedMilestones: [],
         }]
       })),
-      addProgress: (id, minutes) => {
+      addProgress: (id, amount) => {
         // Block progress updates if currently in default
         if (useEconomyStore.getState().isInDefault) {
           return [];
@@ -70,10 +75,23 @@ export const useMacroGoalStore = create<MacroGoalState>()(
         const goal = get().macroGoals.find(g => g.id === id);
         if (!goal) return [];
 
-        const oldMinutes = goal.completedMinutes;
-        const newMinutes = oldMinutes + minutes;
-        const target = goal.targetMinutes;
-        const newPct = Math.min(100, Math.floor((newMinutes / target) * 100));
+        const isUnits = goal.metricType === 'units';
+        
+        let newPct = 0;
+        let newMinutes = goal.completedMinutes;
+        let newMetric = goal.completedMetric || 0;
+        let targetForPayout = goal.targetMinutes;
+
+        if (isUnits) {
+          newMetric = newMetric + amount;
+          const target = goal.targetMetric || 1;
+          newPct = Math.min(100, Math.floor((newMetric / target) * 100));
+          targetForPayout = (goal.targetMetric || 1) * 60; // Approximate 1 hour per unit for economy math fallback
+        } else {
+          newMinutes = newMinutes + amount;
+          const target = goal.targetMinutes;
+          newPct = Math.min(100, Math.floor((newMinutes / target) * 100));
+        }
 
         const existingMilestones = goal.unlockedMilestones || [];
         const possibleMilestones = [25, 50, 75, 100];
@@ -82,7 +100,7 @@ export const useMacroGoalStore = create<MacroGoalState>()(
 
         possibleMilestones.forEach(m => {
           if (newPct >= m && !existingMilestones.includes(m)) {
-            const dollars = getMilestoneDollars(target, m);
+            const dollars = getMilestoneDollars(targetForPayout, m);
             newlyUnlocked.push({
               percentage: m,
               dollarsAwarded: dollars,
@@ -102,11 +120,7 @@ export const useMacroGoalStore = create<MacroGoalState>()(
         set((state) => ({
           macroGoals: state.macroGoals.map(g =>
             g.id === id
-              ? {
-                  ...g,
-                  completedMinutes: newMinutes,
-                  unlockedMilestones: updatedUnlocked,
-                }
+              ? { ...g, completedMinutes: newMinutes, completedMetric: newMetric, unlockedMilestones: updatedUnlocked }
               : g
           ),
         }));

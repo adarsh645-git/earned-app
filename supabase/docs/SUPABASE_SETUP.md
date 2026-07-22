@@ -1,4 +1,4 @@
-# Supabase PostgreSQL Database Setup Guide (3 Minutes)
+# Supabase PostgreSQL Database Setup Guide
 
 This step-by-step guide will help you connect a **100% Free Supabase PostgreSQL Database** to **Earned** so your stats, streak, cash balance, tasks, and store items automatically sync across all your devices in real-time.
 
@@ -26,20 +26,20 @@ This step-by-step guide will help you connect a **100% Free Supabase PostgreSQL 
 
 ---
 
-## Step 3: Run the Database Migration Script
+## Step 3: Run Database Migrations
 1. In your Supabase dashboard sidebar, click **SQL Editor**.
 2. Click **New query**.
-3. Open [`supabase_schema.sql`](file:///Users/adarshreddy/Projects/earned-app/supabase_schema.sql) from your project folder, copy its contents, and paste them into the Supabase SQL Editor.
+3. Open [`supabase/schema.sql`](file:///Users/adarshreddy/Projects/earned-app/supabase/schema.sql) from your project folder, copy its contents, and paste them into the Supabase SQL Editor.
 4. Click **Run** (bottom right of SQL Editor).
 
-You will see `Success. No rows returned`. All 4 tables (`profiles`, `tasks`, `rewards`, `macro_goals`), automated user creation triggers, and Row Level Security (RLS) policies are now active!
+All tables (`profiles`, `tasks`, `rewards`, `macro_goals`, `collections`, `collection_items`), automated user creation triggers, and Row Level Security (RLS) policies are now active!
 
 ---
 
 ## Step 4: Test Real-Time Multi-Device Sync
 1. Start your local web app:
    ```bash
-   npx expo start --web
+   npm run web
    ```
 2. Open `http://localhost:8081` in your desktop browser -> click **Sync Devices** -> create an account.
 3. Open the app on your phone -> click **Sync Devices** -> log in with the same email.

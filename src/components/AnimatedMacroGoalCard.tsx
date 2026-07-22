@@ -190,7 +190,11 @@ export default function AnimatedMacroGoalCard({
   showIcon = false,
   iconName,
 }: AnimatedMacroGoalCardProps) {
-  const pct = Math.min(100, Math.round((goal.completedMinutes / goal.targetMinutes) * 100));
+  const isUnits = goal.metricType === 'units';
+  const target = isUnits ? (goal.targetMetric || 1) : goal.targetMinutes;
+  const completed = isUnits ? (goal.completedMetric || 0) : goal.completedMinutes;
+  
+  const pct = Math.min(100, Math.round((completed / target) * 100));
   const unlocked = goal.unlockedMilestones || [];
   const milestones = [25, 50, 75, 100];
 
@@ -227,9 +231,15 @@ export default function AnimatedMacroGoalCard({
 
   // Format labels based on goal type
   const isEntertainment = goal.type === 'entertainment';
-  const completedLabel = isEntertainment
-    ? `${(goal.completedMinutes / 60).toFixed(1)}/${(goal.targetMinutes / 60).toFixed(0)}h`
-    : `${goal.completedMinutes}/${goal.targetMinutes}m`;
+  
+  let completedLabel = '';
+  if (isUnits) {
+    completedLabel = `${completed}/${target}`;
+  } else if (isEntertainment) {
+    completedLabel = `${(completed / 60).toFixed(1)}/${(target / 60).toFixed(0)}h`;
+  } else {
+    completedLabel = `${completed}/${target}m`;
+  }
 
   const barWidth = barAnim.interpolate({
     inputRange: [0, 100],
