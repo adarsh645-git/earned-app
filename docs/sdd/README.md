@@ -1,0 +1,11 @@
+# Software Design Description (SDD) Index
+
+This directory contains the feature specification documents and task checklists organized by feature name for Spec-Driven Development (SDD).
+
+## SDD Documents
+
+- **[001-long-term-milestone-rewards.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/001-long-term-milestone-rewards.md)**: Milestone reward scaling, auto-crediting, and milestone badges for Pyramid Goals.
+- **[002-focus-lock-timer.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/002-focus-lock-timer.md)**: Focus timer overlay, economic multiplier rates, and session completion rollup.
+- **[003-daily-checkin-and-planning-rewards.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/003-daily-checkin-and-planning-rewards.md)**: Daily launch check-in bonus, planning task creation bounties (+1 key, max 3/day), and streak grace period shield.
+- **[004-dual-currency-reward-economy.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/004-dual-currency-reward-economy.md)**: Dual-currency economy (Hours + Dollars), streak-based focus conversion, entertainment macro goals, and hard-block timer enforcement.
+

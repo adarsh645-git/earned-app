@@ -1,0 +1,346 @@
+import React, { useState } from 'react';
+import { View, Text, ScrollView, TextInput, Pressable } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTaskStore, Bucket, Task } from '../store/taskStore';
+import { useMacroGoalStore } from '../store/macroGoalStore';
+import { useEconomyStore } from '../store/economyStore';
+import RewardToast from '../components/RewardToast';
+import AnimatedTaskRow from '../components/AnimatedTaskRow';
+import DialPicker from '../components/DialPicker';
+export default function TasksScreen() {
+  const { tasks, tags, addTask, toggleTask, moveToIcebox, activateFromIcebox } = useTaskStore();
+  const { macroGoals } = useMacroGoalStore();
+  
+  const [modalVisible, setModalVisible] = useState(false);
+  const [title, setTitle] = useState('');
+  const [selectedTagId, setSelectedTagId] = useState(tags[0]?.id || '');
+  const [estimatedMinutes, setEstimatedMinutes] = useState<number>(25);
+  const [selectedMacroId, setSelectedMacroId] = useState('');
+  const [sendDirectlyToIcebox, setSendDirectlyToIcebox] = useState(false);
+  const [validationError, setValidationError] = useState('');
+
+  // Reward toast state
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastSubtext, setToastSubtext] = useState('');
+
+  const incompleteTasks = tasks.filter(t => !t.isIcebox && !t.completed);
+  const completedTasks = tasks.filter(t => !t.isIcebox && t.completed);
+  const iceboxTasks = tasks.filter(t => t.isIcebox);
+
+  const handleAddTask = () => {
+    setValidationError('');
+    
+    if (!title.trim()) {
+      setValidationError('Task title is required');
+      return;
+    }
+    
+    if (estimatedMinutes <= 0) {
+      setValidationError('Estimated focus time must be a valid number of minutes');
+      return;
+    }
+    
+    if (estimatedMinutes > 60) {
+      setValidationError('Focus chunks cannot exceed 60 minutes. Break it down!');
+      return;
+    }
+
+    addTask({
+      title: title.trim(),
+      tagId: selectedTagId,
+      estimatedMinutes: estimatedMinutes,
+      macroGoalId: selectedMacroId || undefined,
+      isIcebox: sendDirectlyToIcebox,
+    });
+
+    setTitle('');
+    setEstimatedMinutes(25);
+    setSelectedMacroId('');
+    setSendDirectlyToIcebox(false);
+    setModalVisible(false);
+  };
+
+  // If modal is visible, show the form inline instead of using Modal component
+  if (modalVisible) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }}>
+        <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 40 }}>
+          
+          {/* Header */}
+          <View className="flex-row justify-between items-center mt-3 mb-6">
+            <Text className="text-white text-xl font-extrabold tracking-tight">New Focus Block</Text>
+            <Pressable onPress={() => setModalVisible(false)} style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 }} className="p-2 rounded-full">
+              <Ionicons name="close" size={20} color="#8E8E93" />
+            </Pressable>
+          </View>
+
+          {validationError ? (
+            <View style={{ backgroundColor: 'rgba(255,69,58,0.15)', borderColor: 'rgba(255,69,58,0.4)', borderWidth: 1 }} className="p-3.5 rounded-2xl mb-4">
+              <Text className="text-[#FF453A] text-xs font-semibold text-center">{validationError}</Text>
+            </View>
+          ) : null}
+
+          {/* Title Input */}
+          <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Focus Item Title</Text>
+          <TextInput
+            value={title}
+            onChangeText={setTitle}
+            placeholder="e.g. Code Review, Bike Ride, Read Book"
+            placeholderTextColor="#8E8E93"
+            style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }}
+            className="text-white rounded-2xl p-4 mb-4 text-sm font-semibold"
+          />
+
+          {/* Estimated Minutes Input */}
+          <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Estimated Focus (Minutes)</Text>
+          <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl py-2 mb-4 items-center justify-center">
+            <DialPicker 
+              value={estimatedMinutes} 
+              onChange={setEstimatedMinutes} 
+              options={[5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]} 
+              itemHeight={40} 
+            />
+          </View>
+
+          {/* Tag Selection */}
+          <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Category Tag</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
+            {tags.map((tag) => {
+              const isSelected = selectedTagId === tag.id;
+              return (
+                <Pressable
+                  key={tag.id}
+                  onPress={() => setSelectedTagId(tag.id)}
+                  style={{
+                    backgroundColor: isSelected ? 'rgba(191,90,242,0.2)' : '#1C1C1E',
+                    borderColor: isSelected ? '#BF5AF2' : 'rgba(255,255,255,0.08)',
+                    borderWidth: 1,
+                  }}
+                  className="px-4 py-2.5 rounded-full mr-2 items-center justify-center"
+                >
+                  <Text className={`font-bold text-xs ${isSelected ? 'text-[#BF5AF2]' : 'text-[#8E8E93]'}`}>
+                    {tag.name} ({tag.bucket})
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {/* Link to Macro Goal */}
+          {macroGoals.length > 0 && (
+            <>
+              <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Link to Pyramid Goal (Optional)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
+                <Pressable
+                  onPress={() => setSelectedMacroId('')}
+                  style={{
+                    backgroundColor: !selectedMacroId ? 'rgba(191,90,242,0.2)' : '#1C1C1E',
+                    borderColor: !selectedMacroId ? '#BF5AF2' : 'rgba(255,255,255,0.08)',
+                    borderWidth: 1,
+                  }}
+                  className="px-4 py-2.5 rounded-full mr-2 items-center justify-center"
+                >
+                  <Text className={`font-bold text-xs ${!selectedMacroId ? 'text-[#BF5AF2]' : 'text-[#8E8E93]'}`}>
+                    None
+                  </Text>
+                </Pressable>
+                {macroGoals.map((goal) => {
+                  const isSelected = selectedMacroId === goal.id;
+                  return (
+                    <Pressable
+                      key={goal.id}
+                      onPress={() => setSelectedMacroId(goal.id)}
+                      style={{
+                        backgroundColor: isSelected ? 'rgba(191,90,242,0.2)' : '#1C1C1E',
+                        borderColor: isSelected ? '#BF5AF2' : 'rgba(255,255,255,0.08)',
+                        borderWidth: 1,
+                      }}
+                      className="px-4 py-2.5 rounded-full mr-2 items-center justify-center"
+                    >
+                      <Text className={`font-bold text-xs ${isSelected ? 'text-[#BF5AF2]' : 'text-[#8E8E93]'}`}>
+                        {goal.title}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </>
+          )}
+
+          {/* Send Directly to Icebox Toggle */}
+          <Pressable
+            onPress={() => setSendDirectlyToIcebox(!sendDirectlyToIcebox)}
+            style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }}
+            className="flex-row items-center p-4 rounded-2xl justify-between mb-6"
+          >
+            <View className="flex-row items-center gap-2.5">
+              <Ionicons name="snow-outline" size={18} color="#8E8E93" />
+              <View>
+                <Text className="text-white font-semibold text-sm">Defer directly to Icebox</Text>
+                <Text className="text-[#8E8E93] text-xs mt-0.5">Locks item out of today's focus list</Text>
+              </View>
+            </View>
+            <Ionicons
+              name={sendDirectlyToIcebox ? 'checkbox' : 'square-outline'}
+              size={20}
+              color={sendDirectlyToIcebox ? '#BF5AF2' : '#8E8E93'}
+            />
+          </Pressable>
+
+          {/* Submit Button */}
+          <Pressable
+            onPress={handleAddTask}
+            style={{ backgroundColor: '#AF52DE' }}
+            className="w-full py-4 rounded-2xl items-center justify-center"
+          >
+            <Text className="text-white font-extrabold text-base">Add Focus Item (+$0.02)</Text>
+          </Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }}>
+      <RewardToast
+        visible={toastVisible}
+        message={toastMessage}
+        subtext={toastSubtext}
+        onDismiss={() => setToastVisible(false)}
+      />
+
+      <View style={{ maxWidth: 900, width: '100%', alignSelf: 'center' }} className="flex-1 px-5">
+        
+        {/* Header */}
+        <View className="flex-row justify-between items-center mt-3 mb-4">
+          <Text className="text-white text-3xl font-extrabold tracking-tight">Manage Focus</Text>
+          <Pressable
+            onPress={() => setModalVisible(true)}
+            style={{ backgroundColor: '#AF52DE' }}
+            className="flex-row items-center px-4 py-2 rounded-full"
+          >
+            <Ionicons name="add" size={18} color="white" />
+            <Text className="text-white font-bold ml-1 text-xs">Add Task</Text>
+          </Pressable>
+        </View>
+
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} className="flex-1">
+          
+          {/* Active Tasks Section */}
+          <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3">
+            Today's Focus List
+          </Text>
+          
+          {incompleteTasks.length === 0 ? (
+            <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl p-6 items-center justify-center mb-6">
+              <Text className="text-white font-semibold text-center">Your focus list is clear.</Text>
+              <Text className="text-[#8E8E93] text-xs text-center mt-1">Tap Add Task to schedule focused chunks for today.</Text>
+            </View>
+          ) : (
+            <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl overflow-hidden mb-5">
+              {incompleteTasks.map((task, index) => {
+                const tag = tags.find(t => t.id === task.tagId);
+                const isLast = index === incompleteTasks.length - 1;
+                return (
+                  <AnimatedTaskRow
+                    key={task.id}
+                    task={task}
+                    tagName={tag?.name}
+                    isLast={isLast}
+                    onToggle={toggleTask}
+                    onMoveToIcebox={moveToIcebox}
+                    showIceboxButton
+                  />
+                );
+              })}
+            </View>
+          )}
+
+          {/* Completed Tasks Section */}
+          {completedTasks.length > 0 && (
+            <View className="mb-5">
+              <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3">
+                Completed Today
+              </Text>
+              <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl overflow-hidden">
+                {completedTasks.map((task, index) => {
+                  const tag = tags.find(t => t.id === task.tagId);
+                  const isLast = index === completedTasks.length - 1;
+                  return (
+                    <AnimatedTaskRow
+                      key={task.id}
+                      task={task}
+                      tagName={tag?.name}
+                      isLast={isLast}
+                      onToggle={toggleTask}
+                      onMoveToIcebox={moveToIcebox}
+                      showIceboxButton={false}
+                    />
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* Icebox Tasks Section */}
+          <View className="mt-5">
+            <View className="flex-row items-center gap-1.5 mb-3">
+              <Ionicons name="snow-outline" size={16} color="#8E8E93" />
+              <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px]">
+                The Icebox (Distractions Deferred)
+              </Text>
+            </View>
+
+            {iceboxTasks.length === 0 ? (
+              <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl p-6 items-center justify-center">
+                <Text className="text-[#8E8E93] text-xs font-semibold text-center">The Icebox is empty.</Text>
+                <Text className="text-[#8E8E93] text-[11px] text-center mt-0.5">Defer distractions here to protect today's focus.</Text>
+              </View>
+            ) : (
+              <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.05)', borderWidth: 1 }} className="rounded-2xl overflow-hidden mb-3 opacity-65">
+                {iceboxTasks.map((task, index) => {
+                  const tag = tags.find(t => t.id === task.tagId);
+                  const isLast = index === iceboxTasks.length - 1;
+                  return (
+                    <View
+                      key={task.id}
+                      style={{
+                        borderBottomWidth: isLast ? 0 : 0.5,
+                        borderBottomColor: 'rgba(255,255,255,0.05)',
+                      }}
+                      className="p-4 flex-row items-center justify-between"
+                    >
+                      <View className="flex-1 pr-4">
+                        <Text className="text-zinc-300 text-base font-semibold">
+                          {task.title}
+                        </Text>
+                        <View className="flex-row items-center mt-1 gap-1.5">
+                          <View style={{ backgroundColor: '#2C2C2E' }} className="px-2 py-0.5 rounded-full">
+                            <Text className="text-[#8E8E93] text-[9px] font-bold uppercase tracking-wider">{tag?.name}</Text>
+                          </View>
+                          <Text className="text-[#8E8E93] text-xs font-medium">{task.estimatedMinutes} mins</Text>
+                        </View>
+                      </View>
+
+                      <Pressable
+                        onPress={() => activateFromIcebox(task.id)}
+                        style={{ backgroundColor: 'rgba(191,90,242,0.2)', borderColor: 'rgba(191,90,242,0.4)', borderWidth: 1 }}
+                        className="flex-row items-center px-3 py-1.5 rounded-xl"
+                      >
+                        <Ionicons name="thunderstorm-outline" size={12} color="#BF5AF2" />
+                        <Text className="text-[#BF5AF2] font-bold text-xs ml-1">De-ice</Text>
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        </ScrollView>
+
+      </View>
+    </SafeAreaView>
+  );
+}
