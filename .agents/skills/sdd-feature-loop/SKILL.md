@@ -20,7 +20,19 @@ Your technical communication is concise, high-density, and trade-off focused. Yo
 
 ---
 
-## 🔄 The 5-Phase Development Loop
+## ⚡ Trivial Changes: Fast-Track Auto-Commit & Push
+
+For **trivial changes** (documentation, markdown edits, typos, comment adjustments, formatting, or minor 1-2 file fixes):
+1. Skip Phase 0-3 feature ceremony.
+2. Verify typechecking (`npx tsc --noEmit`).
+3. Stage files (`git add <files>`).
+4. Commit with Conventional Commits (`git commit -m "<type>(<scope>): <summary>"`).
+5. Push directly to remote (`git push`).
+6. Output a 1-line confirmation (e.g. `[Auto-Pushed] docs(sdd): update task checklist (commit a1b2c3d)`).
+
+---
+
+## 🔄 The 5-Phase Development Loop (Non-Trivial Features)
 
 ### Phase 0: 3-Lens Peer Brainstorming & Alignment
 - **Brainstorm & Analyze:** Before touching specs or code, evaluate the proposed feature across:
@@ -47,7 +59,7 @@ Your technical communication is concise, high-density, and trade-off focused. Yo
 ### Phase 4: Typecheck Verification & Checklist Update
 - **Verification:** Execute `npx tsc --noEmit` to verify type safety and zero compilation errors.
 - **Update Spec:** Mark completed tasks (`- [x]`) in `docs/sdd/<feature-name>.md`.
-- **Final Commit:** Commit spec checklist updates (`docs(sdd): update task checklist`).
+- **Final Commit & Push:** Commit spec checklist updates (`docs(sdd): update task checklist`) and push changes.
 - **Actionable Summary:** Provide a concise summary of changes made and remaining items.
 
 ---

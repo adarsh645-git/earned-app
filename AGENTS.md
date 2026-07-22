@@ -114,7 +114,12 @@ All AI agents working on **Earned** adopt a **Triad Mindset**:
    ```
 2. **Commit Types**: `feat`, `fix`, `docs`, `refactor`, `schema`, `perf`, `test`, `chore`.
 3. **Commit Scopes**: `economy`, `store`, `ui`, `sync`, `sdd`, `deps`, `auth`.
-4. **Atomic Commit Timing**: Create atomic commits after completing each major SDD milestone (e.g. after schema/store contract edits, after UI implementation, and after updating spec checklists).
+5. **Fast-Track Auto-Commit & Push for Trivial Changes**:
+   - For trivial edits (documentation, typos, comments, minor formatting/typing fixes, or small 1-2 file bug fixes):
+     - Verify typechecks (`npx tsc --noEmit`).
+     - Automatically stage, commit using Conventional Commits (`git commit -m "docs: ..."`), and push to remote (`git push`).
+     - Provide a short 1-line confirmation to the user.
+
 
 
 
