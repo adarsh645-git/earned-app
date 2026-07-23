@@ -14,6 +14,7 @@ interface AnimatedMacroGoalCardProps {
   showIcon?: boolean;
   iconName?: string;
   onQuickStart?: (goal: MacroGoal) => void;
+  onAddSubGoal?: (parentId: string) => void;
 }
 
 // ─── Mini Confetti Burst (localized to a milestone badge) ────────────────────
@@ -193,6 +194,7 @@ export default function AnimatedMacroGoalCard({
   showIcon = false,
   iconName,
   onQuickStart,
+  onAddSubGoal,
 }: AnimatedMacroGoalCardProps) {
   const isUnits = goal.metricType === 'units';
   const target = isUnits ? (goal.targetMetric || 1) : goal.targetMinutes;
@@ -313,10 +315,27 @@ export default function AnimatedMacroGoalCard({
         })}
       </View>
 
-      {/* Sub-Projects List */}
-      {subGoals && subGoals.length > 0 && (
+      {/* Header for Sub-Projects (shown if we have subgoals OR if we can add them) */}
+      {(subGoals && subGoals.length > 0 || onAddSubGoal) && (
         <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }}>
-          {subGoals.map((subGoal) => {
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Sub-Projects</Text>
+            {onAddSubGoal && (
+              <Pressable
+                onPress={() => onAddSubGoal(goal.id)}
+                style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center' })}
+              >
+                <Ionicons name="add" size={14} color={accentColor} />
+                <Text style={{ color: accentColor, fontSize: 12, fontWeight: '600', marginLeft: 2 }}>Add</Text>
+              </Pressable>
+            )}
+          </View>
+          
+          {subGoals && subGoals.length === 0 && (
+            <Text style={{ color: '#52525B', fontSize: 13, fontStyle: 'italic', marginBottom: 12 }}>No sub-projects yet.</Text>
+          )}
+
+          {subGoals && subGoals.map((subGoal) => {
             const subIsUnits = subGoal.metricType === 'units';
             const subTarget = subIsUnits ? (subGoal.targetMetric || 1) : subGoal.targetMinutes;
             const subCompleted = subIsUnits ? (subGoal.completedMetric || 0) : subGoal.completedMinutes;

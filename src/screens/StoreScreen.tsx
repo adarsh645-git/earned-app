@@ -475,6 +475,10 @@ export default function StoreScreen() {
                     showIcon
                     iconName="game-controller"
                     onQuickStart={setQuickStartGoal}
+                    onAddSubGoal={(parentId) => {
+                      setSelectedParentId(parentId);
+                      setShowAddModal(true);
+                    }}
                   />
                 ))}
 
