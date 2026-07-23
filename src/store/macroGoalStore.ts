@@ -136,7 +136,13 @@ export const useMacroGoalStore = create<MacroGoalState>()(
           ),
         }));
 
-        return newlyUnlocked;
+        // Recursively update parent if exists
+        let parentUnlocked: UnlockedMilestoneInfo[] = [];
+        if (goal.parentId) {
+          parentUnlocked = get().addProgress(goal.parentId, amount);
+        }
+
+        return [...newlyUnlocked, ...parentUnlocked];
       },
       removeProgress: (id, amount) => {
         const goal = get().macroGoals.find(g => g.id === id);
@@ -188,6 +194,11 @@ export const useMacroGoalStore = create<MacroGoalState>()(
               : g
           ),
         }));
+
+        // Recursively remove progress from parent if exists
+        if (goal.parentId) {
+          get().removeProgress(goal.parentId, amount);
+        }
       },
     }),
     {
