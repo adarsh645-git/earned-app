@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import { View, Text, Animated, Dimensions } from 'react-native';
+import { View, Text, Animated, Dimensions, Pressable } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { MacroGoal, getMilestoneDollars } from '../store/macroGoalStore';
 import { hapticHeavyImpact, hapticMediumImpact } from '../utils/haptics';
@@ -9,9 +9,11 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface AnimatedMacroGoalCardProps {
   goal: MacroGoal;
+  subGoals?: MacroGoal[];
   accentColor: string; // '#BF5AF2' for productive, '#5AC8FA' for entertainment
   showIcon?: boolean;
   iconName?: string;
+  onQuickStart?: (goal: MacroGoal) => void;
 }
 
 // ─── Mini Confetti Burst (localized to a milestone badge) ────────────────────
@@ -186,9 +188,11 @@ function CountingPercentage({
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function AnimatedMacroGoalCard({
   goal,
+  subGoals = [],
   accentColor,
   showIcon = false,
   iconName,
+  onQuickStart,
 }: AnimatedMacroGoalCardProps) {
   const isUnits = goal.metricType === 'units';
   const target = isUnits ? (goal.targetMetric || 1) : goal.targetMinutes;
@@ -308,6 +312,59 @@ export default function AnimatedMacroGoalCard({
           );
         })}
       </View>
+
+      {/* Sub-Projects List */}
+      {subGoals && subGoals.length > 0 && (
+        <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }}>
+          {subGoals.map((subGoal) => {
+            const subIsUnits = subGoal.metricType === 'units';
+            const subTarget = subIsUnits ? (subGoal.targetMetric || 1) : subGoal.targetMinutes;
+            const subCompleted = subIsUnits ? (subGoal.completedMetric || 0) : subGoal.completedMinutes;
+            const subPct = Math.min(100, Math.round((subCompleted / subTarget) * 100));
+            
+            let subLabel = '';
+            if (subIsUnits) {
+              subLabel = `${subCompleted}/${subTarget}`;
+            } else if (isEntertainment) {
+              subLabel = `${(subCompleted / 60).toFixed(1)}/${(subTarget / 60).toFixed(0)}h`;
+            } else {
+              subLabel = `${subCompleted}/${subTarget}m`;
+            }
+
+            return (
+              <View key={subGoal.id} style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <Text style={{ color: '#EBEBF5', fontSize: 13, fontWeight: '500' }}>↳ {subGoal.title}</Text>
+                  <Text style={{ color: '#8E8E93', fontSize: 12 }}>{subLabel} ({subPct}%)</Text>
+                </View>
+                <View style={{ backgroundColor: '#2C2C2E', width: '100%', height: 4, borderRadius: 2, overflow: 'hidden' }}>
+                  <View style={{ width: `${subPct}%`, height: '100%', backgroundColor: accentColor, opacity: 0.8, borderRadius: 2 }} />
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Quick Start Button */}
+      {onQuickStart && (
+        <View style={{ marginTop: 16 }}>
+          <Pressable
+            onPress={() => onQuickStart(goal)}
+            style={({ pressed, hovered }: any) => ({
+              backgroundColor: hovered ? (isEntertainment ? '#47A3D1' : '#A442D6') : (isEntertainment ? '#5AC8FA' : '#BF5AF2'),
+              paddingVertical: 10,
+              borderRadius: 12,
+              alignItems: 'center',
+              opacity: pressed ? 0.9 : 1,
+            })}
+          >
+            <Text style={{ color: isEntertainment ? '#000000' : '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
+              {isEntertainment ? 'Indulge' : 'Focus'}
+            </Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }

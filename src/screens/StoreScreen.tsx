@@ -4,13 +4,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEconomyStore } from '../store/economyStore';
 import { useRewardStore, Reward } from '../store/rewardStore';
-import { useMacroGoalStore } from '../store/macroGoalStore';
+import { useMacroGoalStore, MacroGoal } from '../store/macroGoalStore';
 import TimeSelectorModal from '../components/TimeSelectorModal';
 import { hapticSuccess, hapticError } from '../utils/haptics';
 import { useConfettiStore } from '../store/confettiStore';
 import ConfirmModal, { ConfirmAction } from '../components/ConfirmModal';
 import AnimatedMacroGoalCard from '../components/AnimatedMacroGoalCard';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { useTaskStore } from '../store/taskStore';
+import { useTimerStore } from '../store/timerStore';
+import QuickStartModal from '../components/QuickStartModal';
 
 type DialogConfig = {
   icon: string;
@@ -49,6 +52,11 @@ export default function StoreScreen() {
   const [projectMinutes, setProjectMinutes] = useState(0);
   const [showTimeSelector, setShowTimeSelector] = useState(false);
   const [validationError, setValidationError] = useState('');
+  const [selectedParentId, setSelectedParentId] = useState<string>('');
+  const [quickStartGoal, setQuickStartGoal] = useState<MacroGoal | null>(null);
+
+  const { addTask } = useTaskStore();
+  const { startTimer } = useTimerStore();
 
   // Custom dialog state
   const [dialog, setDialog] = useState<DialogConfig | null>(null);
@@ -97,11 +105,24 @@ export default function StoreScreen() {
       horizon: 'yearly',
       targetMinutes: projectMinutes,
       type: 'entertainment',
+      parentId: selectedParentId || undefined,
     });
 
     setTitle('');
     setProjectMinutes(0);
+    setSelectedParentId('');
     setShowAddModal(false);
+  };
+
+  const handleQuickStart = (t: string, tagId: string, targetId: string, minutes: number) => {
+    const newTaskId = addTask({
+      title: t,
+      tagId,
+      estimatedMinutes: minutes,
+      macroGoalId: targetId,
+      isIcebox: false,
+    });
+    startTimer(newTaskId, minutes);
   };
 
   const handleRedeem = (reward: Reward) => {
@@ -237,6 +258,48 @@ export default function StoreScreen() {
               <Text className="text-[#FF453A] text-xs font-medium text-center">{validationError}</Text>
             </View>
           ) : null}
+
+          {activeTab === 'time' && entertainmentGoals.filter(g => !g.parentId).length > 0 && (
+            <View className="mb-4">
+              <Text className="text-[#8E8E93] text-xs font-semibold mb-2">Parent Project (Optional)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <Pressable
+                  onPress={() => setSelectedParentId('')}
+                  style={{
+                    backgroundColor: !selectedParentId ? 'rgba(90,200,250,0.2)' : '#09090B',
+                    borderColor: !selectedParentId ? '#5AC8FA' : '#27272A',
+                    borderWidth: 1,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    marginRight: 8,
+                  }}
+                >
+                  <Text style={{ color: !selectedParentId ? '#FFF' : '#A1A1AA', fontWeight: !selectedParentId ? '700' : '500' }}>None</Text>
+                </Pressable>
+                {entertainmentGoals.filter(g => !g.parentId).map(g => {
+                  const isSelected = selectedParentId === g.id;
+                  return (
+                    <Pressable
+                      key={g.id}
+                      onPress={() => setSelectedParentId(g.id)}
+                      style={{
+                        backgroundColor: isSelected ? 'rgba(90,200,250,0.2)' : '#09090B',
+                        borderColor: isSelected ? '#5AC8FA' : '#27272A',
+                        borderWidth: 1,
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
+                        borderRadius: 8,
+                        marginRight: 8,
+                      }}
+                    >
+                      <Text style={{ color: isSelected ? '#FFF' : '#A1A1AA', fontWeight: isSelected ? '700' : '500' }}>{g.title}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
 
           <View className="mb-4">
             <Text className="text-[#8E8E93] text-xs font-semibold mb-2">Title</Text>
@@ -401,47 +464,18 @@ export default function StoreScreen() {
                 Active Entertainment Projects
               </Text>
 
-              {/* Active Entertainment Projects Grid */}
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 }}>
-                {entertainmentGoals.map((goal) => (
-                  <View
+              {/* Active Entertainment Projects List */}
+              <View style={{ marginTop: 8 }}>
+                {entertainmentGoals.filter(g => !g.parentId).map((goal) => (
+                  <AnimatedMacroGoalCard
                     key={goal.id}
-                    style={{
-                      flex: 1,
-                      minWidth: 160,
-                      backgroundColor: '#09090B',
-                      borderColor: '#27272A',
-                      borderWidth: 1,
-                      borderRadius: 12,
-                      padding: 16,
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <Text style={{ color: '#FAFAFA', fontWeight: '600', fontSize: 15, flex: 1 }} numberOfLines={2}>
-                          {goal.title}
-                        </Text>
-                      </View>
-                      <Text style={{ color: '#A1A1AA', fontSize: 11, marginTop: 4 }}>Time Reward</Text>
-                    </View>
-                    <View style={{ marginTop: 24, marginBottom: 16, alignItems: 'center' }}>
-                      <Text style={{ color: '#FFFFFF', fontSize: 28, fontWeight: '800' }}>
-                        {(goal.targetMinutes / 60).toFixed(1)}h
-                      </Text>
-                    </View>
-                    <Pressable
-                      style={({ pressed, hovered }: any) => ({
-                        backgroundColor: hovered ? '#47A3D1' : '#5AC8FA',
-                        paddingVertical: 10,
-                        borderRadius: 8,
-                        alignItems: 'center',
-                        opacity: pressed ? 0.9 : 1,
-                      })}
-                    >
-                      <Text style={{ color: '#000000', fontWeight: '700', fontSize: 14 }}>Indulge</Text>
-                    </Pressable>
-                  </View>
+                    goal={goal}
+                    subGoals={entertainmentGoals.filter(g => g.parentId === goal.id)}
+                    accentColor="#5AC8FA"
+                    showIcon
+                    iconName="game-controller"
+                    onQuickStart={setQuickStartGoal}
+                  />
                 ))}
 
                 {/* Add New Project Card */}
@@ -611,6 +645,17 @@ export default function StoreScreen() {
           title={dialog.title}
           message={dialog.message}
           actions={dialog.actions}
+        />
+      )}
+
+      {/* Quick Start Modal */}
+      {quickStartGoal && (
+        <QuickStartModal
+          visible={!!quickStartGoal}
+          onClose={() => setQuickStartGoal(null)}
+          goal={quickStartGoal}
+          subGoals={macroGoals.filter(g => g.parentId === quickStartGoal.id)}
+          onStart={handleQuickStart}
         />
       )}
     </SafeAreaView>

@@ -5,18 +5,15 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import Svg, { Circle } from 'react-native-svg';
 import { useEconomyStore } from '../store/economyStore';
 import { useTaskStore, Task } from '../store/taskStore';
-import { useMacroGoalStore } from '../store/macroGoalStore';
+import { useMacroGoalStore, MacroGoal } from '../store/macroGoalStore';
 import { useTimerStore } from '../store/timerStore';
-import { hapticSelection, hapticSuccess } from '../utils/haptics';
+import { hapticSuccess } from '../utils/haptics';
+import { useConfettiStore } from '../store/confettiStore';
 import ConfirmModal from '../components/ConfirmModal';
 import AnimatedTaskRow from '../components/AnimatedTaskRow';
 import AnimatedMacroGoalCard from '../components/AnimatedMacroGoalCard';
-import { useConfettiStore } from '../store/confettiStore';
 import EditTaskModal from '../components/EditTaskModal';
-
-// ─── Animated Task Row & Macro Goal Card imported from components ─────────────
-
-
+import QuickStartModal from '../components/QuickStartModal';
 
 export default function DashboardScreen() {
   const { width } = useWindowDimensions();
@@ -29,9 +26,10 @@ export default function DashboardScreen() {
   const [activePillarId, setActivePillarId] = useState<string>('');
   const [blockedModal, setBlockedModal] = useState<{ title: string; message: string } | null>(null);
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [quickStartGoal, setQuickStartGoal] = useState<MacroGoal | null>(null);
   
   const { dollarBalance, hoursBalanceMinutes, debt, streak, lastCheckInDate } = useEconomyStore();
-  const { tasks, tags, pillars, toggleTask, moveToIcebox, deleteTask, updateTask } = useTaskStore();
+  const { tasks, tags, pillars, toggleTask, moveToIcebox, deleteTask, updateTask, addTask } = useTaskStore();
   const activePillars = pillars.filter(p => !p.isArchived);
   const currentPillarId = activePillarId || activePillars[0]?.id;
   const { macroGoals } = useMacroGoalStore();
@@ -42,7 +40,6 @@ export default function DashboardScreen() {
   const today = new Date().toISOString().split('T')[0];
   const isCheckedInToday = lastCheckInDate === today;
 
-  // Filter tasks for the active pillar that are NOT in the icebox
   const activeBucketTasks = tasks.filter(t => {
     const tag = tags.find(tag => tag.id === t.tagId);
     return tag?.pillarId === currentPillarId && !t.isIcebox;
@@ -51,16 +48,14 @@ export default function DashboardScreen() {
   const incompleteTasks = activeBucketTasks.filter(t => !t.completed);
   const completedTasks = activeBucketTasks.filter(t => t.completed);
 
-  // Calculate progress
   const totalMinutes = activeBucketTasks.reduce((acc, t) => acc + t.estimatedMinutes, 0);
   const completedMinutes = activeBucketTasks.reduce((acc, t) => acc + (t.completed ? t.estimatedMinutes : 0), 0);
   const progressPercent = totalMinutes > 0 ? Math.min(100, Math.round((completedMinutes / totalMinutes) * 100)) : 0;
 
-  // Split macro goals into productive vs entertainment
-  const productiveGoals = macroGoals.filter(g => !g.type || g.type === 'productive');
-  const entertainmentGoals = macroGoals.filter(g => g.type === 'entertainment');
+  const rootGoals = macroGoals.filter((g) => !g.parentId);
+  const productiveGoals = rootGoals.filter(g => !g.type || g.type === 'productive');
+  const entertainmentGoals = rootGoals.filter(g => g.type === 'entertainment');
 
-  // Format today's date: "TUESDAY, OCT 26"
   const formattedDate = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'short',
@@ -78,31 +73,38 @@ export default function DashboardScreen() {
     }
   };
 
+  const handleQuickStart = (title: string, tagId: string, targetId: string, minutes: number) => {
+    const newTaskId = addTask({
+      title,
+      tagId,
+      estimatedMinutes: minutes,
+      macroGoalId: targetId,
+      isIcebox: false,
+    });
+    handleStartTimer(newTaskId, minutes);
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40, maxWidth: 900, width: '100%', alignSelf: 'center' }} className="flex-1 px-5">
         
-        {/* Header Section */}
         <View className="flex-row justify-between items-center mt-3 mb-2">
           <View>
             <Text className="text-[#8E8E93] text-[10px] font-bold tracking-[1.5px] uppercase">{formattedDate}</Text>
             <Text className="text-white text-3xl font-extrabold tracking-tight mt-0.5">Summary</Text>
           </View>
           
-          {/* Economy Badges - Apple Pill Style (Streak, Hours, Dollars) */}
           <View className="flex-row items-center gap-2">
             <View className="flex-row items-center bg-[#1C1C1E] border border-white/10 px-3 py-1.5 rounded-full">
               <Ionicons name="flame" size={15} color="#FF9500" />
               <Text className="text-white font-bold ml-1 text-xs">{streak}d</Text>
             </View>
 
-            {/* Hours Pill (Cyan) */}
             <View className="flex-row items-center bg-[#1C1C1E] border border-[#5AC8FA]/30 px-3 py-1.5 rounded-full">
               <Ionicons name="time" size={13} color="#5AC8FA" />
               <Text className="text-[#5AC8FA] font-bold ml-1 text-xs">{hoursDisplay}h</Text>
             </View>
 
-            {/* Dollars Pill (Green) */}
             <View className="flex-row items-center bg-[#1C1C1E] border border-[#30D158]/30 px-3 py-1.5 rounded-full">
               <Ionicons name="logo-usd" size={13} color="#30D158" />
               <Text className="text-[#30D158] font-bold ml-0.5 text-xs">{dollarBalance.toFixed(2)}</Text>
@@ -117,13 +119,11 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Daily Discipline Section - iOS Inset Group */}
         <View className="mt-2">
           <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-2.5">
             Daily Discipline
           </Text>
           <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl overflow-hidden">
-            {/* Check-In Row */}
             <View style={{ borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.08)' }} className="p-3.5 flex-row justify-between items-center">
               <View className="flex-row items-center gap-2.5">
                 <View style={{ backgroundColor: 'rgba(255,149,0,0.15)', width: 28, height: 28, borderRadius: 8 }} className="items-center justify-center">
@@ -135,7 +135,6 @@ export default function DashboardScreen() {
                 </View>
               </View>
               
-              {/* Check-in Badge */}
               <Pressable 
                 onPress={() => {
                   if (!isCheckedInToday) {
@@ -167,7 +166,6 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Dynamic Pillar Segmented Control Picker */}
         <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderRadius: 12, marginVertical: 16 }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 4 }}>
             {activePillars.map((pillar) => {
@@ -201,7 +199,6 @@ export default function DashboardScreen() {
           </ScrollView>
         </View>
 
-        {/* Apple Activity Progress Ring Badge */}
         <View className="items-center my-5 relative">
           <View style={{ width: ringSize, height: ringSize }} className="items-center justify-center">
             <Svg width={ringSize} height={ringSize}>
@@ -240,7 +237,6 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Task List Header */}
         <View className="flex-row justify-between items-center mt-3 mb-3">
           <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px]">
             Today's Focus
@@ -252,7 +248,6 @@ export default function DashboardScreen() {
           )}
         </View>
 
-        {/* Task List Rendering - Apple Card List */}
         {incompleteTasks.length === 0 ? (
           <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl p-8 items-center justify-center my-1 border-dashed">
             <Ionicons name="sparkles" size={32} color="#8E8E93" />
@@ -321,7 +316,9 @@ export default function DashboardScreen() {
               <AnimatedMacroGoalCard
                 key={goal.id}
                 goal={goal}
+                subGoals={macroGoals.filter(g => g.parentId === goal.id)}
                 accentColor="#BF5AF2"
+                onQuickStart={setQuickStartGoal}
               />
             ))}
           </View>
@@ -337,9 +334,11 @@ export default function DashboardScreen() {
               <AnimatedMacroGoalCard
                 key={goal.id}
                 goal={goal}
+                subGoals={macroGoals.filter(g => g.parentId === goal.id)}
                 accentColor="#5AC8FA"
                 showIcon
                 iconName="game-controller"
+                onQuickStart={setQuickStartGoal}
               />
             ))}
           </View>
@@ -372,6 +371,16 @@ export default function DashboardScreen() {
         onSave={(id, updates) => updateTask(id, updates)}
         onDelete={(id) => deleteTask(id)}
       />
+
+      {quickStartGoal && (
+        <QuickStartModal
+          visible={!!quickStartGoal}
+          onClose={() => setQuickStartGoal(null)}
+          goal={quickStartGoal}
+          subGoals={macroGoals.filter(g => g.parentId === quickStartGoal.id)}
+          onStart={handleQuickStart}
+        />
+      )}
     </SafeAreaView>
   );
 }

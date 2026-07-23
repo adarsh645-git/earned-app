@@ -24,6 +24,7 @@ export type MacroGoal = {
   completedMetric?: number;
   unlockedMilestones: number[]; // e.g. [25, 50, 75, 100]
   type?: MacroGoalType;
+  parentId?: string; // If set, this is a sub-project nested under a parent MacroGoal
 };
 
 export const getMilestoneDollars = (targetMinutes: number, milestone: number): number => {
@@ -63,6 +64,7 @@ export const useMacroGoalStore = create<MacroGoalState>()(
           ...goal, 
           id: uuidv4(),
           type: goal.type || 'productive',
+          parentId: goal.parentId,
           completedMinutes: 0,
           completedMetric: 0,
           metricType: goal.metricType || 'minutes',

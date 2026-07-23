@@ -35,7 +35,7 @@ interface TaskState {
   pillars: Pillar[];
   
   // Task Actions
-  addTask: (task: Omit<Task, 'id' | 'completed' | 'dateCreated'>) => void;
+  addTask: (task: Omit<Task, 'id' | 'completed' | 'dateCreated'>) => string;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
   toggleTask: (id: string, isManual?: boolean) => void;
@@ -68,14 +68,18 @@ export const useTaskStore = create<TaskState>()(
         { id: uuidv4(), pillarId: 'personal', name: 'Gaming', type: 'burner' }
       ],
       
-      addTask: (task) => set((state) => ({
-        tasks: [...state.tasks, { 
-          ...task, 
-          id: uuidv4(),
-          completed: false,
-          dateCreated: new Date().toISOString().split('T')[0]
-        }]
-      })),
+      addTask: (task) => {
+        const id = uuidv4();
+        set((state) => ({
+          tasks: [...state.tasks, { 
+            ...task, 
+            id,
+            completed: false,
+            dateCreated: new Date().toISOString().split('T')[0]
+          }]
+        }));
+        return id;
+      },
       updateTask: (id, updates) => set((state) => ({
         tasks: state.tasks.map(t => t.id === id ? { ...t, ...updates } : t)
       })),
