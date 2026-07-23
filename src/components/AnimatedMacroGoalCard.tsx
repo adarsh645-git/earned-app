@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import { View, Text, Animated, Dimensions, Pressable } from 'react-native';
+import { View, Text, Animated, Dimensions, Pressable, TextInput } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { MacroGoal, getMilestoneDollars } from '../store/macroGoalStore';
+import { MacroGoal, getMilestoneDollars, useMacroGoalStore } from '../store/macroGoalStore';
 import { hapticHeavyImpact, hapticMediumImpact } from '../utils/haptics';
 import { useConfettiStore } from '../store/confettiStore';
 
@@ -186,6 +186,58 @@ function CountingPercentage({
   );
 }
 
+// ─── Inline Editable Text ────────────────────────────────────────────────────
+function InlineEditableText({
+  initialValue,
+  textStyle,
+  onSave,
+  numberOfLines = 1,
+}: {
+  initialValue: string;
+  textStyle: any;
+  onSave: (val: string) => void;
+  numberOfLines?: number;
+}) {
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [value, setValue] = React.useState(initialValue);
+
+  // Sync internal state if initialValue changes externally
+  useEffect(() => {
+    setValue(initialValue);
+  }, [initialValue]);
+
+  const handleSave = () => {
+    setIsEditing(false);
+    if (value.trim() && value.trim() !== initialValue) {
+      onSave(value.trim());
+    } else {
+      setValue(initialValue);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <TextInput
+        value={value}
+        onChangeText={setValue}
+        onBlur={handleSave}
+        onSubmitEditing={handleSave}
+        autoFocus
+        style={[textStyle, { padding: 0, margin: 0, minWidth: 100, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, paddingHorizontal: 4 }]}
+        returnKeyType="done"
+      />
+    );
+  }
+
+  return (
+    <Pressable onPress={() => setIsEditing(true)}>
+      <Text style={textStyle} numberOfLines={numberOfLines}>
+        {initialValue}
+      </Text>
+    </Pressable>
+  );
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function AnimatedMacroGoalCard({
   goal,
@@ -196,6 +248,7 @@ export default function AnimatedMacroGoalCard({
   onQuickStart,
   onAddSubGoal,
 }: AnimatedMacroGoalCardProps) {
+  const { updateMacroGoal } = useMacroGoalStore();
   const isUnits = goal.metricType === 'units';
   const isEntertainment = goal.type === 'entertainment';
   const target = isUnits ? (goal.targetMetric || 1) : goal.targetMinutes;
@@ -284,9 +337,11 @@ export default function AnimatedMacroGoalCard({
           {(showIcon || displayIcon) && (
             <Ionicons name={(displayIcon || iconName) as any} size={16} color={accentColor} />
           )}
-          <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14 }} numberOfLines={1}>
-            {goal.title}
-          </Text>
+          <InlineEditableText
+            initialValue={goal.title}
+            textStyle={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14 }}
+            onSave={(newTitle) => updateMacroGoal(goal.id, { title: newTitle })}
+          />
           {displayCategory !== '' && (
             <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 4 }}>
               <Text style={{ color: '#A1A1AA', fontSize: 10, fontWeight: '600' }}>{displayCategory}</Text>
@@ -381,11 +436,36 @@ export default function AnimatedMacroGoalCard({
 
             return (
               <View key={subGoal.id} style={{ marginBottom: 12 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <Text style={{ color: '#EBEBF5', fontSize: 13, fontWeight: '500' }}>↳ {subGoal.title}</Text>
-                  <Text style={{ color: '#8E8E93', fontSize: 12 }}>
-                    {subLabel} {!subIsOpenEnded && `(${subPct}%)`}
-                  </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
+                    <Text style={{ color: '#EBEBF5', fontSize: 13, fontWeight: '500', marginRight: 4 }}>↳</Text>
+                    <InlineEditableText
+                      initialValue={subGoal.title}
+                      textStyle={{ color: '#EBEBF5', fontSize: 13, fontWeight: '500' }}
+                      onSave={(newTitle) => updateMacroGoal(subGoal.id, { title: newTitle })}
+                      numberOfLines={1}
+                    />
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ color: '#8E8E93', fontSize: 12 }}>
+                      {subLabel} {!subIsOpenEnded && `(${subPct}%)`}
+                    </Text>
+                    {onQuickStart && (
+                      <Pressable 
+                        onPress={() => onQuickStart(subGoal)}
+                        style={({ pressed }) => ({
+                          backgroundColor: pressed ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.1)',
+                          width: 24,
+                          height: 24,
+                          borderRadius: 12,
+                          justifyContent: 'center',
+                          alignItems: 'center'
+                        })}
+                      >
+                        <Ionicons name="play" size={12} color={accentColor} style={{ marginLeft: 2 }} />
+                      </Pressable>
+                    )}
+                  </View>
                 </View>
                 {!subIsOpenEnded && (
                   <View style={{ backgroundColor: '#2C2C2E', width: '100%', height: 4, borderRadius: 2, overflow: 'hidden' }}>
@@ -398,8 +478,8 @@ export default function AnimatedMacroGoalCard({
         </View>
       )}
 
-      {/* Quick Start Button */}
-      {onQuickStart && (
+      {/* Quick Start Button (Only show if no subGoals) */}
+      {onQuickStart && (!subGoals || subGoals.length === 0) && (
         <View style={{ marginTop: 16 }}>
           <Pressable
             onPress={() => onQuickStart(goal)}

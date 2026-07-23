@@ -135,7 +135,23 @@ export default function StoreScreen() {
       macroGoalId: targetId,
       isIcebox: false,
     });
-    startTimer(newTaskId, minutes);
+    const res = startTimer(newTaskId, minutes);
+    if (res && res.success === false && res.reason === 'insufficient_hours') {
+      const missingHours = ((res.missingMinutes || 0) / 60).toFixed(1);
+      setDialog({
+        icon: 'time-outline',
+        iconColor: '#FF453A',
+        accentColor: '#FF453A',
+        title: 'Not Enough Time Earned',
+        message: `You need ${missingHours} more hours of focus to earn this entertainment session.\n\nKeep focusing on productive tasks to earn leisure time!`,
+        actions: [
+          { label: 'Got It', onPress: () => {}, style: 'default' },
+        ],
+      });
+    } else {
+      // Provide haptic feedback so they know it started
+      hapticSuccess();
+    }
   };
 
   const handleRedeem = (reward: Reward) => {
