@@ -52,11 +52,14 @@ export default function TasksScreen() {
   const completedTasks = tasks.filter(t => !t.isIcebox && t.completed);
   const iceboxTasks = tasks.filter(t => t.isIcebox);
 
+  const selectedTag = tags.find(t => t.id === selectedTagId);
+  const isBurner = selectedTag?.type === 'burner';
+
   const handleAddTask = () => {
     setValidationError('');
     
     if (!title.trim()) {
-      setValidationError('Task title is required');
+      setValidationError(isBurner ? 'Activity title is required' : 'Task title is required');
       return;
     }
     
@@ -88,7 +91,9 @@ export default function TasksScreen() {
           
           {/* Header */}
           <View className="flex-row justify-between items-center mt-3 mb-6">
-            <Text style={{ color: '#FFF', fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>New Focus Block</Text>
+            <Text style={{ color: '#FFF', fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>
+              {isBurner ? 'New Leisure Activity' : 'New Focus Block'}
+            </Text>
             <Pressable onPress={() => setModalVisible(false)} style={{ backgroundColor: '#2C2C2E', padding: 6, borderRadius: 12 }}>
               <Ionicons name="close" size={20} color="#8E8E93" />
             </Pressable>
@@ -101,11 +106,13 @@ export default function TasksScreen() {
           ) : null}
 
           {/* Title Input */}
-          <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Focus Item Title</Text>
+          <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>
+            {isBurner ? 'Activity Title' : 'Focus Item Title'}
+          </Text>
           <TextInput
             value={title}
             onChangeText={setTitle}
-            placeholder="e.g. Code Review, Bike Ride, Read Book"
+            placeholder={isBurner ? "e.g. Play PS5, Watch Netflix" : "e.g. Code Review, Bike Ride, Read Book"}
             placeholderTextColor="#5C5C5E"
             spellCheck={true}
             autoCorrect={true}
@@ -242,8 +249,8 @@ export default function TasksScreen() {
           {/* Submit Button */}
           <PrimaryButton
             onPress={handleAddTask}
-            title="Add Focus Item (+$0.02)"
-            style={{ width: '100%' }}
+            title={isBurner ? `Add Leisure Task (-${estimatedMinutes}m)` : "Add Focus Item (+$0.02)"}
+            style={{ width: '100%', backgroundColor: isBurner ? '#5AC8FA' : '#BF5AF2' }}
           />
 
           <TimeSelectorModal
