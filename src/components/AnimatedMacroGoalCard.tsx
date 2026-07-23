@@ -197,12 +197,22 @@ export default function AnimatedMacroGoalCard({
   onAddSubGoal,
 }: AnimatedMacroGoalCardProps) {
   const isUnits = goal.metricType === 'units';
+  const isEntertainment = goal.type === 'entertainment';
   const target = isUnits ? (goal.targetMetric || 1) : goal.targetMinutes;
   const completed = isUnits ? (goal.completedMetric || 0) : goal.completedMinutes;
   
-  const pct = Math.min(100, Math.round((completed / target) * 100));
+  const isOpenEnded = target === 0;
+  const pct = target > 0 ? Math.min(100, Math.round((completed / target) * 100)) : 0;
   const unlocked = goal.unlockedMilestones || [];
   const milestones = [25, 50, 75, 100];
+
+  let displayCategory = '';
+  let displayIcon = iconName;
+  if (goal.category === 'video-game') { displayCategory = 'Video Game'; displayIcon = 'game-controller'; }
+  else if (goal.category === 'movie') { displayCategory = 'Movie'; displayIcon = 'film'; }
+  else if (goal.category === 'tv-show') { displayCategory = 'TV Show'; displayIcon = 'tv'; }
+  else if (goal.category === 'youtube') { displayCategory = 'YouTube'; displayIcon = 'logo-youtube'; }
+  else if (goal.category === 'custom') { displayCategory = 'Entertainment'; displayIcon = 'star'; }
 
   // Animated progress bar width
   const barAnim = useRef(new Animated.Value(0)).current;
@@ -236,10 +246,11 @@ export default function AnimatedMacroGoalCard({
   }, [unlocked.length]);
 
   // Format labels based on goal type
-  const isEntertainment = goal.type === 'entertainment';
   
   let completedLabel = '';
-  if (isUnits) {
+  if (isOpenEnded) {
+    completedLabel = `${(completed / 60).toFixed(1)}h Logged`;
+  } else if (isUnits) {
     completedLabel = `${completed}/${target}`;
   } else if (isEntertainment) {
     completedLabel = `${(completed / 60).toFixed(1)}/${(target / 60).toFixed(0)}h`;
@@ -270,34 +281,48 @@ export default function AnimatedMacroGoalCard({
       {/* Header Row */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-          {showIcon && iconName && (
-            <Ionicons name={iconName as any} size={16} color={accentColor} />
+          {(showIcon || displayIcon) && (
+            <Ionicons name={(displayIcon || iconName) as any} size={16} color={accentColor} />
           )}
           <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14 }} numberOfLines={1}>
             {goal.title}
           </Text>
+          {displayCategory !== '' && (
+            <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 4 }}>
+              <Text style={{ color: '#A1A1AA', fontSize: 10, fontWeight: '600' }}>{displayCategory}</Text>
+            </View>
+          )}
         </View>
-        <CountingPercentage
-          targetPct={pct}
-          completedLabel={completedLabel}
-          accentColor={accentColor}
-        />
+        {isOpenEnded ? (
+          <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '500' }}>
+            {completedLabel}
+          </Text>
+        ) : (
+          <CountingPercentage
+            targetPct={pct}
+            completedLabel={completedLabel}
+            accentColor={accentColor}
+          />
+        )}
       </View>
 
-      {/* Animated Progress Bar */}
-      <View style={{ backgroundColor: '#2C2C2E', width: '100%', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 12 }}>
-        <Animated.View
-          style={{
-            width: barWidth,
-            height: '100%',
-            backgroundColor: accentColor,
-            borderRadius: 4,
-          }}
-        />
-      </View>
+      {/* Animated Progress Bar (Hide if open ended) */}
+      {!isOpenEnded && (
+        <View style={{ backgroundColor: '#2C2C2E', width: '100%', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 12 }}>
+          <Animated.View
+            style={{
+              width: barWidth,
+              height: '100%',
+              backgroundColor: accentColor,
+              borderRadius: 4,
+            }}
+          />
+        </View>
+      )}
 
-      {/* Milestone Badges Row */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }}>
+      {/* Milestone Badges Row (Hide if open ended) */}
+      {!isOpenEnded && (
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }}>
         {milestones.map((m) => {
           const isUnlocked = unlocked.includes(m);
           const justNowUnlocked = justUnlockedSet.has(m);
@@ -313,13 +338,14 @@ export default function AnimatedMacroGoalCard({
             />
           );
         })}
-      </View>
+        </View>
+      )}
 
       {/* Header for Sub-Projects (shown if we have subgoals OR if we can add them) */}
       {(subGoals && subGoals.length > 0 || onAddSubGoal) && (
         <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Sub-Projects</Text>
+            <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Milestones & Quests</Text>
             {onAddSubGoal && (
               <Pressable
                 onPress={() => onAddSubGoal(goal.id)}
@@ -339,10 +365,13 @@ export default function AnimatedMacroGoalCard({
             const subIsUnits = subGoal.metricType === 'units';
             const subTarget = subIsUnits ? (subGoal.targetMetric || 1) : subGoal.targetMinutes;
             const subCompleted = subIsUnits ? (subGoal.completedMetric || 0) : subGoal.completedMinutes;
-            const subPct = Math.min(100, Math.round((subCompleted / subTarget) * 100));
+            const subIsOpenEnded = subTarget === 0;
+            const subPct = subIsOpenEnded ? 0 : Math.min(100, Math.round((subCompleted / subTarget) * 100));
             
             let subLabel = '';
-            if (subIsUnits) {
+            if (subIsOpenEnded) {
+              subLabel = `${(subCompleted / 60).toFixed(1)}h`;
+            } else if (subIsUnits) {
               subLabel = `${subCompleted}/${subTarget}`;
             } else if (isEntertainment) {
               subLabel = `${(subCompleted / 60).toFixed(1)}/${(subTarget / 60).toFixed(0)}h`;
@@ -354,11 +383,15 @@ export default function AnimatedMacroGoalCard({
               <View key={subGoal.id} style={{ marginBottom: 12 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                   <Text style={{ color: '#EBEBF5', fontSize: 13, fontWeight: '500' }}>↳ {subGoal.title}</Text>
-                  <Text style={{ color: '#8E8E93', fontSize: 12 }}>{subLabel} ({subPct}%)</Text>
+                  <Text style={{ color: '#8E8E93', fontSize: 12 }}>
+                    {subLabel} {!subIsOpenEnded && `(${subPct}%)`}
+                  </Text>
                 </View>
-                <View style={{ backgroundColor: '#2C2C2E', width: '100%', height: 4, borderRadius: 2, overflow: 'hidden' }}>
-                  <View style={{ width: `${subPct}%`, height: '100%', backgroundColor: accentColor, opacity: 0.8, borderRadius: 2 }} />
-                </View>
+                {!subIsOpenEnded && (
+                  <View style={{ backgroundColor: '#2C2C2E', width: '100%', height: 4, borderRadius: 2, overflow: 'hidden' }}>
+                    <View style={{ width: `${subPct}%`, height: '100%', backgroundColor: accentColor, opacity: 0.8, borderRadius: 2 }} />
+                  </View>
+                )}
               </View>
             );
           })}

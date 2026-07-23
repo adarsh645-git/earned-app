@@ -25,6 +25,7 @@ export type MacroGoal = {
   unlockedMilestones: number[]; // e.g. [25, 50, 75, 100]
   type?: MacroGoalType;
   parentId?: string; // If set, this is a sub-project nested under a parent MacroGoal
+  category?: 'video-game' | 'movie' | 'tv-show' | 'youtube' | 'custom'; // For dynamic categorization
 };
 
 export const getMilestoneDollars = (targetMinutes: number, milestone: number): number => {
@@ -101,7 +102,7 @@ export const useMacroGoalStore = create<MacroGoalState>()(
         } else {
           newMinutes = newMinutes + amount;
           const target = goal.targetMinutes;
-          newPct = Math.min(100, Math.floor((newMinutes / target) * 100));
+          newPct = target > 0 ? Math.min(100, Math.floor((newMinutes / target) * 100)) : 0;
         }
 
         const existingMilestones = goal.unlockedMilestones || [];
@@ -163,7 +164,7 @@ export const useMacroGoalStore = create<MacroGoalState>()(
         } else {
           newMinutes = Math.max(0, newMinutes - amount);
           const target = goal.targetMinutes;
-          newPct = Math.min(100, Math.floor((newMinutes / target) * 100));
+          newPct = target > 0 ? Math.min(100, Math.floor((newMinutes / target) * 100)) : 0;
         }
 
         const existingMilestones = goal.unlockedMilestones || [];

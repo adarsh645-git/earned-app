@@ -54,6 +54,9 @@ export default function StoreScreen() {
   const [validationError, setValidationError] = useState('');
   const [selectedParentId, setSelectedParentId] = useState<string>('');
   const [quickStartGoal, setQuickStartGoal] = useState<MacroGoal | null>(null);
+  
+  const [projectCategory, setProjectCategory] = useState<'video-game' | 'movie' | 'tv-show' | 'youtube' | 'custom'>('custom');
+  const [isOpenEnded, setIsOpenEnded] = useState(false);
 
   const { addTask } = useTaskStore();
   const { startTimer } = useTimerStore();
@@ -91,26 +94,36 @@ export default function StoreScreen() {
     setValidationError('');
 
     if (!title.trim()) {
-      setValidationError('Project title is required');
+      setValidationError('Title is required');
       return;
     }
-
-    if (projectMinutes <= 0) {
-      setValidationError('Target duration must be greater than 0 minutes');
+    
+    // For Parent project, must have a target duration > 0
+    if (!selectedParentId && projectMinutes <= 0) {
+      setValidationError('Parent projects must have a target duration > 0');
+      return;
+    }
+    
+    // For Sub-projects, if it's not open ended, it must have duration
+    if (selectedParentId && !isOpenEnded && projectMinutes <= 0) {
+      setValidationError('Please set a target duration or mark as Open Ended');
       return;
     }
 
     addMacroGoal({
       title: title.trim(),
       horizon: 'yearly',
-      targetMinutes: projectMinutes,
+      targetMinutes: (selectedParentId && isOpenEnded) ? 0 : projectMinutes,
       type: 'entertainment',
       parentId: selectedParentId || undefined,
+      category: !selectedParentId ? projectCategory : undefined,
     });
 
     setTitle('');
     setProjectMinutes(0);
     setSelectedParentId('');
+    setProjectCategory('custom');
+    setIsOpenEnded(false);
     setShowAddModal(false);
   };
 
@@ -246,7 +259,7 @@ export default function StoreScreen() {
         <View style={{ width: '100%', maxWidth: 400, backgroundColor: '#09090B', borderWidth: 1, borderColor: '#27272A', borderRadius: 16, padding: 24 }}>
           <View className="flex-row justify-between items-center mb-6">
             <Text className="text-white text-xl font-bold">
-              {activeTab === 'material' ? 'Add Material Reward' : 'Add Entertainment Project'}
+              {activeTab === 'material' ? 'Add Material Reward' : (selectedParentId ? 'Add Milestone/Quest' : 'Add Entertainment Project')}
             </Text>
             <Pressable onPress={() => setShowAddModal(false)} className="p-2 -mr-2 rounded-full">
               <Ionicons name="close" size={20} color="#8E8E93" />
@@ -301,6 +314,45 @@ export default function StoreScreen() {
             </View>
           )}
 
+          {activeTab === 'time' && !selectedParentId && (
+            <View className="mb-4">
+              <Text className="text-[#8E8E93] text-xs font-semibold mb-2">Category</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {(['video-game', 'movie', 'tv-show', 'youtube', 'custom'] as const).map(cat => {
+                  const isSelected = projectCategory === cat;
+                  let icon = 'star';
+                  let label = 'Custom';
+                  if (cat === 'video-game') { icon = 'game-controller'; label = 'Game'; }
+                  if (cat === 'movie') { icon = 'film'; label = 'Movie'; }
+                  if (cat === 'tv-show') { icon = 'tv'; label = 'TV'; }
+                  if (cat === 'youtube') { icon = 'logo-youtube'; label = 'YouTube'; }
+                  
+                  return (
+                    <Pressable
+                      key={cat}
+                      onPress={() => setProjectCategory(cat)}
+                      style={{
+                        backgroundColor: isSelected ? 'rgba(90,200,250,0.2)' : '#09090B',
+                        borderColor: isSelected ? '#5AC8FA' : '#27272A',
+                        borderWidth: 1,
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
+                        borderRadius: 8,
+                        marginRight: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <Ionicons name={icon as any} size={14} color={isSelected ? '#FFF' : '#A1A1AA'} />
+                      <Text style={{ color: isSelected ? '#FFF' : '#A1A1AA', fontWeight: isSelected ? '700' : '500' }}>{label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
           <View className="mb-4">
             <Text className="text-[#8E8E93] text-xs font-semibold mb-2">Title</Text>
             <TextInput
@@ -316,9 +368,17 @@ export default function StoreScreen() {
           </View>
 
           <View className="mb-6">
-            <Text className="text-[#8E8E93] text-xs font-semibold mb-2">
-              {activeTab === 'material' ? 'Cost ($)' : 'Target Duration'}
-            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text className="text-[#8E8E93] text-xs font-semibold mb-2">
+                {activeTab === 'material' ? 'Cost ($)' : 'Target Duration'}
+              </Text>
+              {activeTab === 'time' && selectedParentId && (
+                <Pressable onPress={() => setIsOpenEnded(!isOpenEnded)} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                  <Ionicons name={isOpenEnded ? "checkbox" : "square-outline"} size={16} color={isOpenEnded ? "#5AC8FA" : "#8E8E93"} />
+                  <Text style={{ color: isOpenEnded ? '#5AC8FA' : '#8E8E93', fontSize: 12, marginLeft: 4 }}>Open Ended</Text>
+                </Pressable>
+              )}
+            </View>
             {activeTab === 'material' ? (
               <TextInput
                 value={costOrHours}
@@ -330,24 +390,30 @@ export default function StoreScreen() {
                 className="text-white rounded-lg p-3 text-sm"
               />
             ) : (
-              <Pressable 
-                onPress={() => setShowTimeSelector(true)}
-                style={{
-                  backgroundColor: '#09090B',
-                  padding: 12,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: '#27272A',
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                <Text style={{ color: '#FFFFFF', fontSize: 14 }}>
-                  {Math.floor(projectMinutes / 60)}h {projectMinutes % 60}m
-                </Text>
-                <Ionicons name="time-outline" size={18} color="#A1A1AA" />
-              </Pressable>
+              isOpenEnded ? (
+                <View style={{ backgroundColor: '#1C1C1E', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#27272A', alignItems: 'center' }}>
+                  <Text style={{ color: '#8E8E93', fontSize: 13, fontStyle: 'italic' }}>Will count up hours logged without a target.</Text>
+                </View>
+              ) : (
+                <Pressable 
+                  onPress={() => setShowTimeSelector(true)}
+                  style={{
+                    backgroundColor: '#09090B',
+                    padding: 12,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: '#27272A',
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontSize: 14 }}>
+                    {Math.floor(projectMinutes / 60)}h {projectMinutes % 60}m
+                  </Text>
+                  <Ionicons name="time-outline" size={18} color="#A1A1AA" />
+                </Pressable>
+              )
             )}
           </View>
 
