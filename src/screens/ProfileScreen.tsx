@@ -558,7 +558,7 @@ export default function ProfileScreen() {
                   <View style={{ borderTopColor: 'rgba(255,255,255,0.08)' }} className="flex-row justify-between items-center pt-2 border-t">
                     {milestones.map((m) => {
                       const isUnlocked = unlocked.includes(m);
-                      const dollars = getMilestoneDollars(goal.targetMinutes, m);
+                      const dollars = getMilestoneDollars(goal.targetMinutes, m, goal.type || 'productive');
                       return (
                         <View
                           key={m}

@@ -28,7 +28,10 @@ export type MacroGoal = {
   category?: 'video-game' | 'movie' | 'tv-show' | 'youtube' | 'custom'; // For dynamic categorization
 };
 
-export const getMilestoneDollars = (targetMinutes: number, milestone: number): number => {
+export const getMilestoneDollars = (targetMinutes: number, milestone: number, goalType: MacroGoalType = 'productive'): number => {
+  // Entertainment goals are already paid for with earned Hours — no Dollar double-dip on completion.
+  if (goalType === 'entertainment') return 0;
+
   const totalBonusKeys = Math.max(1, Math.round(targetMinutes / 60));
   const keys25 = Math.round(totalBonusKeys * 0.2);
   const keys50 = Math.round(totalBonusKeys * 0.2);
@@ -112,7 +115,7 @@ export const useMacroGoalStore = create<MacroGoalState>()(
 
         possibleMilestones.forEach(m => {
           if (newPct >= m && !existingMilestones.includes(m)) {
-            const dollars = getMilestoneDollars(targetForPayout, m);
+            const dollars = getMilestoneDollars(targetForPayout, m, goal.type || 'productive');
             newlyUnlocked.push({
               percentage: m,
               dollarsAwarded: dollars,
@@ -174,7 +177,7 @@ export const useMacroGoalStore = create<MacroGoalState>()(
         possibleMilestones.forEach(m => {
           // If we had unlocked this milestone previously, but our new percentage has dropped below it...
           if (existingMilestones.includes(m) && newPct < m) {
-            const dollars = getMilestoneDollars(targetForPayout, m);
+            const dollars = getMilestoneDollars(targetForPayout, m, goal.type || 'productive');
             // Remove the milestone from the active array
             const idx = updatedUnlocked.indexOf(m);
             if (idx > -1) {

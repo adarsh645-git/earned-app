@@ -181,12 +181,16 @@ export default function CollectionsScreen() {
 
       // Trigger Celebration Dopamine Feedback
       triggerConfetti();
+      const linkedGoal = macroGoals.find(g => g.id === selectedMacroId);
+      const isEntertainment = linkedGoal?.type === 'entertainment';
       setCelebrationInfo({
         title: 'QUEST LAUNCHED!',
         subtitle: `Journey "${journeyTitle.trim()}" is live in your Discipline Economy.`,
         iconType: 'rocket',
         category: journeyCategory,
-        payoutText: '🎁 Estimated Rewards: Milestone keys & cash bonus multipliers upon completion!',
+        payoutText: isEntertainment
+          ? '🎁 Milestone badges unlock as you make progress — already earned, guilt-free!'
+          : '🎁 Estimated Rewards: Milestone keys & cash bonus multipliers upon completion!',
         badgeLabel: 'MAIN QUEST UNLOCKED',
       });
     }

@@ -40,6 +40,7 @@ export interface EconomyState {
   isInDefault: boolean;
   completedTasksCount: number;
   completedMacroGoalsCount: number;
+  entertainmentClawbackApplied: boolean;
 
   // Getters
   getCreditScore: () => number;
@@ -63,7 +64,29 @@ export interface EconomyState {
   checkInDaily: () => CheckInResult;
   applyDailyInterestAndCheckDefaults: () => void;
   clearDebtForTesting: () => void;
+  applyEntertainmentClawback: () => void;
 }
+
+// Historical payout formula, frozen as of the entertainment reward-asymmetry fix.
+// Used only once, to claw back Dollars already paid out under the old (type-agnostic)
+// milestone rule. Must NOT be updated if the live formula in macroGoalStore changes later.
+const calculateLegacyEntertainmentMilestoneDollars = (targetMinutes: number, milestone: number): number => {
+  const totalBonusKeys = Math.max(1, Math.round(targetMinutes / 60));
+  const keys25 = Math.round(totalBonusKeys * 0.2);
+  const keys50 = Math.round(totalBonusKeys * 0.2);
+  const keys75 = Math.round(totalBonusKeys * 0.2);
+  const keys100 = totalBonusKeys - (keys25 + keys50 + keys75);
+
+  let keys = 0;
+  switch (milestone) {
+    case 25: keys = keys25; break;
+    case 50: keys = keys50; break;
+    case 75: keys = keys75; break;
+    case 100: keys = keys100; break;
+  }
+
+  return Math.round(keys * 0.02 * 100) / 100;
+};
 
 // Discipline score dynamic calculation
 export const calculateCreditScore = (state: {
@@ -120,6 +143,7 @@ export const useEconomyStore = create<EconomyState>()(
       isInDefault: false,
       completedTasksCount: 0,
       completedMacroGoalsCount: 0,
+      entertainmentClawbackApplied: false,
 
       getCreditScore: () => {
         const { streak, completedTasksCount, completedMacroGoalsCount, historyOfDefaults, streakResetsCount, isInDefault } = get();
@@ -259,6 +283,29 @@ export const useEconomyStore = create<EconomyState>()(
         debtTakenDate: null,
         lastInterestAppliedDate: null,
       }),
+
+      applyEntertainmentClawback: () => {
+        if (get().entertainmentClawbackApplied) return;
+
+        // Required to avoid a circular import with macroGoalStore, which imports this store.
+        const { useMacroGoalStore } = require('./macroGoalStore');
+        const macroGoals = useMacroGoalStore.getState().macroGoals;
+
+        let totalToClawBack = 0;
+        macroGoals
+          .filter((g: { type?: string }) => g.type === 'entertainment')
+          .forEach((g: { targetMinutes: number; unlockedMilestones: number[] }) => {
+            (g.unlockedMilestones || []).forEach((m: number) => {
+              totalToClawBack += calculateLegacyEntertainmentMilestoneDollars(g.targetMinutes, m);
+            });
+          });
+
+        if (totalToClawBack > 0) {
+          get().removeBalance(Math.round(totalToClawBack * 100) / 100);
+        }
+
+        set({ entertainmentClawbackApplied: true });
+      },
 
       applyPenalty: () => set((state) => ({ 
         dollarBalance: Math.round((state.dollarBalance * 0.9) * 100) / 100 
