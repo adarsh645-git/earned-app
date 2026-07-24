@@ -2,6 +2,7 @@ import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { View, Text, Animated, Pressable, LayoutAnimation, Platform, UIManager } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Task } from '../store/taskStore';
+import CheckboxBurst, { CheckboxBurstHandle } from './CheckboxBurst';
 
 if (
   Platform.OS === 'android' &&
@@ -11,9 +12,15 @@ if (
 }
 import { feedback } from '../utils/feedback';
 
+// Completed rows settle at this opacity — a "transparent banner" rather than
+// fully hidden, so the Completed Today group still reads at a glance.
+const COMPLETED_OPACITY = 0.5;
+
 interface AnimatedTaskRowProps {
   task: Task;
   tagName: string | undefined;
+  /** Earner tasks accent green, burner tasks accent blue — mirrors the tag's economic type. */
+  tagType?: 'earner' | 'burner';
   isLast: boolean;
   onToggle: (id: string) => void;
   onMoveToIcebox?: (id: string) => void;
@@ -27,6 +34,7 @@ interface AnimatedTaskRowProps {
 export default function AnimatedTaskRow({
   task,
   tagName,
+  tagType,
   isLast,
   onToggle,
   onMoveToIcebox,
@@ -36,13 +44,16 @@ export default function AnimatedTaskRow({
   showStartButton = false,
   showIceboxButton = true,
 }: AnimatedTaskRowProps) {
+  const accent = tagType === 'burner' ? '#5AC8FA' : '#30D158';
+
   const checkScale = useRef(new Animated.Value(1)).current;
+  const checkmarkScale = useRef(new Animated.Value(task.completed ? 1 : 0)).current;
   const glowOpacity = useRef(new Animated.Value(0)).current;
   const glowScale = useRef(new Animated.Value(0.6)).current;
-  const rowOpacity = useRef(new Animated.Value(1)).current;
+  const rowOpacity = useRef(new Animated.Value(task.completed ? COMPLETED_OPACITY : 1)).current;
   const rowTranslateX = useRef(new Animated.Value(0)).current;
-  const rowHeight = useRef(new Animated.Value(1)).current; // scale factor for height collapse
   const strikethrough = useRef(new Animated.Value(task.completed ? 1 : 0)).current;
+  const burstRef = useRef<CheckboxBurstHandle>(null);
 
   const [localCompleted, setLocalCompleted] = useState(task.completed);
 
@@ -53,8 +64,12 @@ export default function AnimatedTaskRow({
       strikethrough.setValue(0);
       rowOpacity.setValue(1);
       rowTranslateX.setValue(0);
+      checkmarkScale.setValue(0);
     } else {
       strikethrough.setValue(1);
+      rowOpacity.setValue(COMPLETED_OPACITY);
+      rowTranslateX.setValue(0);
+      checkmarkScale.setValue(1);
     }
   }, [task.completed]);
 
@@ -68,9 +83,10 @@ export default function AnimatedTaskRow({
 
     // Completing: trigger multi-layered animation
     feedback('taskComplete');
+    burstRef.current?.fire(); // confetti burst radiating from the checkbox
     setLocalCompleted(true); // instantly show checkmark
 
-    // 1. Checkbox spring bounce + green glow ring pulse + strikethrough
+    // 1. Checkbox spring bounce + glow ring pulse + checkmark pop + strikethrough
     Animated.parallel([
       Animated.sequence([
         Animated.spring(checkScale, { toValue: 1.5, useNativeDriver: true, speed: 80, bounciness: 16 }),
@@ -83,23 +99,24 @@ export default function AnimatedTaskRow({
         ]),
         Animated.timing(glowOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
       ]),
+      Animated.sequence([
+        Animated.spring(checkmarkScale, { toValue: 1.3, useNativeDriver: true, speed: 90, bounciness: 14 }),
+        Animated.spring(checkmarkScale, { toValue: 1, useNativeDriver: true, speed: 40, bounciness: 8 }),
+      ]),
       Animated.timing(strikethrough, { toValue: 1, duration: 200, useNativeDriver: true }),
     ]).start();
 
-    // 2. After 600ms delay, slide left + fade out row
+    // 2. After 600ms delay, fade the row down to a "transparent banner" in place
     setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(rowTranslateX, { toValue: -80, duration: 400, useNativeDriver: true }),
-        Animated.timing(rowOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
-      ]).start();
-      
-      // 3. After fadeout finishes, tell parent to move it to the Completed list
+      Animated.timing(rowOpacity, { toValue: COMPLETED_OPACITY, duration: 400, useNativeDriver: true }).start();
+
+      // 3. Once faded, tell parent to move it into the Completed group
       setTimeout(() => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         onToggle(task.id);
       }, 400);
     }, 600);
-  }, [task.id, task.completed, onToggle, checkScale, glowOpacity, glowScale, rowOpacity, rowTranslateX, strikethrough]);
+  }, [task.id, task.completed, onToggle, checkScale, checkmarkScale, glowOpacity, glowScale, rowOpacity, strikethrough]);
 
   // Reset glow after animation
   useEffect(() => {
@@ -118,18 +135,18 @@ export default function AnimatedTaskRow({
         transform: [{ translateX: rowTranslateX }],
       }}
     >
-      <View className="flex-row items-stretch justify-between min-h-[72px]">
+      <Pressable className="flex-row items-stretch justify-between min-h-[72px] hover:bg-[#1F1F22]">
         <View className="flex-row items-center flex-1 py-4 pl-4 pr-2">
-          {/* Checkbox with glow ring */}
+          {/* Checkbox with glow ring + confetti burst */}
           <Pressable onPress={handleToggle} style={{ position: 'relative' }}>
-            {/* Green glow ring (behind checkbox) */}
+            {/* Accent glow ring (behind checkbox) */}
             <Animated.View
               style={{
                 position: 'absolute',
                 width: 24,
                 height: 24,
-                borderRadius: 12,
-                backgroundColor: '#30D158',
+                borderRadius: 7,
+                backgroundColor: accent,
                 opacity: glowOpacity,
                 transform: [{ scale: glowScale }],
                 left: 0,
@@ -137,13 +154,15 @@ export default function AnimatedTaskRow({
               }}
               pointerEvents="none"
             />
-            {/* Checkbox */}
+            {/* Confetti burst, centered on the checkbox */}
+            <CheckboxBurst ref={burstRef} color={accent} size={24} />
+            {/* Checkbox — rounded square, TickTick-style */}
             <Animated.View
               style={[
                 {
                   width: 24,
                   height: 24,
-                  borderRadius: 12,
+                  borderRadius: 7,
                   borderWidth: 2,
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -151,12 +170,14 @@ export default function AnimatedTaskRow({
                   transform: [{ scale: checkScale }],
                 },
                 localCompleted
-                  ? { backgroundColor: '#30D158', borderColor: '#30D158' }
+                  ? { backgroundColor: accent, borderColor: accent }
                   : { borderColor: '#8E8E93', backgroundColor: 'transparent' },
               ]}
             >
               {localCompleted && (
-                <Ionicons name="checkmark" size={14} color="white" />
+                <Animated.View style={{ transform: [{ scale: checkmarkScale }] }}>
+                  <Ionicons name="checkmark" size={14} color="white" />
+                </Animated.View>
               )}
             </Animated.View>
           </Pressable>
@@ -238,7 +259,7 @@ export default function AnimatedTaskRow({
             </Pressable>
           )}
         </View>
-      </View>
+      </Pressable>
     </Animated.View>
   );
 }

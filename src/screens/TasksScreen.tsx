@@ -8,6 +8,19 @@ import { feedback } from '../utils/feedback';
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
+
+// Shared section-card look (Today's Focus / Completed Today / Icebox) — a
+// consistent border + subtle depth so the three groups read as one system.
+const CARD_STYLE = {
+  backgroundColor: '#1C1C1E',
+  borderColor: 'rgba(255,255,255,0.08)',
+  borderWidth: 1,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.25,
+  shadowRadius: 12,
+  elevation: 3,
+} as const;
 import { useSummitStore, getChainTrail } from '../store/summitStore';
 import { useEconomyStore } from '../store/economyStore';
 import { useTimerStore } from '../store/timerStore';
@@ -307,12 +320,13 @@ export default function TasksScreen() {
           </Text>
           
           {incompleteTasks.length === 0 ? (
-            <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl p-6 items-center justify-center mb-6">
+            <View style={CARD_STYLE} className="rounded-2xl p-6 items-center justify-center mb-6">
+              <Ionicons name="checkmark-done-circle-outline" size={28} color="#3A3A3C" style={{ marginBottom: 8 }} />
               <Text className="text-white font-semibold text-center">Your focus list is clear.</Text>
               <Text className="text-[#8E8E93] text-xs text-center mt-1">Tap Add Task to schedule focus sessions for today.</Text>
             </View>
           ) : (
-            <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl overflow-hidden mb-5">
+            <View style={CARD_STYLE} className="rounded-2xl overflow-hidden mb-5">
               {incompleteTasks.map((task, index) => {
                 const tag = tags.find(t => t.id === task.tagId);
                 const isLast = index === incompleteTasks.length - 1;
@@ -321,6 +335,7 @@ export default function TasksScreen() {
                     key={task.id}
                     task={task}
                     tagName={tag?.name}
+                    tagType={tag?.type}
                     isLast={isLast}
                     onToggle={handleToggle}
                     onMoveToIcebox={handleMoveToIcebox}
@@ -340,7 +355,7 @@ export default function TasksScreen() {
               <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3">
                 Completed Today
               </Text>
-              <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl overflow-hidden">
+              <View style={CARD_STYLE} className="rounded-2xl overflow-hidden">
                 {completedTasks.map((task, index) => {
                   const tag = tags.find(t => t.id === task.tagId);
                   const isLast = index === completedTasks.length - 1;
@@ -349,6 +364,7 @@ export default function TasksScreen() {
                       key={task.id}
                       task={task}
                       tagName={tag?.name}
+                      tagType={tag?.type}
                       isLast={isLast}
                       onToggle={handleToggle}
                       onMoveToIcebox={handleMoveToIcebox}
@@ -372,12 +388,13 @@ export default function TasksScreen() {
             </View>
 
             {iceboxTasks.length === 0 ? (
-              <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl p-6 items-center justify-center">
+              <View style={CARD_STYLE} className="rounded-2xl p-6 items-center justify-center">
+                <Ionicons name="snow-outline" size={28} color="#3A3A3C" style={{ marginBottom: 8 }} />
                 <Text className="text-[#8E8E93] text-xs font-semibold text-center">The Icebox is empty.</Text>
                 <Text className="text-[#8E8E93] text-[11px] text-center mt-0.5">Defer distractions here to protect today's focus.</Text>
               </View>
             ) : (
-              <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.05)', borderWidth: 1 }} className="rounded-2xl overflow-hidden mb-3 opacity-65">
+              <View style={{ ...CARD_STYLE, borderColor: 'rgba(255,255,255,0.05)' }} className="rounded-2xl overflow-hidden mb-3 opacity-65">
                 {iceboxTasks.map((task, index) => {
                   const tag = tags.find(t => t.id === task.tagId);
                   const isLast = index === iceboxTasks.length - 1;
@@ -390,15 +407,21 @@ export default function TasksScreen() {
                       }}
                       className="p-4 flex-row items-center justify-between"
                     >
-                      <View className="flex-1 pr-4">
-                        <Text className="text-zinc-300 text-base font-semibold">
-                          {task.title}
-                        </Text>
-                        <View className="flex-row items-center mt-1 gap-1.5">
-                          <View style={{ backgroundColor: '#2C2C2E' }} className="px-2 py-0.5 rounded-full">
-                            <Text className="text-[#8E8E93] text-[9px] font-bold uppercase tracking-wider">{tag?.name}</Text>
+                      <View className="flex-row items-center flex-1 pr-4">
+                        {/* Frozen checkbox — visual parity with active/completed rows */}
+                        <View
+                          style={{ width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: '#8E8E93', backgroundColor: 'transparent', marginRight: 12 }}
+                        />
+                        <View className="flex-1">
+                          <Text className="text-zinc-300 text-base font-semibold">
+                            {task.title}
+                          </Text>
+                          <View className="flex-row items-center mt-1 gap-1.5">
+                            <View style={{ backgroundColor: '#2C2C2E' }} className="px-2 py-0.5 rounded-full">
+                              <Text className="text-[#8E8E93] text-[9px] font-bold uppercase tracking-wider">{tag?.name}</Text>
+                            </View>
+                            <Text className="text-[#8E8E93] text-xs font-medium">{task.estimatedMinutes} mins</Text>
                           </View>
-                          <Text className="text-[#8E8E93] text-xs font-medium">{task.estimatedMinutes} mins</Text>
                         </View>
                       </View>
 
