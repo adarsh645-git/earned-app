@@ -23,7 +23,8 @@ export type Task = {
   title: string;
   tagId: string;
   macroGoalId?: string;
-  estimatedMinutes: number; 
+  collectionId?: string; // Journey this task belongs to
+  estimatedMinutes: number;
   completed: boolean;
   isIcebox: boolean;
   dateCreated: string;

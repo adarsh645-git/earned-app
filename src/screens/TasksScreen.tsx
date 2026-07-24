@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, ScrollView, TextInput, Pressable, Modal, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTaskStore, Task } from '../store/taskStore';
@@ -18,6 +18,7 @@ import DialPicker from '../components/DialPicker';
 import EditTaskModal from '../components/EditTaskModal';
 import TimeSelectorModal from '../components/TimeSelectorModal';
 import ConfirmModal from '../components/ConfirmModal';
+import LinkProgressPicker from '../components/LinkProgressPicker';
 
 export default function TasksScreen() {
   const { tasks, tags, pillars, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox } = useTaskStore();
@@ -29,6 +30,7 @@ export default function TasksScreen() {
   const [selectedTagId, setSelectedTagId] = useState(tags[0]?.id || '');
   const [estimatedMinutes, setEstimatedMinutes] = useState<number>(25);
   const [selectedMacroId, setSelectedMacroId] = useState('');
+  const [selectedCollectionId, setSelectedCollectionId] = useState('');
   const [sendDirectlyToIcebox, setSendDirectlyToIcebox] = useState(false);
   const [validationError, setValidationError] = useState('');
   const [blockedModal, setBlockedModal] = useState<{ title: string; message: string } | null>(null);
@@ -111,200 +113,167 @@ export default function TasksScreen() {
       tagId: selectedTagId,
       estimatedMinutes: estimatedMinutes,
       macroGoalId: selectedMacroId || undefined,
+      collectionId: selectedCollectionId || undefined,
       isIcebox: sendDirectlyToIcebox,
     });
 
+    feedback('taskComplete');
     setTitle('');
     setEstimatedMinutes(25);
     setSelectedMacroId('');
+    setSelectedCollectionId('');
     setSendDirectlyToIcebox(false);
     setModalVisible(false);
   };
 
-  // If modal is visible, show the form inline instead of using Modal component
-  if (modalVisible) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }}>
-        <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 40 }}>
-          
-          {/* Header */}
-          <View className="flex-row justify-between items-center mt-3 mb-6">
-            <Text style={{ color: '#FFF', fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>
-              {isBurner ? 'New Leisure Activity' : 'New Focus Block'}
-            </Text>
-            <Pressable onPress={() => setModalVisible(false)} style={{ backgroundColor: '#2C2C2E', padding: 6, borderRadius: 12 }}>
-              <Ionicons name="close" size={20} color="#8E8E93" />
-            </Pressable>
-          </View>
-
-          {validationError ? (
-            <View style={{ backgroundColor: 'rgba(255,69,58,0.15)', borderColor: 'rgba(255,69,58,0.4)', borderWidth: 1 }} className="p-3.5 rounded-2xl mb-4">
-              <Text className="text-[#FF453A] text-xs font-semibold text-center">{validationError}</Text>
-            </View>
-          ) : null}
-
-          {/* Title Input */}
-          <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>
-            {isBurner ? 'Activity Title' : 'Focus Item Title'}
-          </Text>
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            placeholder={isBurner ? "e.g. Play PS5, Watch Netflix" : "e.g. Code Review, Bike Ride, Read Book"}
-            placeholderTextColor="#5C5C5E"
-            spellCheck={true}
-            autoCorrect={true}
-            style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 16, borderRadius: 16, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2C2C2E' }}
-          />
-
-          {/* Focus Duration */}
-          <View style={{ marginBottom: 24 }}>
-            <Text style={{ color: '#8E8E93', fontSize: 13, fontWeight: '600', marginBottom: 8 }}>Estimated Duration</Text>
-            <Pressable 
-              onPress={() => setShowAddTimeSelector(true)}
-              style={{
-                backgroundColor: '#18181B',
-                padding: 16,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: '#27272A',
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
-            >
-              <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '500' }}>
-                {Math.floor(estimatedMinutes / 60)}h {estimatedMinutes % 60}m
-              </Text>
-              <Ionicons name="time-outline" size={20} color="#A1A1AA" />
-            </Pressable>
-          </View>
-
-          {/* Tag Selection */}
-          <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Category Tag</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
-            {tags.filter(t => !t.isArchived).map((tag) => {
-              const isSelected = selectedTagId === tag.id;
-              const pillar = pillars.find(p => p.id === tag.pillarId);
-              return (
-                <Pressable
-                  key={tag.id}
-                  onPress={() => setSelectedTagId(tag.id)}
-                  style={({ hovered }: any) => ({
-                    backgroundColor: isSelected ? (hovered ? '#3A2053' : '#2C183E') : (hovered ? '#2C2C2E' : '#1C1C1E'),
-                    borderColor: isSelected ? (hovered ? '#5A3382' : '#4D2A6B') : '#2C2C2E',
-                    borderWidth: 1,
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
-                    borderRadius: 12,
-                    marginRight: 8,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.15s ease-in-out',
-                  })}
-                >
-                  <Text style={{ color: isSelected ? '#FFF' : '#8E8E93', fontWeight: isSelected ? '700' : '600', fontSize: 13 }}>
-                    {tag.name} {pillar ? `(${pillar.name})` : ''}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          {/* Link to Macro Goal */}
-          {macroGoals.length > 0 && (
-            <>
-              <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Link to Pyramid Goal (Optional)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
-                <Pressable
-                  onPress={() => setSelectedMacroId('')}
-                  style={({ hovered }: any) => ({
-                    backgroundColor: !selectedMacroId ? (hovered ? '#3A2053' : '#2C183E') : (hovered ? '#2C2C2E' : '#1C1C1E'),
-                    borderColor: !selectedMacroId ? (hovered ? '#5A3382' : '#4D2A6B') : '#2C2C2E',
-                    borderWidth: 1,
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
-                    borderRadius: 12,
-                    marginRight: 8,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.15s ease-in-out',
-                  })}
-                >
-                  <Text style={{ color: !selectedMacroId ? '#FFF' : '#8E8E93', fontWeight: !selectedMacroId ? '700' : '600', fontSize: 13 }}>
-                    None
-                  </Text>
-                </Pressable>
-                {macroGoals.map((goal) => {
-                  const isSelected = selectedMacroId === goal.id;
-                  return (
-                    <Pressable
-                      key={goal.id}
-                      onPress={() => setSelectedMacroId(goal.id)}
-                      style={({ hovered }: any) => ({
-                        backgroundColor: isSelected ? (hovered ? '#3A2053' : '#2C183E') : (hovered ? '#2C2C2E' : '#1C1C1E'),
-                        borderColor: isSelected ? (hovered ? '#5A3382' : '#4D2A6B') : '#2C2C2E',
-                        borderWidth: 1,
-                        paddingHorizontal: 16,
-                        paddingVertical: 10,
-                        borderRadius: 12,
-                        marginRight: 8,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.15s ease-in-out',
-                      })}
-                    >
-                      <Text style={{ color: isSelected ? '#FFF' : '#8E8E93', fontWeight: isSelected ? '700' : '600', fontSize: 13 }}>
-                        {goal.title}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </>
-          )}
-
-          {/* Send Directly to Icebox Toggle */}
-          <Pressable
-            onPress={() => setSendDirectlyToIcebox(!sendDirectlyToIcebox)}
-            style={{ backgroundColor: '#151517', borderColor: '#2C2C2E', borderWidth: 1 }}
-            className="flex-row items-center p-4 rounded-2xl justify-between mb-8"
+  const addTaskModal = (
+    <Modal visible={modalVisible} transparent animationType="fade">
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', padding: 20 }}>
+        <View style={{ width: '100%', maxWidth: 440, alignSelf: 'center', maxHeight: '88%' }}>
+          <ScrollView
+            style={{ backgroundColor: '#1C1C1E', borderRadius: 24, borderWidth: 1, borderColor: '#2C2C2E' }}
+            contentContainerStyle={{ padding: 24 }}
+            showsVerticalScrollIndicator={false}
           >
-            <View className="flex-row items-center gap-2.5">
-              <Ionicons name="snow-outline" size={18} color="#8E8E93" />
-              <View>
-                <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '600' }}>Defer directly to Icebox</Text>
-                <Text style={{ color: '#8E8E93', fontSize: 12, marginTop: 2 }}>Locks item out of today's focus list</Text>
-              </View>
+            {/* Header */}
+            <View className="flex-row justify-between items-center mb-5">
+              <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '700' }}>
+                {isBurner ? 'New Leisure Activity' : 'New Focus Block'}
+              </Text>
+              <Pressable onPress={() => setModalVisible(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={22} color="#8E8E93" />
+              </Pressable>
             </View>
-            <Ionicons
-              name={sendDirectlyToIcebox ? 'checkbox' : 'square-outline'}
-              size={20}
-              color={sendDirectlyToIcebox ? '#BF5AF2' : '#8E8E93'}
+
+            {validationError ? (
+              <View style={{ backgroundColor: 'rgba(255,69,58,0.15)', borderColor: 'rgba(255,69,58,0.4)', borderWidth: 1 }} className="p-3.5 rounded-2xl mb-4">
+                <Text className="text-[#FF453A] text-xs font-semibold text-center">{validationError}</Text>
+              </View>
+            ) : null}
+
+            {/* Title Input */}
+            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>
+              {isBurner ? 'Activity Title' : 'Focus Item Title'}
+            </Text>
+            <TextInput
+              value={title}
+              onChangeText={setTitle}
+              placeholder={isBurner ? "e.g. Play PS5, Watch Netflix" : "e.g. Code Review, Bike Ride, Read Book"}
+              placeholderTextColor="#5C5C5E"
+              autoFocus
+              spellCheck={true}
+              autoCorrect={true}
+              style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 16, borderRadius: 16, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2C2C2E' }}
             />
-          </Pressable>
 
-          {/* Submit Button */}
-          <PrimaryButton
-            onPress={handleAddTask}
-            title={isBurner ? `Add Leisure Activity (${estimatedMinutes}m)` : 'Add Focus Block'}
-            style={{ width: '100%', backgroundColor: isBurner ? '#5AC8FA' : '#BF5AF2' }}
-          />
+            {/* Duration */}
+            <View style={{ marginBottom: 20 }}>
+              <Text style={{ color: '#8E8E93', fontSize: 13, fontWeight: '600', marginBottom: 8 }}>Estimated Duration</Text>
+              <Pressable
+                onPress={() => setShowAddTimeSelector(true)}
+                style={{
+                  backgroundColor: '#18181B',
+                  padding: 16,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: '#27272A',
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '500' }}>
+                  {Math.floor(estimatedMinutes / 60)}h {estimatedMinutes % 60}m
+                </Text>
+                <Ionicons name="time-outline" size={20} color="#A1A1AA" />
+              </Pressable>
+            </View>
 
-          <TimeSelectorModal
-            visible={showAddTimeSelector}
-            initialMinutes={estimatedMinutes}
-            title="Estimate Duration"
-            onClose={() => setShowAddTimeSelector(false)}
-            onConfirm={(mins) => {
-              setEstimatedMinutes(mins);
-              setShowAddTimeSelector(false);
-            }}
-          />
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
+            {/* Tag Selection */}
+            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Category Tag</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
+              {tags.filter(t => !t.isArchived).map((tag) => {
+                const isSelected = selectedTagId === tag.id;
+                const pillar = pillars.find(p => p.id === tag.pillarId);
+                return (
+                  <Pressable
+                    key={tag.id}
+                    onPress={() => { feedback('select'); setSelectedTagId(tag.id); }}
+                    style={({ hovered }: any) => ({
+                      backgroundColor: isSelected ? (hovered ? '#3A2053' : '#2C183E') : (hovered ? '#2C2C2E' : '#1C1C1E'),
+                      borderColor: isSelected ? (hovered ? '#5A3382' : '#4D2A6B') : '#2C2C2E',
+                      borderWidth: 1,
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      borderRadius: 12,
+                      marginRight: 8,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.15s ease-in-out',
+                    })}
+                  >
+                    <Text style={{ color: isSelected ? '#FFF' : '#8E8E93', fontWeight: isSelected ? '700' : '600', fontSize: 13 }}>
+                      {tag.name} {pillar ? `(${pillar.name})` : ''}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            <LinkProgressPicker
+              tagType={isBurner ? 'burner' : 'earner'}
+              collectionId={selectedCollectionId}
+              macroGoalId={selectedMacroId}
+              onChange={(collectionId, macroGoalId) => {
+                feedback('select');
+                setSelectedCollectionId(collectionId);
+                setSelectedMacroId(macroGoalId);
+              }}
+              accentColor={isBurner ? '#5AC8FA' : '#BF5AF2'}
+            />
+
+            {/* Send Directly to Icebox Toggle */}
+            <Pressable
+              onPress={() => setSendDirectlyToIcebox(!sendDirectlyToIcebox)}
+              style={{ backgroundColor: '#151517', borderColor: '#2C2C2E', borderWidth: 1 }}
+              className="flex-row items-center p-4 rounded-2xl justify-between mb-6"
+            >
+              <View className="flex-row items-center gap-2.5">
+                <Ionicons name="snow-outline" size={18} color="#8E8E93" />
+                <View>
+                  <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '600' }}>Defer directly to Icebox</Text>
+                  <Text style={{ color: '#8E8E93', fontSize: 12, marginTop: 2 }}>Locks item out of today's focus list</Text>
+                </View>
+              </View>
+              <Ionicons
+                name={sendDirectlyToIcebox ? 'checkbox' : 'square-outline'}
+                size={20}
+                color={sendDirectlyToIcebox ? '#BF5AF2' : '#8E8E93'}
+              />
+            </Pressable>
+
+            {/* Submit Button */}
+            <PrimaryButton
+              onPress={handleAddTask}
+              title={isBurner ? `Add Leisure Activity (${estimatedMinutes}m)` : 'Add Focus Block'}
+              style={{ width: '100%', backgroundColor: isBurner ? '#5AC8FA' : '#BF5AF2' }}
+            />
+          </ScrollView>
+        </View>
+      </View>
+
+      <TimeSelectorModal
+        visible={showAddTimeSelector}
+        initialMinutes={estimatedMinutes}
+        title="Estimate Duration"
+        onClose={() => setShowAddTimeSelector(false)}
+        onConfirm={(mins) => {
+          setEstimatedMinutes(mins);
+          setShowAddTimeSelector(false);
+        }}
+      />
+    </Modal>
+  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }}>
@@ -474,6 +443,8 @@ export default function TasksScreen() {
           ]}
         />
       )}
+
+      {addTaskModal}
     </SafeAreaView>
   );
 }

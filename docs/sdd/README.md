@@ -18,6 +18,7 @@ This directory contains the feature specification documents and task checklists 
 - **[012-macro-goal-edit-delete.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/012-macro-goal-edit-delete.md)**: Edit (title/horizon/target) and cascade-safe delete (unlinks tasks/Journeys, removes sub-goals) for macro targets, wired into both `AnimatedMacroGoalCard` and Profile's Pyramid list.
 - **[013-interlinked-goal-chains.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/013-interlinked-goal-chains.md)**: Cascade foundation (Phase 1+2) for single-chain goal interlinking — persists parent_id/pays_currency/category, gates currency to one designated level, and cascades time continuously vs count-on-completion. (Chain-building UI is Phase 3.)
 - **[014-interlinked-goal-chains-ui.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/014-interlinked-goal-chains-ui.md)**: Chain-building UI (Phase 3) and cascade-legibility toasts (Phase 4) — parent selectors, the "Rewards Paid Here" single-payer toggle, a Time/Count choice at creation (previously impossible to create count goals at all), and "Contributed to: X → Y" feedback across Tasks/Timer/Journeys completion paths.
+- **[015-task-journey-linking-and-compact-creation.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/015-task-journey-linking-and-compact-creation.md)**: Adds `collection_id` to tasks so they can link to a Journey (auto-linking its macro goal too), a shared `LinkProgressPicker` component, and a compact modal replacing the full-page task-creation form.
 
 
 
