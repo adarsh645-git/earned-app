@@ -16,6 +16,7 @@ This directory contains the feature specification documents and task checklists 
 - **[010-ui-juice-and-screen-redesigns.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/010-ui-juice-and-screen-redesigns.md)**: Dependency-free Web Audio sound layer, animated ring/pills/bars, tiered haptic+sound feedback, and flow/naming/motion redesigns of Tasks, Store, and Journeys.
 - **[011-cloud-sync-data-loss-fixes.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/011-cloud-sync-data-loss-fixes.md)**: Fixes dropped macro-goal `type` field on sync, destructive pull-overwrite races that erased newly-added tags/items, and an unfiltered Pyramid list on Profile.
 - **[012-macro-goal-edit-delete.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/012-macro-goal-edit-delete.md)**: Edit (title/horizon/target) and cascade-safe delete (unlinks tasks/Journeys, removes sub-goals) for macro targets, wired into both `AnimatedMacroGoalCard` and Profile's Pyramid list.
+- **[013-interlinked-goal-chains.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/013-interlinked-goal-chains.md)**: Cascade foundation (Phase 1+2) for single-chain goal interlinking — persists parent_id/pays_currency/category, gates currency to one designated level, and cascades time continuously vs count-on-completion. (Chain-building UI is Phase 3.)
 
 
 

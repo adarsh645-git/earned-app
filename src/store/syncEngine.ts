@@ -193,6 +193,9 @@ export async function pullCloudData(userId: string) {
         targetMetric: g.target_metric || 0,
         completedMetric: g.completed_metric || 0,
         unlockedMilestones: g.unlocked_milestones || [],
+        parentId: g.parent_id || undefined,
+        paysCurrency: g.pays_currency !== false,
+        category: g.category || undefined,
       }));
       useMacroGoalStore.setState((s) => ({ macroGoals: mergeById(s.macroGoals, formattedMacroGoals) }));
     }
@@ -360,6 +363,9 @@ export async function pushAllMacroGoalsToCloud(userId: string, goals: MacroGoal[
       target_metric: g.targetMetric || 0,
       completed_metric: g.completedMetric || 0,
       unlocked_milestones: g.unlockedMilestones || [],
+      parent_id: g.parentId || null,
+      pays_currency: g.paysCurrency !== false,
+      category: g.category || null,
     }));
     await supabase.from('macro_goals').upsert(payload, { onConflict: 'id' });
   } catch (err) {

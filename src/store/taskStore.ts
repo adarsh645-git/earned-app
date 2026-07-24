@@ -112,7 +112,7 @@ export const useTaskStore = create<TaskState>()(
               economyState.incrementCompletedTasks();
 
               if (task.macroGoalId) {
-                macroState.addProgress(task.macroGoalId, task.estimatedMinutes);
+                macroState.applyLeafProgress(task.macroGoalId, task.estimatedMinutes);
               }
             } else if (tag?.type === 'burner') {
               economyState.spendHours(task.estimatedMinutes);
@@ -126,7 +126,7 @@ export const useTaskStore = create<TaskState>()(
               economyState.decrementCompletedTasks();
 
               if (task.macroGoalId) {
-                macroState.removeProgress(task.macroGoalId, task.estimatedMinutes);
+                macroState.revokeLeafProgress(task.macroGoalId, task.estimatedMinutes);
               }
             } else if (tag?.type === 'burner') {
               economyState.addHours(task.estimatedMinutes);
