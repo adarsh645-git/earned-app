@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, Modal, Pressable } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { CheckInResult } from '../store/economyStore';
+import { feedback } from '../utils/feedback';
 
 interface CheckInModalProps {
   visible: boolean;
@@ -10,7 +11,13 @@ interface CheckInModalProps {
 }
 
 export default function CheckInModal({ visible, checkInResult, onClose }: CheckInModalProps) {
-  if (!visible || !checkInResult || !checkInResult.rewarded) return null;
+  const shouldShow = visible && !!checkInResult && checkInResult.rewarded;
+
+  useEffect(() => {
+    if (shouldShow) feedback('milestone');
+  }, [shouldShow]);
+
+  if (!shouldShow) return null;
 
   return (
     <Modal visible={visible} animationType="fade" transparent>

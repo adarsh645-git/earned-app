@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable } from 'react-native';
+import { View, Text, ScrollView, TextInput, Pressable, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTaskStore, Task } from '../store/taskStore';
+import { feedback } from '../utils/feedback';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { useMacroGoalStore } from '../store/macroGoalStore';
 import { useEconomyStore } from '../store/economyStore';
 import { useTimerStore } from '../store/timerStore';
@@ -43,6 +48,37 @@ export default function TasksScreen() {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastSubtext, setToastSubtext] = useState('');
+
+  // Show a reward toast when completing a task (was previously silent)
+  const handleToggle = (id: string) => {
+    const task = tasks.find(t => t.id === id);
+    const tag = task ? tags.find(t => t.id === task.tagId) : null;
+    if (task && !task.completed && tag) {
+      if (tag.type === 'earner') {
+        const conversion = useEconomyStore.getState().getConversionRate();
+        const hoursEarned = Math.round(task.estimatedMinutes * conversion.multiplier);
+        setToastMessage(`+${(hoursEarned / 60).toFixed(1)}h entertainment earned`);
+        setToastSubtext(`Focused ${task.estimatedMinutes}m on "${task.title}"`);
+      } else {
+        setToastMessage(`-${(task.estimatedMinutes / 60).toFixed(1)}h leisure spent`);
+        setToastSubtext(`Enjoyed "${task.title}" guilt-free`);
+      }
+      setToastVisible(true);
+    }
+    toggleTask(id);
+  };
+
+  const handleMoveToIcebox = (id: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    feedback('select');
+    moveToIcebox(id);
+  };
+
+  const handleActivate = (id: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    feedback('select');
+    activateFromIcebox(id);
+  };
 
   // Modals state
   const [editTask, setEditTask] = useState<Task | null>(null);
@@ -249,7 +285,7 @@ export default function TasksScreen() {
           {/* Submit Button */}
           <PrimaryButton
             onPress={handleAddTask}
-            title={isBurner ? `Add Leisure Task (-${estimatedMinutes}m)` : "Add Focus Item (+$0.02)"}
+            title={isBurner ? `Add Leisure Activity (${estimatedMinutes}m)` : 'Add Focus Block'}
             style={{ width: '100%', backgroundColor: isBurner ? '#5AC8FA' : '#BF5AF2' }}
           />
 
@@ -314,8 +350,8 @@ export default function TasksScreen() {
                     task={task}
                     tagName={tag?.name}
                     isLast={isLast}
-                    onToggle={toggleTask}
-                    onMoveToIcebox={moveToIcebox}
+                    onToggle={handleToggle}
+                    onMoveToIcebox={handleMoveToIcebox}
                     onEdit={setEditTask}
                     onDelete={deleteTask}
                     onStartTimer={handleStartTimer}
@@ -342,8 +378,8 @@ export default function TasksScreen() {
                       task={task}
                       tagName={tag?.name}
                       isLast={isLast}
-                      onToggle={toggleTask}
-                      onMoveToIcebox={moveToIcebox}
+                      onToggle={handleToggle}
+                      onMoveToIcebox={handleMoveToIcebox}
                       onEdit={setEditTask}
                       onDelete={deleteTask}
                       showIceboxButton={false}
@@ -395,12 +431,12 @@ export default function TasksScreen() {
                       </View>
 
                       <Pressable
-                        onPress={() => activateFromIcebox(task.id)}
+                        onPress={() => handleActivate(task.id)}
                         style={{ backgroundColor: 'rgba(191,90,242,0.2)', borderColor: 'rgba(191,90,242,0.4)', borderWidth: 1 }}
                         className="flex-row items-center px-3 py-1.5 rounded-xl"
                       >
-                        <Ionicons name="thunderstorm-outline" size={12} color="#BF5AF2" />
-                        <Text className="text-[#BF5AF2] font-bold text-xs ml-1">De-ice</Text>
+                        <Ionicons name="arrow-up-circle-outline" size={13} color="#BF5AF2" />
+                        <Text className="text-[#BF5AF2] font-bold text-xs ml-1">Move to Today</Text>
                       </Pressable>
                     </View>
                   );

@@ -381,7 +381,7 @@ export default function AnimatedMacroGoalCard({
         {milestones.map((m) => {
           const isUnlocked = unlocked.includes(m);
           const justNowUnlocked = justUnlockedSet.has(m);
-          const dollars = getMilestoneDollars(goal.targetMinutes, m);
+          const dollars = getMilestoneDollars(goal.targetMinutes, m, goal.type || 'productive');
           return (
             <MilestoneBadge
               key={m}

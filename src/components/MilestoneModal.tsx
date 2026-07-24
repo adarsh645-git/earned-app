@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, Modal, Pressable } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { UnlockedMilestoneInfo } from '../store/macroGoalStore';
+import { feedback } from '../utils/feedback';
 
 interface MilestoneModalProps {
   visible: boolean;
@@ -10,7 +11,13 @@ interface MilestoneModalProps {
 }
 
 export default function MilestoneModal({ visible, milestones, onClose }: MilestoneModalProps) {
-  if (!visible || milestones.length === 0) return null;
+  const shouldShow = visible && milestones.length > 0;
+
+  useEffect(() => {
+    if (shouldShow) feedback('milestone');
+  }, [shouldShow]);
+
+  if (!shouldShow) return null;
 
   const totalBonus = milestones.reduce((acc, m) => acc + m.dollarsAwarded, 0);
 
@@ -39,21 +46,23 @@ export default function MilestoneModal({ visible, milestones, onClose }: Milesto
             </View>
           ))}
 
-          {/* Reward Box */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(39,39,42,0.8)', borderWidth: 1, borderColor: 'rgba(63,63,70,0.8)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 16, marginTop: 16, marginBottom: 24, gap: 8 }}>
-            <Ionicons name="logo-usd" size={16} color="#30D158" />
-            <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800' }}>
-              +{totalBonus.toFixed(2)} Bonus Cash
-            </Text>
-          </View>
+          {/* Reward Box (only for goals that actually pay Dollars) */}
+          {totalBonus > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(39,39,42,0.8)', borderWidth: 1, borderColor: 'rgba(63,63,70,0.8)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 16, marginTop: 16, marginBottom: 24, gap: 8 }}>
+              <Ionicons name="logo-usd" size={16} color="#30D158" />
+              <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800' }}>
+                +{totalBonus.toFixed(2)} Bonus Cash
+              </Text>
+            </View>
+          )}
 
           {/* Claim Button */}
           <Pressable
             onPress={onClose}
-            style={{ width: '100%', backgroundColor: '#9333EA', paddingVertical: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: '#A855F7' }}
+            style={{ width: '100%', backgroundColor: '#9333EA', paddingVertical: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: '#A855F7', marginTop: totalBonus > 0 ? 0 : 16 }}
           >
             <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '800' }}>
-              Claim Milestone Reward
+              {totalBonus > 0 ? 'Claim Milestone Reward' : 'Nice!'}
             </Text>
           </Pressable>
         </View>

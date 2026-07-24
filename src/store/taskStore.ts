@@ -109,7 +109,6 @@ export const useTaskStore = create<TaskState>()(
               const hoursEarned = Math.round(task.estimatedMinutes * conversion.multiplier);
               economyState.addHours(hoursEarned);
               economyState.incrementStreak();
-              economyState.recordFocusSession();
               economyState.incrementCompletedTasks();
 
               if (task.macroGoalId) {

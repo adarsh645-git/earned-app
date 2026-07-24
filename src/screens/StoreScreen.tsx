@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, Pressable, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEconomyStore } from '../store/economyStore';
+import { useEconomyStore, IOU_CAP } from '../store/economyStore';
 import { useRewardStore, Reward } from '../store/rewardStore';
 import { useMacroGoalStore, MacroGoal } from '../store/macroGoalStore';
 import TimeSelectorModal from '../components/TimeSelectorModal';
-import { hapticSuccess, hapticError } from '../utils/haptics';
+import { feedback } from '../utils/feedback';
 import { useConfettiStore } from '../store/confettiStore';
 import ConfirmModal, { ConfirmAction } from '../components/ConfirmModal';
 import AnimatedMacroGoalCard from '../components/AnimatedMacroGoalCard';
+import CountUpText from '../components/CountUpText';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { useTaskStore } from '../store/taskStore';
 import { useTimerStore } from '../store/timerStore';
@@ -30,15 +31,11 @@ export default function StoreScreen() {
     hoursBalanceMinutes,
     spendBalance,
     debt,
-    getCreditScore,
-    getCreditLimit,
-    isInDefault,
     getConversionRate,
   } = useEconomyStore();
   const { rewards, addReward, deleteReward } = useRewardStore();
   const { macroGoals, addMacroGoal } = useMacroGoalStore();
 
-  const hoursDisplay = (hoursBalanceMinutes / 60).toFixed(1);
   const conversionInfo = getConversionRate();
   const entertainmentGoals = macroGoals.filter((g) => g.type === 'entertainment');
 
@@ -149,40 +146,24 @@ export default function StoreScreen() {
         ],
       });
     } else {
-      // Provide haptic feedback so they know it started
-      hapticSuccess();
+      // Light confirmation so they know the session started
+      feedback('select');
     }
   };
 
   const handleRedeem = (reward: Reward) => {
-    if (isInDefault) {
-      setDialog({
-        icon: 'warning-outline',
-        iconColor: '#FF9F0A',
-        accentColor: '#FF9F0A',
-        title: 'Account in Default',
-        message: 'You cannot redeem rewards or make transactions while your account is in default. Pay off your debt to restore access.',
-        actions: [
-          { label: 'Got It', onPress: () => {}, style: 'default' },
-        ],
-      });
-      return;
-    }
-
     const canAffordCash = dollarBalance >= reward.cost;
-    const currentScore = getCreditScore();
-    const limit = getCreditLimit(currentScore);
-    const remainingLimit = limit - debt;
+    const remainingLimit = IOU_CAP - debt;
     const deficit = reward.cost - dollarBalance;
-    const canAffordCredit = !canAffordCash && deficit <= remainingLimit;
+    const canAffordTab = !canAffordCash && deficit <= remainingLimit;
 
-    if (!canAffordCash && !canAffordCredit) {
+    if (!canAffordCash && !canAffordTab) {
       setDialog({
         icon: 'close-circle-outline',
         iconColor: '#FF453A',
         accentColor: '#FF453A',
         title: 'Insufficient Funds',
-        message: `"${reward.title}" costs $${reward.cost.toFixed(2)}.\n\nYour cash: $${dollarBalance.toFixed(2)}\nCredit remaining: $${remainingLimit.toFixed(2)}\n\nKeep focusing to earn more dollars.`,
+        message: `"${reward.title}" costs $${reward.cost.toFixed(2)}.\n\nYour cash: $${dollarBalance.toFixed(2)}\nTab remaining: $${remainingLimit.toFixed(2)}\n\nKeep focusing to earn more dollars.`,
         actions: [
           { label: 'Keep Grinding', onPress: () => {}, style: 'cancel' },
         ],
@@ -205,10 +186,10 @@ export default function StoreScreen() {
             onPress: () => {
               const success = spendBalance(reward.cost, false);
               if (success) {
-                hapticSuccess();
+                feedback('sessionComplete');
                 useConfettiStore.getState().triggerConfetti();
               } else {
-                hapticError();
+                feedback('error');
               }
             },
           },
@@ -219,26 +200,26 @@ export default function StoreScreen() {
         icon: 'card-outline',
         iconColor: '#0A84FF',
         accentColor: '#0A84FF',
-        title: 'Buy on Credit',
-        message: `You're $${deficit.toFixed(2)} short. Borrow on credit to redeem "${reward.title}"?\n\nDebt accrues daily interest. All future earnings will repay this first.`,
+        title: 'Put on Tab',
+        message: `You're $${deficit.toFixed(2)} short. Put it on your tab to redeem "${reward.title}"?\n\nNo interest — future earnings repay this automatically first.`,
         actions: [
           { label: 'Cancel', onPress: () => {}, style: 'cancel' },
           {
-            label: `Borrow $${deficit.toFixed(2)} & Redeem`,
+            label: `Add $${deficit.toFixed(2)} to Tab & Redeem`,
             style: 'default',
             onPress: () => {
               const success = spendBalance(reward.cost, true);
               if (success) {
-                hapticSuccess();
+                feedback('sessionComplete');
                 useConfettiStore.getState().triggerConfetti();
               } else {
-                hapticError();
+                feedback('error');
                 setDialog({
                   icon: 'close-circle-outline',
                   iconColor: '#FF453A',
                   accentColor: '#FF453A',
                   title: 'Transaction Failed',
-                  message: 'Could not complete the credit transaction. Please try again.',
+                  message: 'Could not complete the tab transaction. Please try again.',
                   actions: [{ label: 'OK', onPress: () => {}, style: 'cancel' }],
                 });
               }
@@ -476,7 +457,7 @@ export default function StoreScreen() {
               style={{ color: activeTab === 'time' ? '#5AC8FA' : '#30D158' }}
               className="font-bold ml-1 text-xs"
             >
-              {activeTab === 'time' ? 'Add Project' : 'Add Item'}
+              {activeTab === 'time' ? 'Add Project' : 'Add Reward'}
             </Text>
           </Pressable>
         </View>
@@ -485,7 +466,7 @@ export default function StoreScreen() {
         <View style={{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }} className="flex-row p-1 rounded-xl mb-4 mt-2">
           {(['time', 'material'] as const).map((tab) => {
             const isActive = activeTab === tab;
-            const label = tab === 'time' ? 'Media' : 'Material Rewards';
+            const label = tab === 'time' ? 'Entertainment' : 'Material';
             return (
               <Pressable
                 key={tab}
@@ -526,9 +507,11 @@ export default function StoreScreen() {
                   Available Entertainment Time
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
-                  <Text style={{ color: '#FFFFFF', fontSize: 52, fontWeight: '900', letterSpacing: -1 }}>
-                    {hoursDisplay}
-                  </Text>
+                  <CountUpText
+                    value={hoursBalanceMinutes / 60}
+                    format={(n) => n.toFixed(1)}
+                    style={{ color: '#FFFFFF', fontSize: 52, fontWeight: '900', letterSpacing: -1 }}
+                  />
                   <Text style={{ color: '#5AC8FA', fontSize: 28, fontWeight: '900', marginLeft: 6 }}>
                     hours
                   </Text>
@@ -602,13 +585,15 @@ export default function StoreScreen() {
                   <Text style={{ color: '#30D158', fontSize: 28, fontWeight: '900', marginRight: 4 }}>
                     $
                   </Text>
-                  <Text style={{ color: '#FFFFFF', fontSize: 52, fontWeight: '900', letterSpacing: -1 }}>
-                    {dollarBalance.toFixed(2)}
-                  </Text>
+                  <CountUpText
+                    value={dollarBalance}
+                    format={(n) => n.toFixed(2)}
+                    style={{ color: '#FFFFFF', fontSize: 52, fontWeight: '900', letterSpacing: -1 }}
+                  />
                 </View>
                 {debt > 0 && (
-                  <Text className="text-[#FF453A] text-xs font-bold mt-2.5">
-                    Outstanding Debt: ${debt.toFixed(2)} (All earnings garnished)
+                  <Text className="text-[#0A84FF] text-xs font-bold mt-2.5">
+                    On your tab: ${debt.toFixed(2)} — repaid automatically from earnings
                   </Text>
                 )}
               </View>
@@ -622,11 +607,9 @@ export default function StoreScreen() {
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 }}>
                 {rewards.map((reward) => {
                   const canAffordCash = dollarBalance >= reward.cost;
-                  const currentScore = getCreditScore();
-                  const limit = getCreditLimit(currentScore);
-                  const remainingLimit = limit - debt;
+                  const remainingLimit = IOU_CAP - debt;
                   const deficit = reward.cost - dollarBalance;
-                  const canAffordCredit = !canAffordCash && deficit <= remainingLimit;
+                  const canAffordTab = !canAffordCash && deficit <= remainingLimit;
 
                   return (
                     <View
@@ -665,7 +648,7 @@ export default function StoreScreen() {
                         style={({ pressed, hovered }: any) => ({
                           backgroundColor: canAffordCash
                             ? (hovered ? '#28B84B' : '#30D158')
-                            : canAffordCredit
+                            : canAffordTab
                             ? (hovered ? '#0974E3' : '#0A84FF')
                             : '#27272A',
                           paddingVertical: 10,
@@ -676,15 +659,15 @@ export default function StoreScreen() {
                       >
                         <Text
                           style={{
-                            color: canAffordCash || canAffordCredit ? '#FFFFFF' : '#A1A1AA',
+                            color: canAffordCash || canAffordTab ? '#FFFFFF' : '#A1A1AA',
                             fontWeight: '700',
                             fontSize: 14,
                           }}
                         >
                           {canAffordCash
                             ? 'Purchase'
-                            : canAffordCredit
-                            ? 'Use Credit'
+                            : canAffordTab
+                            ? 'Use Tab'
                             : 'Insufficient'}
                         </Text>
                       </Pressable>

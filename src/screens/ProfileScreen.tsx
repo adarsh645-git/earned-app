@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, Pressable, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEconomyStore } from '../store/economyStore';
+import { useEconomyStore, IOU_CAP } from '../store/economyStore';
+import { usePreferencesStore } from '../store/preferencesStore';
+import { feedback } from '../utils/feedback';
 import { useTaskStore } from '../store/taskStore';
 import { useMacroGoalStore, MacroGoal, getMilestoneDollars } from '../store/macroGoalStore';
 import { useAuthStore } from '../store/authStore';
@@ -32,19 +34,16 @@ const PremiumInput = (props: React.ComponentProps<typeof TextInput>) => {
 
 export default function ProfileScreen() {
   const { user, openModal } = useAuthStore();
-  const { 
-    dollarBalance, 
-    streak, 
-    debt, 
-    getCreditScore, 
-    getCreditLimit, 
-    getDailyInterestRate, 
-    historyOfDefaults, 
-    isInDefault,
-    clearDebtForTesting 
+  const {
+    dollarBalance,
+    streak,
+    debt,
+    getDisciplineScore,
+    clearDebtForTesting
   } = useEconomyStore();
   const { tasks, pillars, tags, addPillar, archivePillar, addTag, archiveTag } = useTaskStore();
   const { macroGoals, addMacroGoal } = useMacroGoalStore();
+  const { soundEnabled, toggleSound } = usePreferencesStore();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [title, setTitle] = useState('');
@@ -296,79 +295,109 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
 
-        {/* Credit Score & Debt Dashboard - Apple Widget */}
+        {/* Preferences */}
         <View className="mb-6">
           <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3">
-            Credit Rating & Debt
+            Preferences
+          </Text>
+          <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl overflow-hidden">
+            <Pressable
+              onPress={() => {
+                const next = !soundEnabled;
+                toggleSound();
+                if (next) feedback('select'); // preview the sound when enabling
+              }}
+              className="p-3.5 flex-row justify-between items-center"
+            >
+              <View className="flex-row items-center gap-2.5">
+                <View style={{ backgroundColor: 'rgba(191,90,242,0.15)', width: 28, height: 28, borderRadius: 8 }} className="items-center justify-center">
+                  <Ionicons name={soundEnabled ? 'volume-high' : 'volume-mute'} size={15} color="#BF5AF2" />
+                </View>
+                <View>
+                  <Text className="text-white font-semibold text-xs">Sound Effects</Text>
+                  <Text className="text-[#8E8E93] text-[9px]">Ticks, coins & fanfares on web</Text>
+                </View>
+              </View>
+              <View
+                style={{
+                  width: 44,
+                  height: 26,
+                  borderRadius: 13,
+                  padding: 3,
+                  backgroundColor: soundEnabled ? '#30D158' : '#3A3A3C',
+                  alignItems: soundEnabled ? 'flex-end' : 'flex-start',
+                }}
+              >
+                <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFFFFF' }} />
+              </View>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Discipline Score & Tab Dashboard - Apple Widget */}
+        <View className="mb-6">
+          <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3">
+            Discipline Score & Tab
           </Text>
           <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="p-5 rounded-2xl">
-            {/* Score Ring / Bar */}
+            {/* Score Ring / Bar - pure positive signal, never gates anything */}
             <View className="flex-row justify-between items-center mb-4">
               <View>
-                <Text className="text-white text-3xl font-black tracking-tight">{getCreditScore()}</Text>
+                <Text className="text-white text-3xl font-black tracking-tight">{getDisciplineScore()}</Text>
                 <Text className="text-[#8E8E93] text-[10px] font-bold uppercase tracking-wider mt-0.5">
                   Discipline Score
                 </Text>
               </View>
               {/* Rating Badge */}
-              <View 
-                style={{ 
-                  backgroundColor: getCreditScore() >= 750 ? 'rgba(48,209,88,0.15)' : getCreditScore() >= 650 ? 'rgba(10,132,255,0.15)' : getCreditScore() >= 580 ? 'rgba(255,149,0,0.15)' : 'rgba(255,69,58,0.15)',
-                  borderColor: getCreditScore() >= 750 ? '#30D158' : getCreditScore() >= 650 ? '#0A84FF' : getCreditScore() >= 580 ? '#FF9500' : '#FF453A',
-                  borderWidth: 1 
-                }} 
+              <View
+                style={{
+                  backgroundColor: getDisciplineScore() >= 800 ? 'rgba(48,209,88,0.15)' : getDisciplineScore() >= 700 ? 'rgba(10,132,255,0.15)' : 'rgba(191,90,242,0.15)',
+                  borderColor: getDisciplineScore() >= 800 ? '#30D158' : getDisciplineScore() >= 700 ? '#0A84FF' : '#BF5AF2',
+                  borderWidth: 1
+                }}
                 className="px-3.5 py-1.5 rounded-full"
               >
-                <Text 
-                  style={{ 
-                    color: getCreditScore() >= 750 ? '#30D158' : getCreditScore() >= 650 ? '#0A84FF' : getCreditScore() >= 580 ? '#FF9500' : '#FF453A'
-                  }} 
+                <Text
+                  style={{
+                    color: getDisciplineScore() >= 800 ? '#30D158' : getDisciplineScore() >= 700 ? '#0A84FF' : '#BF5AF2'
+                  }}
                   className="text-xs font-black uppercase tracking-wider"
                 >
-                  {getCreditScore() >= 750 ? 'Excellent' : getCreditScore() >= 650 ? 'Good' : getCreditScore() >= 580 ? 'Fair' : 'Poor'}
+                  {getDisciplineScore() >= 800 ? 'Excellent' : getDisciplineScore() >= 700 ? 'Great' : 'Good'}
                 </Text>
               </View>
             </View>
 
-            {/* In Debt indicator */}
+            {/* Tab indicator */}
             <View style={{ borderTopWidth: 0.5, borderTopColor: '#2C2C2E' }} className="pt-4 flex-row justify-between items-center">
               <View>
                 <Text className="text-white text-lg font-bold">${debt.toFixed(2)}</Text>
-                <Text className="text-[#8E8E93] text-[9px] uppercase font-bold tracking-wider mt-0.5">Current Debt</Text>
+                <Text className="text-[#8E8E93] text-[9px] uppercase font-bold tracking-wider mt-0.5">On Tab</Text>
               </View>
               <View className="items-end">
-                <Text className="text-white text-sm font-semibold">${getCreditLimit(getCreditScore()).toFixed(2)}</Text>
-                <Text className="text-[#8E8E93] text-[9px] uppercase font-bold tracking-wider mt-0.5">Credit Limit</Text>
+                <Text className="text-white text-sm font-semibold">${IOU_CAP.toFixed(2)}</Text>
+                <Text className="text-[#8E8E93] text-[9px] uppercase font-bold tracking-wider mt-0.5">Tab Limit</Text>
               </View>
             </View>
 
-            {/* Default Penalty Risk */}
+            {/* Neutral reminder - no interest, no default, just a reminder to close the loop */}
             {debt > 0 && (
-              <View style={{ backgroundColor: isInDefault ? 'rgba(255,69,58,0.1)' : 'rgba(255,149,0,0.1)', borderColor: isInDefault ? 'rgba(255,69,58,0.3)' : 'rgba(255,149,0,0.3)', borderWidth: 1 }} className="mt-4 p-3 rounded-xl flex-row items-center gap-2">
-                <Ionicons name={isInDefault ? "alert-circle" : "warning"} size={16} color={isInDefault ? "#FF453A" : "#FF9500"} />
-                <Text className="text-xs flex-1" style={{ color: isInDefault ? "#FF453A" : "#FF9500", fontWeight: '600' }}>
-                  {isInDefault 
-                    ? "DELINQUENT DEFAULT: Streak reset, goals frozen, +20% penalty fee applied." 
-                    : `Active loan accumulating ${(getDailyInterestRate(getCreditScore()) * 100).toFixed(2)}% daily interest. Focus daily to pay down.`}
+              <View style={{ backgroundColor: 'rgba(10,132,255,0.1)', borderColor: 'rgba(10,132,255,0.3)', borderWidth: 1 }} className="mt-4 p-3 rounded-xl flex-row items-center gap-2">
+                <Ionicons name="information-circle" size={16} color="#0A84FF" />
+                <Text className="text-xs flex-1" style={{ color: '#0A84FF', fontWeight: '600' }}>
+                  You owe ${debt.toFixed(2)} — future earnings go here first until you're square. No interest, no penalty.
                 </Text>
               </View>
             )}
 
-            {/* Defaults tally */}
-            {historyOfDefaults > 0 && (
-              <Text className="text-[#8E8E93] text-[9px] font-bold uppercase tracking-wider mt-3">
-                Lifetime Defaults Count: {historyOfDefaults} ⚠️
-              </Text>
-            )}
-
-            {/* Clear Debt testing utility */}
+            {/* Clear Tab testing utility */}
             {__DEV__ && debt > 0 && (
-              <Pressable 
-                onPress={clearDebtForTesting} 
-                style={{ backgroundColor: 'rgba(255,255,255,0.05)', alignSelf: 'flex-start' }} 
+              <Pressable
+                onPress={clearDebtForTesting}
+                style={{ backgroundColor: 'rgba(255,255,255,0.05)', alignSelf: 'flex-start' }}
                 className="mt-3 px-3 py-1.5 rounded-lg"
               >
-                <Text className="text-[#8E8E93] text-[10px] font-bold">Clear Debt (Dev Tool)</Text>
+                <Text className="text-[#8E8E93] text-[10px] font-bold">Clear Tab (Dev Tool)</Text>
               </Pressable>
             )}
           </View>
@@ -558,7 +587,7 @@ export default function ProfileScreen() {
                   <View style={{ borderTopColor: 'rgba(255,255,255,0.08)' }} className="flex-row justify-between items-center pt-2 border-t">
                     {milestones.map((m) => {
                       const isUnlocked = unlocked.includes(m);
-                      const dollars = getMilestoneDollars(goal.targetMinutes, m);
+                      const dollars = getMilestoneDollars(goal.targetMinutes, m, goal.type || 'productive');
                       return (
                         <View
                           key={m}

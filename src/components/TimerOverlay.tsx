@@ -5,7 +5,7 @@ import { useTimerStore, calculateDollarsEarned } from '../store/timerStore';
 import { useTaskStore } from '../store/taskStore';
 import MilestoneModal from './MilestoneModal';
 import ConfirmModal from './ConfirmModal';
-import { hapticSuccess } from '../utils/haptics';
+import { feedback } from '../utils/feedback';
 import { useConfettiStore } from '../store/confettiStore';
 
 export default function TimerOverlay() {
@@ -184,7 +184,7 @@ export default function TimerOverlay() {
               <Pressable
                 onPress={() => {
                   setZenMode(false);
-                  hapticSuccess();
+                  feedback('sessionComplete');
                   useConfettiStore.getState().triggerConfetti();
                   completeSession();
                 }}
@@ -278,7 +278,7 @@ export default function TimerOverlay() {
 
             <TouchableOpacity
               onPress={() => {
-                hapticSuccess();
+                feedback('sessionComplete');
                 useConfettiStore.getState().triggerConfetti();
                 completeSession();
               }}
