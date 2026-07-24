@@ -185,7 +185,7 @@ export async function pullCloudData(userId: string) {
       const formattedMacroGoals = macroGoals.map((g: any) => ({
         id: g.id,
         title: g.title,
-        horizon: 'monthly' as 'monthly' | 'yearly', // simplified for now
+        horizon: (g.horizon || 'monthly') as 'monthly' | 'yearly',
         targetMinutes: g.target_minutes || 0,
         completedMinutes: g.completed_minutes || 0,
         type: g.goal_type || 'productive',
@@ -352,6 +352,7 @@ export async function pushAllMacroGoalsToCloud(userId: string, goals: MacroGoal[
       id: g.id,
       user_id: userId,
       title: g.title,
+      horizon: g.horizon || 'monthly',
       target_minutes: g.targetMinutes || 0,
       completed_minutes: g.completedMinutes || 0,
       goal_type: g.type || 'productive',

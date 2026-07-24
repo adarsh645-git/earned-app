@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS public.macro_goals (
   id TEXT PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
+  horizon TEXT DEFAULT 'monthly' CHECK (horizon IN ('monthly', 'yearly')),
   target_minutes INTEGER NOT NULL,
   completed_minutes INTEGER DEFAULT 0,
   goal_type TEXT DEFAULT 'productive' CHECK (goal_type IN ('productive', 'entertainment')),

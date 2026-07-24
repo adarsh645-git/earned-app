@@ -13,8 +13,8 @@ Adds edit and delete UI for macro goals ("Macro Targets") — previously the sto
 - `src/components/AnimatedMacroGoalCard.tsx`: pencil icon added next to the title (root goal) and each sub-goal's inline-editable title, opening `EditMacroGoalModal`. Covers Dashboard (Pyramid Targets + Entertainment Projects) and Store (Entertainment).
 - `src/screens/ProfileScreen.tsx`: pencil icon added to its own (separate, non-shared) Pyramid Targets row rendering, wired to the same modal.
 
-## 4. Known Limitation (flagged, not fixed here)
-`horizon` (monthly/yearly) has **no column at all** in the `macro_goals` Supabase table, and `syncEngine.ts`'s pull handler hardcodes `horizon: 'monthly'` on every read — a pre-existing bug (not introduced by this feature) that silently reverts any yearly goal's horizon after a cloud sync round-trip. Unlike the `type`/`goal_type` fix in `011`, this can't be fixed with a code-only change — it needs an actual schema migration to add the column. Left the horizon editor in anyway since: (a) it's purely a cosmetic label, not used in any economic/gating logic, so the impact of it reverting is low: (b) it's still useful before the next sync, or for anyone not using cloud sync at all. Flagging for a follow-up migration if the user wants it fixed.
+## 4. Follow-up: `horizon` schema migration
+Originally flagged here as a known limitation — `horizon` had no column in the `macro_goals` Supabase table, and `syncEngine.ts`'s pull handler hardcoded `horizon: 'monthly'` on every read, silently reverting any yearly goal after a cloud sync round-trip. Fixed via `supabase/migrations/20260724000001_macro_goal_horizon.sql` (adds the column) plus updating `pushAllMacroGoalsToCloud`/`pullCloudData` in `syncEngine.ts` to actually send/read it. **The migration must be run manually against the Supabase project** (this repo has no automated migration runner) — see the SQL file for the exact statement.
 
 ## 5. Task Checklist
 - [x] Cascade-safe `deleteMacroGoal` (unlink tasks/collections, remove sub-goals)
@@ -22,3 +22,4 @@ Adds edit and delete UI for macro goals ("Macro Targets") — previously the sto
 - [x] Wire into `AnimatedMacroGoalCard` (root + sub-goals)
 - [x] Wire into `ProfileScreen`'s Pyramid list
 - [x] Typecheck (`npx tsc --noEmit`)
+- [x] `horizon` migration + sync fix (`20260724000001_macro_goal_horizon.sql`, `syncEngine.ts`)
