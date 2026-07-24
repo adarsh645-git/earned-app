@@ -9,6 +9,7 @@ import { useTaskStore } from '../store/taskStore';
 import { useMacroGoalStore, MacroGoal, getMilestoneDollars } from '../store/macroGoalStore';
 import { useAuthStore } from '../store/authStore';
 import { PrimaryButton } from '../components/PrimaryButton';
+import EditMacroGoalModal from '../components/EditMacroGoalModal';
 
 const PremiumInput = (props: React.ComponentProps<typeof TextInput>) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -42,9 +43,10 @@ export default function ProfileScreen() {
     clearDebtForTesting
   } = useEconomyStore();
   const { tasks, pillars, tags, addPillar, archivePillar, addTag, archiveTag } = useTaskStore();
-  const { macroGoals: allMacroGoals, addMacroGoal } = useMacroGoalStore();
+  const { macroGoals: allMacroGoals, addMacroGoal, updateMacroGoal, deleteMacroGoal } = useMacroGoalStore();
   // Pyramid Targets are productive goals only — entertainment projects live in the Store.
   const macroGoals = allMacroGoals.filter(g => !g.type || g.type === 'productive');
+  const [editingGoal, setEditingGoal] = useState<MacroGoal | null>(null);
   const { soundEnabled, toggleSound } = usePreferencesStore();
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -568,11 +570,16 @@ export default function ProfileScreen() {
                   className="p-4"
                 >
                   <View className="flex-row justify-between items-center mb-2">
-                    <View>
-                      <Text className="text-white font-semibold text-sm">{goal.title}</Text>
-                      <Text className="text-[#8E8E93] text-[9px] font-bold uppercase mt-0.5 tracking-wider">
-                        {goal.horizon} Target
-                      </Text>
+                    <View className="flex-row items-center flex-1 pr-2">
+                      <View>
+                        <Text className="text-white font-semibold text-sm">{goal.title}</Text>
+                        <Text className="text-[#8E8E93] text-[9px] font-bold uppercase mt-0.5 tracking-wider">
+                          {goal.horizon} Target
+                        </Text>
+                      </View>
+                      <Pressable onPress={() => setEditingGoal(goal)} style={{ padding: 6, marginLeft: 4 }}>
+                        <Ionicons name="pencil" size={13} color="#8E8E93" />
+                      </Pressable>
                     </View>
                     <Text className="text-[#8E8E93] text-xs font-medium">
                       {completedHours} / {targetHrs} hrs ({pct}%)
@@ -621,6 +628,14 @@ export default function ProfileScreen() {
         )}
 
       </ScrollView>
+
+      <EditMacroGoalModal
+        goal={editingGoal}
+        visible={!!editingGoal}
+        onClose={() => setEditingGoal(null)}
+        onSave={(id, updates) => updateMacroGoal(id, updates)}
+        onDelete={(id) => deleteMacroGoal(id)}
+      />
     </SafeAreaView>
   );
 }
