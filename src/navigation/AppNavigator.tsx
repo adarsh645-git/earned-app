@@ -105,7 +105,7 @@ function DesktopSidebar({ currentTab, onSelectTab }: SidebarProps) {
 
         {debt > 0 && (
           <View style={styles.debtBanner}>
-            <Text style={styles.debtText}>Debt: ${debt.toFixed(2)}</Text>
+            <Text style={styles.debtText}>Tab: ${debt.toFixed(2)}</Text>
           </View>
         )}
       </View>
@@ -368,9 +368,9 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
   debtBanner: {
-    backgroundColor: 'rgba(255,69,58,0.15)',
+    backgroundColor: 'rgba(10,132,255,0.15)',
     borderWidth: 1,
-    borderColor: 'rgba(255,69,58,0.3)',
+    borderColor: 'rgba(10,132,255,0.3)',
     borderRadius: 8,
     paddingVertical: 4,
     paddingHorizontal: 8,
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   debtText: {
-    color: '#FF453A',
+    color: '#0A84FF',
     fontSize: 10,
     fontWeight: '700',
   },

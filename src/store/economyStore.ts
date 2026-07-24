@@ -30,22 +30,16 @@ export interface EconomyState {
   lastCheckInDate: string | null;
   gracePeriodUsed: boolean;
 
-  // New Credit Economy Variables
+  // Interest-free IOU on Dollars only — a flat-capped tab, repaid automatically
+  // from future earnings (garnishment in addBalance). No interest, no default/lockout.
   debt: number;
-  historyOfDefaults: number;
-  lastFocusDate: string | null;
   debtTakenDate: string | null;
-  lastInterestAppliedDate: string | null;
-  streakResetsCount: number;
-  isInDefault: boolean;
   completedTasksCount: number;
   completedMacroGoalsCount: number;
   entertainmentClawbackApplied: boolean;
 
   // Getters
-  getCreditScore: () => number;
-  getCreditLimit: (score: number) => number;
-  getDailyInterestRate: (score: number) => number;
+  getDisciplineScore: () => number;
   getConversionRate: () => ConversionRateInfo;
 
   // Actions
@@ -55,17 +49,18 @@ export interface EconomyState {
   addHours: (minutes: number) => void;
   removeHours: (minutes: number) => void;
   spendHours: (minutes: number) => boolean;
-  recordFocusSession: () => void;
   incrementCompletedTasks: () => void;
   decrementCompletedTasks: () => void;
   incrementCompletedMacroGoals: () => void;
-  applyPenalty: () => void;
   incrementStreak: () => void;
   checkInDaily: () => CheckInResult;
-  applyDailyInterestAndCheckDefaults: () => void;
   clearDebtForTesting: () => void;
   applyEntertainmentClawback: () => void;
 }
+
+// Flat tab limit for the interest-free Dollar IOU. Deliberately not score-gated —
+// the tab is a fixed, predictable ceiling, not a punishment lever.
+export const IOU_CAP = 25.0;
 
 // Historical payout formula, frozen as of the entertainment reward-asymmetry fix.
 // Used only once, to claw back Dollars already paid out under the old (type-agnostic)
@@ -88,39 +83,19 @@ const calculateLegacyEntertainmentMilestoneDollars = (targetMinutes: number, mil
   return Math.round(keys * 0.02 * 100) / 100;
 };
 
-// Discipline score dynamic calculation
-export const calculateCreditScore = (state: {
+// Discipline score: pure positive feedback signal. Never gates anything (no borrow
+// limit, no penalty) — it only ever goes up with real activity.
+export const calculateDisciplineScore = (state: {
   streak: number;
   completedTasksCount: number;
   completedMacroGoalsCount: number;
-  historyOfDefaults: number;
-  streakResetsCount: number;
-  isInDefault: boolean;
 }): number => {
-  if (state.isInDefault) return 300;
-
   let score = 600; // Base score
   score += Math.min(150, state.streak * 10);
   score += Math.min(100, state.completedTasksCount * 5);
   score += Math.min(200, state.completedMacroGoalsCount * 50);
-  score -= state.historyOfDefaults * 100;
-  score -= state.streakResetsCount * 20;
 
   return Math.max(300, Math.min(850, score));
-};
-
-export const getCreditLimitByScore = (score: number): number => {
-  if (score >= 750) return 50.00; // Excellent
-  if (score >= 650) return 25.00; // Good
-  if (score >= 580) return 10.00; // Fair
-  return 0.00;                    // Poor / Delinquent
-};
-
-export const getDailyInterestRateByScore = (score: number): number => {
-  if (score >= 750) return 0.0005; // 0.05% daily (~18% APR)
-  if (score >= 650) return 0.0010; // 0.10% daily (~36.5% APR)
-  if (score >= 580) return 0.0020; // 0.20% daily (~73% APR)
-  return 0.0030;                   // 0.30% daily (~109.5% APR)
 };
 
 export const useEconomyStore = create<EconomyState>()(
@@ -133,25 +108,17 @@ export const useEconomyStore = create<EconomyState>()(
       lastCheckInDate: null,
       gracePeriodUsed: false,
 
-      // New Credit variables
+      // Interest-free Dollar IOU
       debt: 0,
-      historyOfDefaults: 0,
-      lastFocusDate: null,
       debtTakenDate: null,
-      lastInterestAppliedDate: null,
-      streakResetsCount: 0,
-      isInDefault: false,
       completedTasksCount: 0,
       completedMacroGoalsCount: 0,
       entertainmentClawbackApplied: false,
 
-      getCreditScore: () => {
-        const { streak, completedTasksCount, completedMacroGoalsCount, historyOfDefaults, streakResetsCount, isInDefault } = get();
-        return calculateCreditScore({ streak, completedTasksCount, completedMacroGoalsCount, historyOfDefaults, streakResetsCount, isInDefault });
+      getDisciplineScore: () => {
+        const { streak, completedTasksCount, completedMacroGoalsCount } = get();
+        return calculateDisciplineScore({ streak, completedTasksCount, completedMacroGoalsCount });
       },
-
-      getCreditLimit: (score) => getCreditLimitByScore(score),
-      getDailyInterestRate: (score) => getDailyInterestRateByScore(score),
 
       getConversionRate: () => {
         const streak = get().streak;
@@ -207,11 +174,6 @@ export const useEconomyStore = create<EconomyState>()(
         const state = get();
         const today = new Date().toISOString().split('T')[0];
 
-        if (state.isInDefault) {
-          // Blocked from any transaction if in default
-          return false;
-        }
-
         if (!allowDebt) {
           if (state.dollarBalance >= amount) {
             set({ dollarBalance: Math.round((state.dollarBalance - amount) * 100) / 100 });
@@ -220,20 +182,16 @@ export const useEconomyStore = create<EconomyState>()(
           return false;
         }
 
-        // Allow Debt accumulation
+        // Put the shortfall on the flat, interest-free tab
         const cashUsed = Math.min(state.dollarBalance, amount);
         const debtNeeded = amount - cashUsed;
 
-        const currentScore = get().getCreditScore();
-        const creditLimit = getCreditLimitByScore(currentScore);
-
-        if (state.debt + debtNeeded <= creditLimit) {
+        if (state.debt + debtNeeded <= IOU_CAP) {
           const isNewDebt = state.debt === 0 && debtNeeded > 0;
           set({
             dollarBalance: Math.round((state.dollarBalance - cashUsed) * 100) / 100,
             debt: Math.round((state.debt + debtNeeded) * 100) / 100,
             debtTakenDate: isNewDebt ? today : state.debtTakenDate,
-            lastInterestAppliedDate: isNewDebt ? today : state.lastInterestAppliedDate,
           });
           return true;
         }
@@ -258,13 +216,6 @@ export const useEconomyStore = create<EconomyState>()(
         return false;
       },
 
-      recordFocusSession: () => {
-        const today = new Date().toISOString().split('T')[0];
-        set({ lastFocusDate: today });
-        // Trigger interest accrual and default check on activity
-        get().applyDailyInterestAndCheckDefaults();
-      },
-
       incrementCompletedTasks: () => set((state) => ({
         completedTasksCount: state.completedTasksCount + 1
       })),
@@ -279,9 +230,7 @@ export const useEconomyStore = create<EconomyState>()(
 
       clearDebtForTesting: () => set({
         debt: 0,
-        isInDefault: false,
         debtTakenDate: null,
-        lastInterestAppliedDate: null,
       }),
 
       applyEntertainmentClawback: () => {
@@ -307,10 +256,6 @@ export const useEconomyStore = create<EconomyState>()(
         set({ entertainmentClawbackApplied: true });
       },
 
-      applyPenalty: () => set((state) => ({ 
-        dollarBalance: Math.round((state.dollarBalance * 0.9) * 100) / 100 
-      })),
-
       incrementStreak: () => set((state) => {
         const today = new Date().toISOString().split('T')[0];
         if (state.lastActiveDate === today) return state;
@@ -323,9 +268,6 @@ export const useEconomyStore = create<EconomyState>()(
       checkInDaily: () => {
         const state = get();
         const today = new Date().toISOString().split('T')[0];
-
-        // Ensure interest is applied daily on check-in
-        get().applyDailyInterestAndCheckDefaults();
 
         // Already checked in today
         if (state.lastCheckInDate === today) {
@@ -340,7 +282,6 @@ export const useEconomyStore = create<EconomyState>()(
         let newStreak = state.streak;
         let isWelcomeBack = false;
         let graceUsed = state.gracePeriodUsed;
-        let resetsCount = state.streakResetsCount;
 
         if (state.lastCheckInDate) {
           const lastDate = new Date(state.lastCheckInDate);
@@ -355,10 +296,8 @@ export const useEconomyStore = create<EconomyState>()(
             isWelcomeBack = true;
             graceUsed = true;
           } else {
-            // Streak reset penalty
             newStreak = 1;
             graceUsed = false;
-            resetsCount += 1;
           }
         } else {
           newStreak = 1;
@@ -371,7 +310,6 @@ export const useEconomyStore = create<EconomyState>()(
           lastActiveDate: today,
           lastCheckInDate: today,
           gracePeriodUsed: graceUsed,
-          streakResetsCount: resetsCount,
         });
 
         // Add award (garnish-safe)
@@ -383,62 +321,6 @@ export const useEconomyStore = create<EconomyState>()(
           streak: newStreak,
           isWelcomeBack,
         };
-      },
-
-      applyDailyInterestAndCheckDefaults: () => {
-        const state = get();
-        if (state.debt <= 0) return;
-
-        const todayStr = new Date().toISOString().split('T')[0];
-        const lastInterestStr = state.lastInterestAppliedDate || todayStr;
-
-        const today = new Date(todayStr);
-        const lastInterest = new Date(lastInterestStr);
-        
-        const diffTime = today.getTime() - lastInterest.getTime();
-        const daysElapsed = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-        let currentDebt = state.debt;
-        let lastInterestDate = lastInterestStr;
-
-        // 1. Accrue Interest
-        if (daysElapsed > 0) {
-          const score = get().getCreditScore();
-          const dailyRate = getDailyInterestRateByScore(score);
-          currentDebt = currentDebt * Math.pow(1 + dailyRate, daysElapsed);
-          currentDebt = Math.round(currentDebt * 100) / 100;
-          lastInterestDate = todayStr;
-        }
-
-        // 2. Check Strict Default (7 days without focus/repayment)
-        let inDefault = state.isInDefault;
-        let resetsCount = state.streakResetsCount;
-        let defaultsCount = state.historyOfDefaults;
-        let currentStreak = state.streak;
-
-        if (!inDefault) {
-          const baseReferenceDateStr = state.lastFocusDate || state.debtTakenDate || todayStr;
-          const baseReferenceDate = new Date(baseReferenceDateStr);
-          const timeSinceActivity = today.getTime() - baseReferenceDate.getTime();
-          const daysSinceActivity = Math.floor(timeSinceActivity / (1000 * 60 * 60 * 24));
-
-          if (daysSinceActivity >= 7) {
-            inDefault = true;
-            currentStreak = 0; // Streak wiped to 0
-            resetsCount += 1;
-            defaultsCount += 1;
-            currentDebt = Math.round((currentDebt * 1.20) * 100) / 100; // 20% penalty fee
-          }
-        }
-
-        set({
-          debt: currentDebt,
-          lastInterestAppliedDate: lastInterestDate,
-          isInDefault: inDefault,
-          streak: currentStreak,
-          streakResetsCount: resetsCount,
-          historyOfDefaults: defaultsCount,
-        });
       },
     }),
     {

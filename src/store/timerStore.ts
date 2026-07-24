@@ -185,9 +185,8 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       hoursEarnedMinutes = Math.round(minutesElapsed * conversionInfo.multiplier);
       useEconomyStore.getState().addHours(hoursEarnedMinutes);
       
-      // Update streak, record focus activity & discipline score counters
+      // Update streak & discipline score counters
       useEconomyStore.getState().incrementStreak();
-      useEconomyStore.getState().recordFocusSession();
       useEconomyStore.getState().incrementCompletedTasks();
     } else {
       // Burner: Spend entertainment hours

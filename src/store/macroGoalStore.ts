@@ -82,11 +82,6 @@ export const useMacroGoalStore = create<MacroGoalState>()(
         macroGoals: state.macroGoals.filter(g => g.id !== id)
       })),
       addProgress: (id, amount) => {
-        // Block progress updates if currently in default
-        if (useEconomyStore.getState().isInDefault) {
-          return [];
-        }
-
         const goal = get().macroGoals.find(g => g.id === id);
         if (!goal) return [];
 

@@ -111,9 +111,9 @@ export default function DashboardScreen() {
             </View>
 
             {debt > 0 && (
-              <View className="flex-row items-center bg-[#1C1C1E] border border-red-500/20 px-3 py-1.5 rounded-full">
-                <Ionicons name="trending-down" size={14} color="#FF453A" />
-                <Text className="text-[#FF453A] font-bold ml-1 text-xs">${debt.toFixed(2)}</Text>
+              <View className="flex-row items-center bg-[#1C1C1E] border border-[#0A84FF]/30 px-3 py-1.5 rounded-full">
+                <Ionicons name="receipt-outline" size={13} color="#0A84FF" />
+                <Text className="text-[#0A84FF] font-bold ml-1 text-xs">Tab: ${debt.toFixed(2)}</Text>
               </View>
             )}
           </View>
