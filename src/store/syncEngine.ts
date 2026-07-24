@@ -7,6 +7,20 @@ import { useRewardStore, Reward } from './rewardStore';
 import { useMacroGoalStore, MacroGoal } from './macroGoalStore';
 import { useCollectionStore, Collection, CollectionItem } from './collectionStore';
 
+/**
+ * Merges cloud rows into a local array by id instead of replacing it outright.
+ * Cloud wins for ids present in both (it's the confirmed-synced source of
+ * truth), but any local-only id (added but not yet reflected in this read)
+ * is preserved rather than being wiped out by a stale snapshot.
+ */
+function mergeById<T extends { id: string }>(local: T[], cloud: T[]): T[] {
+  const merged = new Map(local.map((item) => [item.id, item]));
+  for (const item of cloud) {
+    merged.set(item.id, item);
+  }
+  return Array.from(merged.values());
+}
+
 export function useCloudSync() {
   const { user, initializeAuth } = useAuthStore();
 
@@ -112,7 +126,7 @@ export async function pullCloudData(userId: string) {
         isIcebox: t.is_icebox,
         dateCreated: t.date_created,
       }));
-      useTaskStore.setState((s) => ({ ...s, tasks: formattedTasks }));
+      useTaskStore.setState((s) => ({ ...s, tasks: mergeById(s.tasks, formattedTasks) }));
     }
 
     // Fetch Pillars
@@ -130,18 +144,18 @@ export async function pullCloudData(userId: string) {
     if ((pillars && pillars.length > 0) || (tags && tags.length > 0)) {
       useTaskStore.setState((s) => ({
         ...s,
-        pillars: pillars && pillars.length > 0 ? pillars.map((p: any) => ({
+        pillars: pillars && pillars.length > 0 ? mergeById(s.pillars, pillars.map((p: any) => ({
           id: p.id,
           name: p.name,
           isArchived: p.is_archived
-        })) : s.pillars,
-        tags: tags && tags.length > 0 ? tags.map((t: any) => ({
+        }))) : s.pillars,
+        tags: tags && tags.length > 0 ? mergeById(s.tags, tags.map((t: any) => ({
           id: t.id,
           pillarId: t.pillar_id,
           name: t.name,
           type: t.type,
           isArchived: t.is_archived
-        })) : s.tags
+        }))) : s.tags
       }));
     }
 
@@ -158,7 +172,7 @@ export async function pullCloudData(userId: string) {
         cost: parseFloat(r.cost) || 0,
         dateCreated: r.date_created,
       }));
-      useRewardStore.setState({ rewards: formattedRewards });
+      useRewardStore.setState((s) => ({ rewards: mergeById(s.rewards, formattedRewards) }));
     }
 
     // Fetch Macro Goals
@@ -174,12 +188,13 @@ export async function pullCloudData(userId: string) {
         horizon: 'monthly' as 'monthly' | 'yearly', // simplified for now
         targetMinutes: g.target_minutes || 0,
         completedMinutes: g.completed_minutes || 0,
+        type: g.goal_type || 'productive',
         metricType: g.metric_type || 'minutes',
         targetMetric: g.target_metric || 0,
         completedMetric: g.completed_metric || 0,
         unlockedMilestones: g.unlocked_milestones || [],
       }));
-      useMacroGoalStore.setState({ macroGoals: formattedMacroGoals });
+      useMacroGoalStore.setState((s) => ({ macroGoals: mergeById(s.macroGoals, formattedMacroGoals) }));
     }
 
     // Fetch Collections
@@ -196,7 +211,7 @@ export async function pullCloudData(userId: string) {
         macroGoalId: c.macro_goal_id,
         dateCreated: c.date_created,
       }));
-      useCollectionStore.setState((s) => ({ ...s, collections: formattedCollections }));
+      useCollectionStore.setState((s) => ({ ...s, collections: mergeById(s.collections, formattedCollections) }));
 
       // Fetch Journey Sub Goals
       const { data: subGoals } = await supabase
@@ -214,7 +229,7 @@ export async function pullCloudData(userId: string) {
           month: s.month,
           dateCreated: s.date_created,
         }));
-        useCollectionStore.setState((s) => ({ ...s, subGoals: formattedSubGoals }));
+        useCollectionStore.setState((s) => ({ ...s, subGoals: mergeById(s.subGoals, formattedSubGoals) }));
       }
     }
 
@@ -236,7 +251,7 @@ export async function pullCloudData(userId: string) {
           isAddedLater: i.is_added_later,
           dateCreated: i.date_created,
         }));
-        useCollectionStore.setState((s) => ({ ...s, items: formattedItems }));
+        useCollectionStore.setState((s) => ({ ...s, items: mergeById(s.items, formattedItems) }));
       }
     }
   } catch (err) {
@@ -339,6 +354,7 @@ export async function pushAllMacroGoalsToCloud(userId: string, goals: MacroGoal[
       title: g.title,
       target_minutes: g.targetMinutes || 0,
       completed_minutes: g.completedMinutes || 0,
+      goal_type: g.type || 'productive',
       metric_type: g.metricType || 'minutes',
       target_metric: g.targetMetric || 0,
       completed_metric: g.completedMetric || 0,

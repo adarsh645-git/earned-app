@@ -42,7 +42,9 @@ export default function ProfileScreen() {
     clearDebtForTesting
   } = useEconomyStore();
   const { tasks, pillars, tags, addPillar, archivePillar, addTag, archiveTag } = useTaskStore();
-  const { macroGoals, addMacroGoal } = useMacroGoalStore();
+  const { macroGoals: allMacroGoals, addMacroGoal } = useMacroGoalStore();
+  // Pyramid Targets are productive goals only — entertainment projects live in the Store.
+  const macroGoals = allMacroGoals.filter(g => !g.type || g.type === 'productive');
   const { soundEnabled, toggleSound } = usePreferencesStore();
 
   const [modalVisible, setModalVisible] = useState(false);
