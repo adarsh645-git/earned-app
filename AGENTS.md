@@ -1,6 +1,6 @@
 # AGENTS.md - Earned App Development Guide
 
-> This file serves as the unified instruction guide for all AI coding agents (Gemini, Claude, Cursor, Copilot, Codex, etc.).
+> This file serves as the unified instruction guide for all AI coding agents (Gemini, Claude, Cursor, Copilot, Codex, etc.). It loads on every turn — keep it to things every agent needs on every turn. Feature-design workflow lives in a skill, not here (see "Feature Work" below).
 
 ## ⚠️ Important Framework Version Note
 # Expo HAS CHANGED
@@ -51,7 +51,7 @@ npx expo export -p web
 ## Key Conventions & Guidelines
 
 1. **Expo SDK Versioning**: Strictly adhere to Expo SDK v57 standards. Avoid deprecated APIs.
-2. **Local-First State**: 
+2. **Local-First State**:
    - State lives in Zustand stores (`src/store/`).
    - Store changes automatically sync to Supabase via `syncEngine.ts`.
    - Never block UI renders on remote API calls; operate optimistically.
@@ -65,63 +65,35 @@ npx expo export -p web
 
 ---
 
-## 🎭 Agent Triad Persona & Peer Interaction Model
+## Peer Communication Model
 
-### 1. Multidisciplinary Persona
-All AI agents working on **Earned** adopt a **Triad Mindset**:
-- **Behavioral Economist**: Analyzes dual-currency velocity, streak reward multipliers, indulgence pricing, inflation/deflation balance, and debt mechanics.
-- **Behavioral Psychologist**: Analyzes habit loops, dopamine triggers, friction reduction for productive focus, and friction insertion for indulgences.
-- **Lead Solution Architect**: Enforces clean local-first Zustand architecture, Supabase RLS security, Expo SDK 57 performance, and token efficiency.
-
-### 2. Peer Communication Model (Senior IT Professional)
-- Treat the user as a **Senior IT Professional & Solution Architect** with deep systems engineering experience.
-- Maintain **Peer-to-Peer Technical Rigor**: High-density architectural dialogue evaluating trade-offs (e.g., eventual consistency vs immediate state, DB indexing, token budget, behavioral incentive loops) without hand-holding or elementary explanations.
+Treat the user as a **Senior IT Professional & Solution Architect** with deep systems engineering experience. Maintain peer-to-peer technical rigor — high-density architectural dialogue evaluating trade-offs (eventual consistency vs immediate state, DB indexing, token budget, behavioral incentive loops) — without hand-holding or elementary explanations.
 
 ---
 
-## 📐 Specification-Driven Development (SDD) Workflow
+## Feature Work
 
-### Phase 0: 3-Lens Peer Brainstorming & Alignment
-- **Mandatory Interactive Brainstorming & Alignment**: Before generating an implementation plan artifact (`implementation_plan.md`), drafting specs, or writing code for ANY non-trivial feature:
-  1. **DO NOT** create an `implementation_plan.md` artifact or write code on your first response turn.
-  2. **MUST** present Phase 0 analysis directly in chat to the user evaluating the feature through 3 lenses (*Behavioral Psychology*, *Behavioral Economics*, *System Architecture*).
-  3. **MUST** ask targeted questions regarding trade-offs, schemas, and user flow **1 by 1** by ALWAYS invoking the `ask_question` tool with explicit multiple-choice options (prefixing the top option with `(Recommended)`), and WAIT for the user's response to each question before asking the next question or creating plans/code.
+Non-trivial features (new economy rules, currency/reward math, store shape changes, new Supabase tables, or anything touching user-facing behavior) follow the SDD loop defined in `.claude/skills/sdd-feature-loop/SKILL.md`. Claude Code loads it automatically when the task matches; other agents should read it directly. Specs live in `docs/sdd/`, indexed in `docs/sdd/README.md`.
 
-### Phase 1–4: Execution Loop
-1. **Specs Directory**: Feature specifications reside in `docs/sdd/` (indexed in `docs/sdd/README.md`).
-2. **Spec-First Context Scoping**: Before implementing any non-trivial feature or bug fix:
-   - Read **only** the relevant feature spec in `docs/sdd/` and targeted code files.
-   - Do NOT perform broad workspace file dumps.
-3. **Spec Structure**: Each SDD document must define:
-   - Feature Objectives & User Flow
-   - Data Schema / Interface Contracts
-   - Implementation Checklist (`- [ ] Task`)
-4. **Incremental Checklists**: Agents update task checkboxes (`- [x]`) in `docs/sdd/<spec>.md` as sub-tasks are completed.
+## Trivial Changes: Fast-Track
+
+For trivial edits (documentation, typos, comments, minor formatting/typing fixes, or small 1-2 file bug fixes) — i.e. anything that does **not** match the Feature Work criteria above:
+1. Skip the SDD loop entirely.
+2. Verify typechecks (`npx tsc --noEmit`).
+3. Stage the specific files, commit using Conventional Commits, and push to remote.
+4. Give a short 1-line confirmation (e.g. `[Auto-Pushed] docs: fix typo (commit a1b2c3d)`).
 
 ---
 
----
+## Git Commit Standards
 
-## 📦 Git Commit Standards
-
-1. **Format**: Use Conventional Commits with a concise bulleted body:
+1. **Format**: Conventional Commits with a concise bulleted body:
    ```gitcommit
    <type>(<scope>): <short summary line under 72 chars>
 
-   - Concise bullet detailing key architectural / state / schema change
-   - Concise bullet detailing affected UI components or stores
-   - Concise bullet noting SDD spec checklist updates in docs/sdd/
+   - Concise bullet detailing the key change
+   - Concise bullet detailing affected files/components
    ```
 2. **Commit Types**: `feat`, `fix`, `docs`, `refactor`, `schema`, `perf`, `test`, `chore`.
 3. **Commit Scopes**: `economy`, `store`, `ui`, `sync`, `sdd`, `deps`, `auth`.
-5. **Fast-Track Auto-Commit & Push for Trivial Changes**:
-   - For trivial edits (documentation, typos, comments, minor formatting/typing fixes, or small 1-2 file bug fixes):
-     - Verify typechecks (`npx tsc --noEmit`).
-     - Automatically stage, commit using Conventional Commits (`git commit -m "docs: ..."`), and push to remote (`git push`).
-     - Provide a short 1-line confirmation to the user.
-
-
-
-
-
-
+4. **Fast-Track Auto-Commit & Push**: see "Trivial Changes: Fast-Track" above — a pre-commit hook (`.claude/hooks/tsc-gate.sh`) enforces the typecheck gate on every commit regardless of path.
