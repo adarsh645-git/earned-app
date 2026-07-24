@@ -165,6 +165,14 @@ export default function CollectionsScreen() {
     setExpandedWaypoints(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  // Journey-level Accordion State (collapsed by default — compact list view)
+  const [expandedJourneys, setExpandedJourneys] = useState<Record<string, boolean>>({});
+  const toggleJourney = (id: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    feedback('expand');
+    setExpandedJourneys(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const categories: CollectionCategory[] = ['books', 'games', 'stocks', 'fitness', 'courses', 'travel', 'general'];
 
   // Journey CRUD
@@ -538,59 +546,64 @@ export default function CollectionsScreen() {
             const linkedSummit = summits.find(g => g.id === collection.summitId);
             const isFullyComplete = progress === 100 && collectionItems.length > 0;
 
+            const isJourneyExpanded = !!expandedJourneys[collection.id];
+
             return (
-              <View key={collection.id} style={{ marginBottom: 24, backgroundColor: '#1C1C1E', borderRadius: 20, padding: 0, borderWidth: 1, borderColor: isFullyComplete ? '#BF5AF255' : '#2C2C2E', shadowColor: isFullyComplete ? '#BF5AF2' : '#000', shadowRadius: 10, shadowOpacity: isFullyComplete ? 0.2 : 0.1, overflow: 'hidden' }}>
-                {/* Journey Card Header */}
-                <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                    <View style={{ flex: 1, marginRight: 12 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                        <View style={{ backgroundColor: '#BF5AF215', width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 12, borderWidth: 1, borderColor: '#BF5AF233' }}>
-                          <CategoryVectorIcon category={collection.category} size={20} color="#BF5AF2" />
-                        </View>
-                        <Text style={{ color: '#FFF', fontSize: 22, fontWeight: '800' }}>{collection.title}</Text>
+              <View key={collection.id} style={{ marginBottom: 10, backgroundColor: '#1C1C1E', borderRadius: 14, padding: 0, borderWidth: 1, borderColor: isFullyComplete ? '#BF5AF255' : '#2C2C2E', shadowColor: isFullyComplete ? '#BF5AF2' : '#000', shadowRadius: 6, shadowOpacity: isFullyComplete ? 0.2 : 0.08, overflow: 'hidden' }}>
+                {/* Journey Row — compact by default, tap to expand */}
+                <Pressable
+                  onPress={() => toggleJourney(collection.id)}
+                  style={{ flexDirection: 'row', alignItems: 'center', padding: 12 }}
+                >
+                  <View style={{ backgroundColor: '#BF5AF215', width: 30, height: 30, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 10, borderWidth: 1, borderColor: '#BF5AF233' }}>
+                    <CategoryVectorIcon category={collection.category} size={15} color="#BF5AF2" />
+                  </View>
+
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }} numberOfLines={1}>{collection.title}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 3 }}>
+                      <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginRight: 6 }}>
+                        <Text style={{ color: '#BF5AF2', fontSize: 10, textTransform: 'uppercase', fontWeight: '700' }}>
+                          {collection.category}
+                        </Text>
                       </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginRight: 8 }}>
-                          <Text style={{ color: '#BF5AF2', fontSize: 11, textTransform: 'uppercase', fontWeight: '700' }}>
-                            {collection.category}
-                          </Text>
+                      {linkedSummit && (
+                        <View style={{ backgroundColor: '#5AC8FA15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, borderWidth: 1, borderColor: '#5AC8FA44', flexDirection: 'row', alignItems: 'center' }}>
+                          <FontAwesome5 name="bullseye" size={9} color="#5AC8FA" style={{ marginRight: 4 }} />
+                          <Text style={{ color: '#5AC8FA', fontSize: 10, fontWeight: '700' }}>{linkedSummit.title}</Text>
                         </View>
-                        {linkedSummit && (
-                          <View style={{ backgroundColor: '#5AC8FA15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#5AC8FA44', flexDirection: 'row', alignItems: 'center' }}>
-                            <FontAwesome5 name="bullseye" size={10} color="#5AC8FA" style={{ marginRight: 6 }} />
-                            <Text style={{ color: '#5AC8FA', fontSize: 11, fontWeight: '700' }}>{linkedSummit.title}</Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Pressable onPress={() => handleOpenEditJourney(collection.id)} style={{ padding: 6, marginRight: 4, backgroundColor: '#2C2C2E', borderRadius: 8 }}>
-                        <Ionicons name="pencil" size={16} color="#8E8E93" />
-                      </Pressable>
-                      <Pressable onPress={() => setDeletingJourneyId(collection.id)} style={{ padding: 6, backgroundColor: '#FF453A15', borderRadius: 8 }}>
-                        <Ionicons name="trash" size={16} color="#FF453A" />
-                      </Pressable>
+                      )}
                     </View>
                   </View>
 
+                  <Text style={{ color: isFullyComplete ? '#30D158' : '#FFF', fontSize: 13, fontWeight: '700', marginRight: 10 }}>
+                    {completedCount}/{collectionItems.length} ({progress}%)
+                  </Text>
+
+                  <Pressable onPress={() => handleOpenEditJourney(collection.id)} style={{ padding: 6, marginRight: 4, backgroundColor: '#2C2C2E', borderRadius: 8 }}>
+                    <Ionicons name="pencil" size={14} color="#8E8E93" />
+                  </Pressable>
+                  <Pressable onPress={() => setDeletingJourneyId(collection.id)} style={{ padding: 6, backgroundColor: '#FF453A15', borderRadius: 8, marginRight: 8 }}>
+                    <Ionicons name="trash" size={14} color="#FF453A" />
+                  </Pressable>
+
+                  <Ionicons name={isJourneyExpanded ? "chevron-up" : "chevron-down"} size={18} color="#8E8E93" />
+                </Pressable>
+
+                {/* Expanded Content — Progress + Waypoints (Shadcn Accordion Style) */}
+                {isJourneyExpanded && (
+                <View style={{ borderTopWidth: 1, borderTopColor: '#2C2C2E' }}>
                   {/* Journey Progress Bar */}
-                  <View style={{ marginTop: 8 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600' }}>Progress</Text>
-                      <Text style={{ color: isFullyComplete ? '#30D158' : '#FFF', fontSize: 13, fontWeight: '700' }}>
-                        {completedCount} / {collectionItems.length} ({progress}%)
-                      </Text>
-                    </View>
+                  <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 2 }}>
                     <AnimatedProgressBar
                       progress={progress}
                       color={isFullyComplete ? '#30D158' : '#BF5AF2'}
+                      height={5}
                     />
                   </View>
-                </View>
 
-                {/* Waypoints Area (Shadcn Accordion Style) */}
-                <View style={{ padding: 16, backgroundColor: '#1C1C1E' }}>
+                {/* Waypoints Area */}
+                <View style={{ padding: 10, backgroundColor: '#1C1C1E' }}>
                   {collectionWaypoints.map(wp => {
                     const wpItems = collectionItems.filter(i => i.waypointId === wp.id);
                     const wpCompleted = wpItems.filter(i => i.completed).length;
@@ -606,22 +619,22 @@ export default function CollectionsScreen() {
                     const isExpanded = !!expandedWaypoints[wp.id];
 
                     return (
-                      <View key={wp.id} style={{ marginBottom: 12, backgroundColor: '#252528', borderRadius: 12, borderWidth: 1, borderColor: isWpComplete ? '#30D15844' : '#3A3A3C', overflow: 'hidden' }}>
+                      <View key={wp.id} style={{ marginBottom: 8, backgroundColor: '#252528', borderRadius: 11, borderWidth: 1, borderColor: isWpComplete ? '#30D15844' : '#3A3A3C', overflow: 'hidden' }}>
                         <Pressable
                           onPress={() => toggleWaypoint(wp.id)}
-                          style={{ padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                          style={{ padding: 11, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
                         >
                           <View style={{ flex: 1 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                               {isWpComplete ? (
-                                <Ionicons name="checkmark-circle" size={18} color="#30D158" style={{ marginRight: 8 }} />
+                                <Ionicons name="checkmark-circle" size={16} color="#30D158" style={{ marginRight: 7 }} />
                               ) : (
-                                <Ionicons name="flag" size={18} color="#5AC8FA" style={{ marginRight: 8 }} />
+                                <Ionicons name="flag" size={16} color="#5AC8FA" style={{ marginRight: 7 }} />
                               )}
-                              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>{wp.title}</Text>
+                              <Text style={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}>{wp.title}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                              <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '500', marginRight: 12 }}>
+                              <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '500', marginRight: 10 }}>
                                 {wpCompleted} / {wp.targetMetric ? wp.targetMetric : wpItems.length} ({wpPct}%)
                               </Text>
                               <View style={{ backgroundColor: '#1C1C1E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
@@ -630,34 +643,34 @@ export default function CollectionsScreen() {
                             </View>
                           </View>
                           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Pressable onPress={() => handleOpenEditWaypoint(wp)} style={{ padding: 8, marginRight: 4 }}>
-                              <Ionicons name="ellipsis-horizontal" size={18} color="#8E8E93" />
+                            <Pressable onPress={() => handleOpenEditWaypoint(wp)} style={{ padding: 7, marginRight: 2 }}>
+                              <Ionicons name="ellipsis-horizontal" size={16} color="#8E8E93" />
                             </Pressable>
-                            <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color="#8E8E93" />
+                            <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={18} color="#8E8E93" />
                           </View>
                         </Pressable>
 
                         {/* Accordion Content */}
                         {isExpanded && (
-                          <View style={{ paddingHorizontal: 16, paddingBottom: 16, borderTopWidth: 1, borderTopColor: '#3A3A3C' }}>
+                          <View style={{ paddingHorizontal: 11, paddingBottom: 11, borderTopWidth: 1, borderTopColor: '#3A3A3C' }}>
                             {wpItems.length > 0 ? (
                               wpItems.map(item => (
-                                <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}>
-                                  <Pressable onPress={() => handleToggleItem(item.id, collection.id, item.waypointId)} style={{ marginRight: 12 }}>
-                                    <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: item.completed ? '#BF5AF2' : '#8E8E93', backgroundColor: item.completed ? '#BF5AF2' : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
-                                      {item.completed && <Ionicons name="checkmark" size={16} color="#FFF" />}
+                                <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
+                                  <Pressable onPress={() => handleToggleItem(item.id, collection.id, item.waypointId)} style={{ marginRight: 10 }}>
+                                    <View style={{ width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: item.completed ? '#BF5AF2' : '#8E8E93', backgroundColor: item.completed ? '#BF5AF2' : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                                      {item.completed && <Ionicons name="checkmark" size={14} color="#FFF" />}
                                     </View>
                                   </Pressable>
-                                  <Text style={{ flex: 1, color: item.completed ? '#8E8E93' : '#FFF', fontSize: 15, textDecorationLine: item.completed ? 'line-through' : 'none' }}>
+                                  <Text style={{ flex: 1, color: item.completed ? '#8E8E93' : '#FFF', fontSize: 14, textDecorationLine: item.completed ? 'line-through' : 'none' }}>
                                     {item.title}
                                   </Text>
                                   <Pressable onPress={() => deleteItem(item.id)} style={{ padding: 4 }}>
-                                    <Ionicons name="trash-outline" size={16} color="#FF453A" />
+                                    <Ionicons name="trash-outline" size={15} color="#FF453A" />
                                   </Pressable>
                                 </View>
                               ))
                             ) : (
-                              <Text style={{ color: '#8E8E93', fontSize: 13, marginTop: 12, fontStyle: 'italic' }}>No tasks added yet.</Text>
+                              <Text style={{ color: '#8E8E93', fontSize: 12, marginTop: 10, fontStyle: 'italic' }}>No tasks added yet.</Text>
                             )}
 
                             {/* Shadcn Quick-Add Task Chip */}
@@ -666,10 +679,10 @@ export default function CollectionsScreen() {
                                 handleOpenNewItem(collection.id);
                                 setSelectedWaypointId(wp.id);
                               }}
-                              style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, alignSelf: 'flex-start', backgroundColor: '#1C1C1E', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#2C2C2E' }}
+                              style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, alignSelf: 'flex-start', backgroundColor: '#1C1C1E', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: '#2C2C2E' }}
                             >
-                              <Ionicons name="add" size={16} color="#BF5AF2" style={{ marginRight: 6 }} />
-                              <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '600' }}>Add Task</Text>
+                              <Ionicons name="add" size={14} color="#BF5AF2" style={{ marginRight: 5 }} />
+                              <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>Add Task</Text>
                             </Pressable>
                           </View>
                         )}
@@ -679,41 +692,43 @@ export default function CollectionsScreen() {
 
                   {/* Root-Level Items (Items without a Waypoint) */}
                   {collectionItems.filter(i => !i.waypointId).map(item => (
-                    <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' }}>
-                      <Pressable onPress={() => handleToggleItem(item.id, collection.id)} style={{ marginRight: 12 }}>
-                        <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: item.completed ? '#BF5AF2' : '#8E8E93', backgroundColor: item.completed ? '#BF5AF2' : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
-                          {item.completed && <Ionicons name="checkmark" size={16} color="#FFF" />}
+                    <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' }}>
+                      <Pressable onPress={() => handleToggleItem(item.id, collection.id)} style={{ marginRight: 10 }}>
+                        <View style={{ width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: item.completed ? '#BF5AF2' : '#8E8E93', backgroundColor: item.completed ? '#BF5AF2' : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                          {item.completed && <Ionicons name="checkmark" size={14} color="#FFF" />}
                         </View>
                       </Pressable>
-                      <Text style={{ flex: 1, color: item.completed ? '#8E8E93' : '#FFF', fontSize: 15, textDecorationLine: item.completed ? 'line-through' : 'none' }}>
+                      <Text style={{ flex: 1, color: item.completed ? '#8E8E93' : '#FFF', fontSize: 14, textDecorationLine: item.completed ? 'line-through' : 'none' }}>
                         {item.title}
                       </Text>
                       <Pressable onPress={() => deleteItem(item.id)} style={{ padding: 4 }}>
-                        <Ionicons name="trash-outline" size={16} color="#FF453A" />
+                        <Ionicons name="trash-outline" size={15} color="#FF453A" />
                       </Pressable>
                     </View>
                   ))}
 
                   {/* Quick Action Chips Footer */}
-                  <View style={{ flexDirection: 'row', marginTop: 16 }}>
+                  <View style={{ flexDirection: 'row', marginTop: 10 }}>
                     <Pressable
                       onPress={() => handleOpenNewWaypoint(collection.id)}
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#252528', paddingVertical: 12, borderRadius: 10, marginRight: 6, borderWidth: 1, borderColor: '#3A3A3C' }}
+                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#252528', paddingVertical: 9, borderRadius: 10, marginRight: 6, borderWidth: 1, borderColor: '#3A3A3C' }}
                     >
-                      <Ionicons name="folder-open" size={16} color="#5AC8FA" style={{ marginRight: 8 }} />
-                      <Text style={{ color: '#5AC8FA', fontSize: 13, fontWeight: '700' }}>+ Waypoint</Text>
+                      <Ionicons name="folder-open" size={14} color="#5AC8FA" style={{ marginRight: 7 }} />
+                      <Text style={{ color: '#5AC8FA', fontSize: 12, fontWeight: '700' }}>+ Waypoint</Text>
                     </Pressable>
 
                     <Pressable
                       onPress={() => handleOpenNewItem(collection.id)}
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#BF5AF215', paddingVertical: 12, borderRadius: 10, marginLeft: 6, borderWidth: 1, borderColor: '#BF5AF233' }}
+                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#BF5AF215', paddingVertical: 9, borderRadius: 10, marginLeft: 6, borderWidth: 1, borderColor: '#BF5AF233' }}
                     >
-                      <Ionicons name="list" size={16} color="#BF5AF2" style={{ marginRight: 8 }} />
-                      <Text style={{ color: '#BF5AF2', fontSize: 13, fontWeight: '700' }}>+ Task</Text>
+                      <Ionicons name="list" size={14} color="#BF5AF2" style={{ marginRight: 7 }} />
+                      <Text style={{ color: '#BF5AF2', fontSize: 12, fontWeight: '700' }}>+ Task</Text>
                     </Pressable>
                   </View>
 
                 </View>
+                </View>
+                )}
               </View>
             );
           })
