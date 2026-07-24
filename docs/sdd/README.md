@@ -13,6 +13,7 @@ This directory contains the feature specification documents and task checklists 
 - **[007-journeys-tab-redesign.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/007-journeys-tab-redesign.md)**: High-density RPG quest cards, glassmorphic executive summary header stats, collapsible sub-goal accordions, and quick-add task chips.
 - **[008-entertainment-reward-asymmetry-fix.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/008-entertainment-reward-asymmetry-fix.md)**: Removes Dollar payouts from entertainment macro-goal milestones (acknowledgment-only), and one-time balance clawback for previously-paid entertainment milestones.
 - **[009-blame-free-economy-iou.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/009-blame-free-economy-iou.md)**: Replaces the punitive credit/interest/default system with a flat-capped, interest-free Dollar IOU and a purely positive Discipline Score.
+- **[010-ui-juice-and-screen-redesigns.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/010-ui-juice-and-screen-redesigns.md)**: Dependency-free Web Audio sound layer, animated ring/pills/bars, tiered haptic+sound feedback, and flow/naming/motion redesigns of Tasks, Store, and Journeys.
 
 
 

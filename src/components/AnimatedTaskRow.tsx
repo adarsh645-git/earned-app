@@ -9,7 +9,7 @@ if (
 ) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-import { hapticSuccess } from '../utils/haptics';
+import { feedback } from '../utils/feedback';
 
 interface AnimatedTaskRowProps {
   task: Task;
@@ -67,7 +67,7 @@ export default function AnimatedTaskRow({
     }
 
     // Completing: trigger multi-layered animation
-    hapticSuccess();
+    feedback('taskComplete');
     setLocalCompleted(true); // instantly show checkmark
 
     // 1. Checkbox spring bounce + green glow ring pulse + strikethrough

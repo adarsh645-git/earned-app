@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, Modal, Pressable } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { UnlockedMilestoneInfo } from '../store/macroGoalStore';
+import { feedback } from '../utils/feedback';
 
 interface MilestoneModalProps {
   visible: boolean;
@@ -10,7 +11,13 @@ interface MilestoneModalProps {
 }
 
 export default function MilestoneModal({ visible, milestones, onClose }: MilestoneModalProps) {
-  if (!visible || milestones.length === 0) return null;
+  const shouldShow = visible && milestones.length > 0;
+
+  useEffect(() => {
+    if (shouldShow) feedback('milestone');
+  }, [shouldShow]);
+
+  if (!shouldShow) return null;
 
   const totalBonus = milestones.reduce((acc, m) => acc + m.dollarsAwarded, 0);
 

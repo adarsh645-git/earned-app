@@ -1,17 +1,18 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, Animated, useWindowDimensions } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, Pressable, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import Svg, { Circle } from 'react-native-svg';
 import { useEconomyStore } from '../store/economyStore';
 import { useTaskStore, Task } from '../store/taskStore';
 import { useMacroGoalStore, MacroGoal } from '../store/macroGoalStore';
 import { useTimerStore } from '../store/timerStore';
-import { hapticSuccess } from '../utils/haptics';
+import { feedback } from '../utils/feedback';
 import { useConfettiStore } from '../store/confettiStore';
 import ConfirmModal from '../components/ConfirmModal';
 import AnimatedTaskRow from '../components/AnimatedTaskRow';
 import AnimatedMacroGoalCard from '../components/AnimatedMacroGoalCard';
+import AnimatedProgressRing from '../components/AnimatedProgressRing';
+import CurrencyPill from '../components/CurrencyPill';
 import EditTaskModal from '../components/EditTaskModal';
 import QuickStartModal from '../components/QuickStartModal';
 
@@ -20,8 +21,6 @@ export default function DashboardScreen() {
   const isDesktop = width >= 768;
   const ringSize = isDesktop ? 280 : Math.min(220, Math.max(170, width * 0.48));
   const strokeWidth = isDesktop ? 14 : 11;
-  const radius = (ringSize - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
 
   const [activePillarId, setActivePillarId] = useState<string>('');
   const [blockedModal, setBlockedModal] = useState<{ title: string; message: string } | null>(null);
@@ -34,8 +33,6 @@ export default function DashboardScreen() {
   const currentPillarId = activePillarId || activePillars[0]?.id;
   const { macroGoals } = useMacroGoalStore();
   const { startTimer } = useTimerStore();
-
-  const hoursDisplay = (hoursBalanceMinutes / 60).toFixed(1);
 
   const today = new Date().toISOString().split('T')[0];
   const isCheckedInToday = lastCheckInDate === today;
@@ -95,26 +92,31 @@ export default function DashboardScreen() {
           </View>
           
           <View className="flex-row items-center gap-2">
-            <View className="flex-row items-center bg-[#1C1C1E] border border-white/10 px-3 py-1.5 rounded-full">
-              <Ionicons name="flame" size={15} color="#FF9500" />
-              <Text className="text-white font-bold ml-1 text-xs">{streak}d</Text>
-            </View>
-
-            <View className="flex-row items-center bg-[#1C1C1E] border border-[#5AC8FA]/30 px-3 py-1.5 rounded-full">
-              <Ionicons name="time" size={13} color="#5AC8FA" />
-              <Text className="text-[#5AC8FA] font-bold ml-1 text-xs">{hoursDisplay}h</Text>
-            </View>
-
-            <View className="flex-row items-center bg-[#1C1C1E] border border-[#30D158]/30 px-3 py-1.5 rounded-full">
-              <Ionicons name="logo-usd" size={13} color="#30D158" />
-              <Text className="text-[#30D158] font-bold ml-0.5 text-xs">{dollarBalance.toFixed(2)}</Text>
-            </View>
-
+            <CurrencyPill
+              value={streak}
+              format={(n) => `${Math.round(n)}d`}
+              icon="flame"
+              color="#FF9500"
+            />
+            <CurrencyPill
+              value={hoursBalanceMinutes / 60}
+              format={(n) => `${n.toFixed(1)}h`}
+              icon="time"
+              color="#5AC8FA"
+            />
+            <CurrencyPill
+              value={dollarBalance}
+              format={(n) => `$${n.toFixed(2)}`}
+              icon="logo-usd"
+              color="#30D158"
+            />
             {debt > 0 && (
-              <View className="flex-row items-center bg-[#1C1C1E] border border-[#0A84FF]/30 px-3 py-1.5 rounded-full">
-                <Ionicons name="receipt-outline" size={13} color="#0A84FF" />
-                <Text className="text-[#0A84FF] font-bold ml-1 text-xs">Tab: ${debt.toFixed(2)}</Text>
-              </View>
+              <CurrencyPill
+                value={debt}
+                format={(n) => `Tab: $${n.toFixed(2)}`}
+                icon="receipt-outline"
+                color="#0A84FF"
+              />
             )}
           </View>
         </View>
@@ -141,7 +143,7 @@ export default function DashboardScreen() {
                     const result = useEconomyStore.getState().checkInDaily();
                     if (result.rewarded) {
                       useConfettiStore.getState().triggerConfetti();
-                      hapticSuccess();
+                      feedback('currency');
                     }
                   }
                 }}
@@ -200,41 +202,15 @@ export default function DashboardScreen() {
         </View>
 
         <View className="items-center my-5 relative">
-          <View style={{ width: ringSize, height: ringSize }} className="items-center justify-center">
-            <Svg width={ringSize} height={ringSize}>
-              <Circle
-                cx={ringSize / 2}
-                cy={ringSize / 2}
-                r={radius}
-                stroke="#1C1C1E"
-                strokeWidth={strokeWidth}
-                fill="transparent"
-              />
-              <Circle
-                cx={ringSize / 2}
-                cy={ringSize / 2}
-                r={radius}
-                stroke="#BF5AF2"
-                strokeWidth={strokeWidth}
-                fill="transparent"
-                strokeDasharray={circumference}
-                strokeDashoffset={circumference - (progressPercent / 100) * circumference}
-                strokeLinecap="round"
-                transform={`rotate(-90 ${ringSize / 2} ${ringSize / 2})`}
-              />
-            </Svg>
-            <View style={{ position: 'absolute', alignItems: 'center' }}>
-              <Text className={`text-white font-black tracking-tighter ${isDesktop ? 'text-5xl' : 'text-3xl'}`}>
-                {progressPercent}%
-              </Text>
-              <Text className={`text-[#8E8E93] font-bold tracking-[2px] mt-0.5 uppercase ${isDesktop ? 'text-xs' : 'text-[9px]'}`}>
-                DAILY GOAL
-              </Text>
-              <Text className={`text-[#BF5AF2] font-semibold mt-0.5 ${isDesktop ? 'text-sm' : 'text-xs'}`}>
-                {completedMinutes} / {totalMinutes}m
-              </Text>
-            </View>
-          </View>
+          <AnimatedProgressRing
+            size={ringSize}
+            strokeWidth={strokeWidth}
+            progress={progressPercent}
+            color="#BF5AF2"
+            isDesktop={isDesktop}
+            label="DAILY GOAL"
+            sublabel={`${completedMinutes} / ${totalMinutes}m`}
+          />
         </View>
 
         <View className="flex-row justify-between items-center mt-3 mb-3">

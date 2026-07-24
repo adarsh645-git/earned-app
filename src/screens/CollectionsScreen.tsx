@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, Modal } from 'react-native';
+import { View, Text, ScrollView, TextInput, Pressable, Modal, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
@@ -8,6 +8,12 @@ import { useCollectionStore, CollectionCategory, JourneySubGoal } from '../store
 import { useMacroGoalStore } from '../store/macroGoalStore';
 import { useConfettiStore } from '../store/confettiStore';
 import { PrimaryButton } from '../components/PrimaryButton';
+import AnimatedProgressBar from '../components/AnimatedProgressBar';
+import { feedback } from '../utils/feedback';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const PremiumInput = (props: React.ComponentProps<typeof TextInput>) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -139,7 +145,11 @@ export default function CollectionsScreen() {
 
   // Accordion State
   const [expandedSubGoals, setExpandedSubGoals] = useState<Record<string, boolean>>({});
-  const toggleSubGoal = (id: string) => setExpandedSubGoals(prev => ({ ...prev, [id]: !prev[id] }));
+  const toggleSubGoal = (id: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    feedback('expand');
+    setExpandedSubGoals(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const categories: CollectionCategory[] = ['books', 'games', 'stocks', 'fitness', 'courses', 'travel', 'other'];
 
@@ -181,6 +191,7 @@ export default function CollectionsScreen() {
 
       // Trigger Celebration Dopamine Feedback
       triggerConfetti();
+      feedback('select');
       const linkedGoal = macroGoals.find(g => g.id === selectedMacroId);
       const isEntertainment = linkedGoal?.type === 'entertainment';
       setCelebrationInfo({
@@ -253,6 +264,7 @@ export default function CollectionsScreen() {
 
       // Trigger Celebration Dopamine Feedback for Sub-Goal creation
       triggerConfetti();
+      feedback('select');
       setCelebrationInfo({
         title: 'SUB-QUEST CREATED!',
         subtitle: `Sub-Goal "${subGoalTitle.trim()}" added to your journey targets.`,
@@ -297,6 +309,7 @@ export default function CollectionsScreen() {
 
     // If completing (not uncompleting), check if it completes a Sub-Goal or Journey!
     if (!wasCompleted) {
+      feedback('taskComplete');
       if (subGoalId) {
         const sgItems = items.filter(i => i.subGoalId === subGoalId);
         const sgCompletedCount = sgItems.filter(i => i.completed).length + 1; // including current
@@ -305,6 +318,7 @@ export default function CollectionsScreen() {
 
         if (sgCompletedCount >= targetVal && targetVal > 0) {
           triggerConfetti();
+          feedback('milestone');
           setCelebrationInfo({
             title: 'SUB-GOAL CONQUERED!',
             subtitle: `You completed 100% of "${sg?.title || 'Sub-Goal'}"!`,
@@ -321,6 +335,7 @@ export default function CollectionsScreen() {
       const colCompletedCount = colItems.filter(i => i.completed).length + 1;
       if (colCompletedCount >= colItems.length && colItems.length > 0) {
         triggerConfetti();
+        feedback('milestone');
         setCelebrationInfo({
           title: 'JOURNEY MASTERED!',
           subtitle: `Congratulations! You conquered all tasks in this Journey!`,
@@ -477,9 +492,10 @@ export default function CollectionsScreen() {
                         {completedCount} / {collectionItems.length} ({progress}%)
                       </Text>
                     </View>
-                    <View style={{ height: 8, backgroundColor: '#2C2C2E', borderRadius: 4 }}>
-                      <View style={{ height: 8, width: `${progress}%`, backgroundColor: isFullyComplete ? '#30D158' : '#BF5AF2', borderRadius: 4 }} />
-                    </View>
+                    <AnimatedProgressBar
+                      progress={progress}
+                      color={isFullyComplete ? '#30D158' : '#BF5AF2'}
+                    />
                   </View>
                 </View>
 

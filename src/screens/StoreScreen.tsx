@@ -6,10 +6,11 @@ import { useEconomyStore, IOU_CAP } from '../store/economyStore';
 import { useRewardStore, Reward } from '../store/rewardStore';
 import { useMacroGoalStore, MacroGoal } from '../store/macroGoalStore';
 import TimeSelectorModal from '../components/TimeSelectorModal';
-import { hapticSuccess, hapticError } from '../utils/haptics';
+import { feedback } from '../utils/feedback';
 import { useConfettiStore } from '../store/confettiStore';
 import ConfirmModal, { ConfirmAction } from '../components/ConfirmModal';
 import AnimatedMacroGoalCard from '../components/AnimatedMacroGoalCard';
+import CountUpText from '../components/CountUpText';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { useTaskStore } from '../store/taskStore';
 import { useTimerStore } from '../store/timerStore';
@@ -35,7 +36,6 @@ export default function StoreScreen() {
   const { rewards, addReward, deleteReward } = useRewardStore();
   const { macroGoals, addMacroGoal } = useMacroGoalStore();
 
-  const hoursDisplay = (hoursBalanceMinutes / 60).toFixed(1);
   const conversionInfo = getConversionRate();
   const entertainmentGoals = macroGoals.filter((g) => g.type === 'entertainment');
 
@@ -146,8 +146,8 @@ export default function StoreScreen() {
         ],
       });
     } else {
-      // Provide haptic feedback so they know it started
-      hapticSuccess();
+      // Light confirmation so they know the session started
+      feedback('select');
     }
   };
 
@@ -186,10 +186,10 @@ export default function StoreScreen() {
             onPress: () => {
               const success = spendBalance(reward.cost, false);
               if (success) {
-                hapticSuccess();
+                feedback('sessionComplete');
                 useConfettiStore.getState().triggerConfetti();
               } else {
-                hapticError();
+                feedback('error');
               }
             },
           },
@@ -210,10 +210,10 @@ export default function StoreScreen() {
             onPress: () => {
               const success = spendBalance(reward.cost, true);
               if (success) {
-                hapticSuccess();
+                feedback('sessionComplete');
                 useConfettiStore.getState().triggerConfetti();
               } else {
-                hapticError();
+                feedback('error');
                 setDialog({
                   icon: 'close-circle-outline',
                   iconColor: '#FF453A',
@@ -457,7 +457,7 @@ export default function StoreScreen() {
               style={{ color: activeTab === 'time' ? '#5AC8FA' : '#30D158' }}
               className="font-bold ml-1 text-xs"
             >
-              {activeTab === 'time' ? 'Add Project' : 'Add Item'}
+              {activeTab === 'time' ? 'Add Project' : 'Add Reward'}
             </Text>
           </Pressable>
         </View>
@@ -466,7 +466,7 @@ export default function StoreScreen() {
         <View style={{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }} className="flex-row p-1 rounded-xl mb-4 mt-2">
           {(['time', 'material'] as const).map((tab) => {
             const isActive = activeTab === tab;
-            const label = tab === 'time' ? 'Media' : 'Material Rewards';
+            const label = tab === 'time' ? 'Entertainment' : 'Material';
             return (
               <Pressable
                 key={tab}
@@ -507,9 +507,11 @@ export default function StoreScreen() {
                   Available Entertainment Time
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
-                  <Text style={{ color: '#FFFFFF', fontSize: 52, fontWeight: '900', letterSpacing: -1 }}>
-                    {hoursDisplay}
-                  </Text>
+                  <CountUpText
+                    value={hoursBalanceMinutes / 60}
+                    format={(n) => n.toFixed(1)}
+                    style={{ color: '#FFFFFF', fontSize: 52, fontWeight: '900', letterSpacing: -1 }}
+                  />
                   <Text style={{ color: '#5AC8FA', fontSize: 28, fontWeight: '900', marginLeft: 6 }}>
                     hours
                   </Text>
@@ -583,9 +585,11 @@ export default function StoreScreen() {
                   <Text style={{ color: '#30D158', fontSize: 28, fontWeight: '900', marginRight: 4 }}>
                     $
                   </Text>
-                  <Text style={{ color: '#FFFFFF', fontSize: 52, fontWeight: '900', letterSpacing: -1 }}>
-                    {dollarBalance.toFixed(2)}
-                  </Text>
+                  <CountUpText
+                    value={dollarBalance}
+                    format={(n) => n.toFixed(2)}
+                    style={{ color: '#FFFFFF', fontSize: 52, fontWeight: '900', letterSpacing: -1 }}
+                  />
                 </View>
                 {debt > 0 && (
                   <Text className="text-[#0A84FF] text-xs font-bold mt-2.5">

@@ -3,6 +3,8 @@ import { View, Text, ScrollView, TextInput, Pressable, Alert } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEconomyStore, IOU_CAP } from '../store/economyStore';
+import { usePreferencesStore } from '../store/preferencesStore';
+import { feedback } from '../utils/feedback';
 import { useTaskStore } from '../store/taskStore';
 import { useMacroGoalStore, MacroGoal, getMilestoneDollars } from '../store/macroGoalStore';
 import { useAuthStore } from '../store/authStore';
@@ -41,6 +43,7 @@ export default function ProfileScreen() {
   } = useEconomyStore();
   const { tasks, pillars, tags, addPillar, archivePillar, addTag, archiveTag } = useTaskStore();
   const { macroGoals, addMacroGoal } = useMacroGoalStore();
+  const { soundEnabled, toggleSound } = usePreferencesStore();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [title, setTitle] = useState('');
@@ -290,6 +293,45 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color="#8E8E93" />
           </Pressable>
+        </View>
+
+        {/* Preferences */}
+        <View className="mb-6">
+          <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3">
+            Preferences
+          </Text>
+          <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl overflow-hidden">
+            <Pressable
+              onPress={() => {
+                const next = !soundEnabled;
+                toggleSound();
+                if (next) feedback('select'); // preview the sound when enabling
+              }}
+              className="p-3.5 flex-row justify-between items-center"
+            >
+              <View className="flex-row items-center gap-2.5">
+                <View style={{ backgroundColor: 'rgba(191,90,242,0.15)', width: 28, height: 28, borderRadius: 8 }} className="items-center justify-center">
+                  <Ionicons name={soundEnabled ? 'volume-high' : 'volume-mute'} size={15} color="#BF5AF2" />
+                </View>
+                <View>
+                  <Text className="text-white font-semibold text-xs">Sound Effects</Text>
+                  <Text className="text-[#8E8E93] text-[9px]">Ticks, coins & fanfares on web</Text>
+                </View>
+              </View>
+              <View
+                style={{
+                  width: 44,
+                  height: 26,
+                  borderRadius: 13,
+                  padding: 3,
+                  backgroundColor: soundEnabled ? '#30D158' : '#3A3A3C',
+                  alignItems: soundEnabled ? 'flex-end' : 'flex-start',
+                }}
+              >
+                <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFFFFF' }} />
+              </View>
+            </Pressable>
+          </View>
         </View>
 
         {/* Discipline Score & Tab Dashboard - Apple Widget */}

@@ -13,11 +13,10 @@ import TimerOverlay from '../components/TimerOverlay';
 import ErrorBoundary from '../components/ErrorBoundary';
 import CheckInModal from '../components/CheckInModal';
 import AuthModal from '../components/AuthModal';
+import CountUpText from '../components/CountUpText';
 import { useEconomyStore, CheckInResult } from '../store/economyStore';
 import { useAuthStore } from '../store/authStore';
 import { useCloudSync } from '../store/syncEngine';
-import { hapticSuccess } from '../utils/haptics';
-import { useConfettiStore } from '../store/confettiStore';
 
 const Tab = createBottomTabNavigator();
 
@@ -52,7 +51,7 @@ function DesktopSidebar({ currentTab, onSelectTab }: SidebarProps) {
     { name: 'Tasks', label: 'Tasks & Icebox', icon: 'list-outline', activeIcon: 'list' },
     { name: 'Collections', label: 'Journeys', icon: 'map-outline', activeIcon: 'map' },
     { name: 'Store', label: 'Reward Store', icon: 'cart-outline', activeIcon: 'cart' },
-    { name: 'Profile', label: 'Profile & Credit', icon: 'person-outline', activeIcon: 'person' },
+    { name: 'Profile', label: 'Profile', icon: 'person-outline', activeIcon: 'person' },
   ];
 
   return (
@@ -92,7 +91,7 @@ function DesktopSidebar({ currentTab, onSelectTab }: SidebarProps) {
           <Text style={styles.economyLabel}>CASH BALANCE</Text>
           <View style={styles.cashContainer}>
             <Text style={styles.dollarSign}>$</Text>
-            <Text style={styles.cashAmount}>{dollarBalance.toFixed(2)}</Text>
+            <CountUpText style={styles.cashAmount} value={dollarBalance} format={(n) => n.toFixed(2)} />
           </View>
         </View>
 
