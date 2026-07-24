@@ -4,6 +4,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { PrimaryButton } from './PrimaryButton';
 import { Task, Tag, Pillar } from '../store/taskStore';
 import TimeSelectorModal from './TimeSelectorModal';
+import LinkProgressPicker from './LinkProgressPicker';
+import { feedback } from '../utils/feedback';
 
 interface EditTaskModalProps {
   task: Task | null;
@@ -30,13 +32,17 @@ export default function EditTaskModal({
   const [showTimeSelector, setShowTimeSelector] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [selectedPillarId, setSelectedPillarId] = useState<string>('');
+  const [selectedMacroId, setSelectedMacroId] = useState('');
+  const [selectedCollectionId, setSelectedCollectionId] = useState('');
 
   useEffect(() => {
     if (task && visible) {
       setTitle(task.title);
       setTagId(task.tagId);
       setEstimatedMinutes(task.estimatedMinutes);
-      
+      setSelectedMacroId(task.macroGoalId || '');
+      setSelectedCollectionId(task.collectionId || '');
+
       const tag = tags.find(t => t.id === task.tagId);
       if (tag) {
         setSelectedPillarId(tag.pillarId);
@@ -46,12 +52,16 @@ export default function EditTaskModal({
 
   if (!task) return null;
 
+  const isBurner = tags.find(t => t.id === tagId)?.type === 'burner';
+
   const handleSave = () => {
     if (!title.trim() || !tagId) return;
     onSave(task.id, {
       title: title.trim(),
       tagId,
-      estimatedMinutes
+      estimatedMinutes,
+      macroGoalId: selectedMacroId || undefined,
+      collectionId: selectedCollectionId || undefined,
     });
     onClose();
   };
@@ -221,6 +231,18 @@ export default function EditTaskModal({
                 </>
               )}
             </View>
+
+            <LinkProgressPicker
+              tagType={isBurner ? 'burner' : 'earner'}
+              collectionId={selectedCollectionId}
+              macroGoalId={selectedMacroId}
+              onChange={(collectionId, macroGoalId) => {
+                feedback('select');
+                setSelectedCollectionId(collectionId);
+                setSelectedMacroId(macroGoalId);
+              }}
+              accentColor={isBurner ? '#5AC8FA' : '#BF5AF2'}
+            />
 
             {/* Footer */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>

@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   title TEXT NOT NULL,
   tag_id TEXT NOT NULL,
   macro_goal_id TEXT,
+  collection_id TEXT,
   estimated_minutes INTEGER NOT NULL,
   completed BOOLEAN DEFAULT FALSE,
   is_icebox BOOLEAN DEFAULT FALSE,
