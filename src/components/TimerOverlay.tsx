@@ -211,7 +211,7 @@ export default function TimerOverlay() {
               >
                 <Ionicons name="logo-usd" size={14} color="#30D158" />
                 <Text className="text-[#30D158] font-bold text-xs uppercase tracking-wider">
-                  Claim ${currentDollars.toFixed(2)}
+                  Collect ${currentDollars.toFixed(2)}
                 </Text>
               </Pressable>
             ) : (
@@ -336,7 +336,7 @@ export default function TimerOverlay() {
         iconColor="#FF453A"
         accentColor="#FF453A"
         title="Abandon Session?"
-        message="You will lose all earnings and the multiplier you've built up in this session. This cannot be undone."
+        message="You will lose all earnings and the bonus you've built up this session. This can't be undone."
         actions={[
           { label: 'Keep Focusing', onPress: () => {}, style: 'cancel' },
           {

@@ -48,7 +48,7 @@ export default function ProfileScreen() {
   const [editingGoal, setEditingGoal] = useState<Summit | null>(null);
   const { soundEnabled, toggleSound } = usePreferencesStore();
 
-  // Taxonomy State
+  // Pillars & Categories state
   const [newPillarName, setNewPillarName] = useState('');
   const [expandedPillarId, setExpandedPillarId] = useState<string | null>(null);
   const [newTagName, setNewTagName] = useState('');
@@ -64,8 +64,8 @@ export default function ProfileScreen() {
 
   const handleResetData = () => {
     Alert.alert(
-      '⚠️ Reset App Data?',
-      'This will erase all of your banked keys, streaks, goals, and tasks permanently. Are you sure you want to do this?',
+      'Reset app data?',
+      'This will erase all of your banked cash, streaks, goals, and tasks permanently. Are you sure you want to do this?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -135,7 +135,7 @@ export default function ProfileScreen() {
               {tasks.filter(t => t.completed).length}
             </Text>
             <Text className="text-[#8E8E93] text-[10px] font-bold mt-1 uppercase tracking-wider">
-              Focus Wins
+              Tasks Completed
             </Text>
           </View>
         </View>
@@ -203,7 +203,7 @@ export default function ProfileScreen() {
                 </View>
                 <View>
                   <Text className="text-white font-semibold text-xs">Sound Effects</Text>
-                  <Text className="text-[#8E8E93] text-[9px]">Ticks, coins & fanfares on web</Text>
+                  <Text className="text-[#8E8E93] text-[9px]">Subtle sound cues on web</Text>
                 </View>
               </View>
               <View
@@ -291,10 +291,10 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Taxonomy Architecture Section */}
+        {/* Pillars & Categories Section */}
         <View className="flex-row justify-between items-center mb-3 mt-6">
           <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px]">
-            Taxonomy Architecture
+            Pillars & Categories
           </Text>
         </View>
         <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl overflow-hidden mb-8 p-4">

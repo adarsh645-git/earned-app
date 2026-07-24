@@ -31,7 +31,7 @@ export default function CheckInModal({ visible, checkInResult, onClose }: CheckI
 
           {/* Title */}
           <Text style={{ color: '#F59E0B', fontSize: 12, fontWeight: '800', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 4 }}>
-            {checkInResult.isWelcomeBack ? 'Streak Shield Activated!' : 'Daily Discipline Check-in'}
+            {checkInResult.isWelcomeBack ? 'Streak protected' : 'Daily check-in'}
           </Text>
 
           <Text style={{ color: '#FFFFFF', fontSize: 26, fontWeight: '900', textAlign: 'center' }}>
@@ -41,12 +41,12 @@ export default function CheckInModal({ visible, checkInResult, onClose }: CheckI
           {checkInResult.isWelcomeBack ? (
             <View style={{ backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, marginTop: 8, marginBottom: 4 }}>
               <Text style={{ color: '#FCD34D', fontSize: 11, fontWeight: '700', textAlign: 'center' }}>
-                🛡️ Welcome back! Grace Shield preserved your streak.
+                Welcome back — your streak was protected while you were away.
               </Text>
             </View>
           ) : (
             <Text style={{ color: '#A1A1AA', fontSize: 13, fontWeight: '500', marginTop: 4, textAlign: 'center' }}>
-              Showing up daily is 80% of the battle. Keep building!
+              Showing up daily is most of the battle. Keep it going.
             </Text>
           )}
 
@@ -54,7 +54,7 @@ export default function CheckInModal({ visible, checkInResult, onClose }: CheckI
           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(39,39,42,0.8)', borderWidth: 1, borderColor: 'rgba(63,63,70,0.8)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 16, marginTop: 16, marginBottom: 24, gap: 8 }}>
             <Ionicons name="logo-usd" size={16} color="#30D158" />
             <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800' }}>
-              +{checkInResult.dollarsAwarded.toFixed(2)} Check-in Reward
+              +{checkInResult.dollarsAwarded.toFixed(2)} earned
             </Text>
           </View>
 
@@ -64,7 +64,7 @@ export default function CheckInModal({ visible, checkInResult, onClose }: CheckI
             style={{ width: '100%', backgroundColor: '#F59E0B', paddingVertical: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: '#FBBF24' }}
           >
             <Text style={{ color: '#000000', fontSize: 16, fontWeight: '800' }}>
-              Claim & Start Day
+              Start day
             </Text>
           </Pressable>
 

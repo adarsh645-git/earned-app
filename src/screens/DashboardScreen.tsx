@@ -133,7 +133,7 @@ export default function DashboardScreen() {
                 </View>
                 <View>
                   <Text className="text-white font-semibold text-xs">Daily Check-In</Text>
-                  <Text className="text-[#8E8E93] text-[9px]">Streak preservation & daily check</Text>
+                  <Text className="text-[#8E8E93] text-[9px]">Preserve your streak with a daily check-in</Text>
                 </View>
               </View>
               
@@ -161,7 +161,7 @@ export default function DashboardScreen() {
               >
                 <Ionicons name={isCheckedInToday ? "checkmark-circle" : "ellipse-outline"} size={11} color={isCheckedInToday ? '#30D158' : '#8E8E93'} />
                 <Text style={{ color: isCheckedInToday ? '#30D158' : '#8E8E93' }} className="text-[10px] font-bold ml-1">
-                  {isCheckedInToday ? 'Claimed' : 'Claim'}
+                  {isCheckedInToday ? 'Checked in' : 'Check in'}
                 </Text>
               </Pressable>
             </View>
@@ -227,8 +227,8 @@ export default function DashboardScreen() {
         {incompleteTasks.length === 0 ? (
           <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl p-8 items-center justify-center my-1 border-dashed">
             <Ionicons name="sparkles" size={32} color="#8E8E93" />
-            <Text className="text-white text-center font-semibold mt-3">No active tasks in this context</Text>
-            <Text className="text-[#8E8E93] text-xs text-center mt-1">Schedule a focus chunk to earn key rewards</Text>
+            <Text className="text-white text-center font-semibold mt-3">No active tasks yet</Text>
+            <Text className="text-[#8E8E93] text-xs text-center mt-1">Schedule a focus session to start earning</Text>
           </View>
         ) : (
           <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl overflow-hidden mb-3">
@@ -333,7 +333,7 @@ export default function DashboardScreen() {
           title={blockedModal.title}
           message={blockedModal.message}
           actions={[
-            { label: 'Got It', onPress: () => setBlockedModal(null), style: 'default' },
+            { label: 'Got it', onPress: () => setBlockedModal(null), style: 'default' },
           ]}
         />
       )}

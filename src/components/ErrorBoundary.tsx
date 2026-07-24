@@ -33,7 +33,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
       return (
         <View style={{ flex: 1, backgroundColor: '#0E0E10', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <Text style={{ color: '#F87171', fontSize: 16, fontWeight: 'bold', marginBottom: 10 }}>
-            Caught Error
+            Something went wrong
           </Text>
           <Text style={{ color: 'white', fontSize: 12, textAlign: 'center' }}>
             {this.state.error?.message}

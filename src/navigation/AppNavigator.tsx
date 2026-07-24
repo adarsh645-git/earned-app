@@ -99,7 +99,7 @@ function DesktopSidebar({ currentTab, onSelectTab }: SidebarProps) {
 
         <View style={styles.economyRow}>
           <Text style={styles.economyLabel}>STREAK</Text>
-          <Text style={styles.streakText}>🔥 {streak} Days</Text>
+          <Text style={styles.streakText}>{streak} Days</Text>
         </View>
 
         {debt > 0 && (

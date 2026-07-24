@@ -21,7 +21,7 @@ export const useRewardStore = create<RewardState>()(
     (set) => ({
       rewards: [
         { id: '1', title: '1 Hour of Video Games', cost: 60 },
-        { id: '2', title: 'Cheat Meal / Pizza Night', cost: 150 },
+        { id: '2', title: 'Dinner Out', cost: 150 },
         { id: '3', title: 'Buy New Tech / Gear', cost: 500 },
         { id: '4', title: 'Watch a Movie', cost: 90 },
       ],

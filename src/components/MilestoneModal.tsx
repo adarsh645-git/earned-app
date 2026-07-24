@@ -32,7 +32,7 @@ export default function MilestoneModal({ visible, milestones, onClose }: Milesto
           </View>
 
           <Text style={{ color: '#C084FC', fontSize: 12, fontWeight: '800', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 4 }}>
-            Milestone Unlocked!
+            Milestone reached
           </Text>
 
           {milestones.map((m, idx) => (
@@ -51,7 +51,7 @@ export default function MilestoneModal({ visible, milestones, onClose }: Milesto
             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(39,39,42,0.8)', borderWidth: 1, borderColor: 'rgba(63,63,70,0.8)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 16, marginTop: 16, marginBottom: 24, gap: 8 }}>
               <Ionicons name="logo-usd" size={16} color="#30D158" />
               <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800' }}>
-                +{totalBonus.toFixed(2)} Bonus Cash
+                +{totalBonus.toFixed(2)} earned
               </Text>
             </View>
           )}
@@ -62,7 +62,7 @@ export default function MilestoneModal({ visible, milestones, onClose }: Milesto
             style={{ width: '100%', backgroundColor: '#9333EA', paddingVertical: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: '#A855F7', marginTop: totalBonus > 0 ? 0 : 16 }}
           >
             <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '800' }}>
-              {totalBonus > 0 ? 'Claim Milestone Reward' : 'Nice!'}
+              Continue
             </Text>
           </Pressable>
         </View>

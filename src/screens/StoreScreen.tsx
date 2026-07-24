@@ -187,7 +187,7 @@ export default function StoreScreen() {
         title: 'Insufficient Funds',
         message: `"${reward.title}" costs $${reward.cost.toFixed(2)}.\n\nYour cash: $${dollarBalance.toFixed(2)}\nTab remaining: $${remainingLimit.toFixed(2)}\n\nKeep focusing to earn more dollars.`,
         actions: [
-          { label: 'Keep Grinding', onPress: () => {}, style: 'cancel' },
+          { label: 'Got it', onPress: () => {}, style: 'cancel' },
         ],
       });
       return;
@@ -662,7 +662,7 @@ export default function StoreScreen() {
 
               {/* Section Subhead */}
               <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3 mt-4">
-                Store Items & Indulgences
+                Rewards & Indulgences
               </Text>
 
               {/* Material Store Items Grid */}

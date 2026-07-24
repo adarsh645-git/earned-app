@@ -110,7 +110,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
         if (finalStatus === 'granted') {
           const id = await Notifications.scheduleNotificationAsync({
             content: {
-              title: isBurner ? "Entertainment Session Complete! 🎮" : "Focus Block Complete! 🏆",
+              title: isBurner ? "Entertainment session complete" : "Focus block complete",
               body: isBurner ? "Hope you enjoyed your earned leisure time!" : "You finished your focus block. Entertainment hours credited!",
               sound: true,
             },

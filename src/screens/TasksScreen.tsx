@@ -309,7 +309,7 @@ export default function TasksScreen() {
           {incompleteTasks.length === 0 ? (
             <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl p-6 items-center justify-center mb-6">
               <Text className="text-white font-semibold text-center">Your focus list is clear.</Text>
-              <Text className="text-[#8E8E93] text-xs text-center mt-1">Tap Add Task to schedule focused chunks for today.</Text>
+              <Text className="text-[#8E8E93] text-xs text-center mt-1">Tap Add Task to schedule focus sessions for today.</Text>
             </View>
           ) : (
             <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl overflow-hidden mb-5">
@@ -367,7 +367,7 @@ export default function TasksScreen() {
             <View className="flex-row items-center gap-1.5 mb-3">
               <Ionicons name="snow-outline" size={16} color="#8E8E93" />
               <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px]">
-                The Icebox (Distractions Deferred)
+                The Icebox
               </Text>
             </View>
 

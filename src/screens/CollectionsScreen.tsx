@@ -56,20 +56,35 @@ type CelebrationInfo = {
   category?: CollectionCategory;
 };
 
+function getCelebrationAccent(type: CelebrationInfo['iconType']): string {
+  switch (type) {
+    case 'target':
+      return '#5AC8FA';
+    case 'award':
+    case 'crown':
+      return '#FFD700';
+    case 'rocket':
+    case 'category':
+    default:
+      return '#BF5AF2';
+  }
+}
+
 function CelebrationVectorIcon({ type, category }: { type: CelebrationInfo['iconType']; category?: CollectionCategory }) {
+  const accent = getCelebrationAccent(type);
   if (type === 'category' && category) {
-    return <CategoryVectorIcon category={category} size={48} color="#BF5AF2" />;
+    return <CategoryVectorIcon category={category} size={40} color={accent} />;
   }
   switch (type) {
     case 'rocket':
-      return <Ionicons name="rocket-sharp" size={48} color="#BF5AF2" />;
+      return <Ionicons name="rocket-sharp" size={40} color={accent} />;
     case 'award':
-      return <FontAwesome5 name="award" size={48} color="#FFD700" />;
+      return <FontAwesome5 name="award" size={38} color={accent} />;
     case 'crown':
-      return <FontAwesome5 name="crown" size={48} color="#FFD700" />;
+      return <FontAwesome5 name="crown" size={38} color={accent} />;
     case 'target':
     default:
-      return <FontAwesome5 name="crosshairs" size={44} color="#5AC8FA" />;
+      return <FontAwesome5 name="crosshairs" size={36} color={accent} />;
   }
 }
 
@@ -97,7 +112,7 @@ export default function CollectionsScreen() {
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1; // 1-12
 
-  // Celebration Dopamine Modal
+  // Celebration feedback modal
   const [celebrationInfo, setCelebrationInfo] = useState<CelebrationInfo | null>(null);
 
   // Chain-legibility toast (shown when a completed item feeds a Summit chain)
@@ -238,20 +253,20 @@ export default function CollectionsScreen() {
       });
       setIsJourneyModalOpen(false);
 
-      // Trigger Celebration Dopamine Feedback
+      // Trigger celebration feedback
       triggerConfetti();
       feedback('select');
       const linkedGoal = summits.find(g => g.id === linkedSummitId) || (journeyLinkMode === 'new' ? { type: 'productive' } : undefined);
       const isEntertainment = linkedGoal?.type === 'entertainment';
       setCelebrationInfo({
-        title: 'JOURNEY STARTED!',
-        subtitle: `Journey "${journeyTitle.trim()}" is live in your Discipline Economy.`,
+        title: 'Journey started',
+        subtitle: `"${journeyTitle.trim()}" is live and tracking.`,
         iconType: 'rocket',
         category: journeyCategory,
         payoutText: isEntertainment
-          ? '🎁 Milestone badges unlock as you make progress — already earned, guilt-free!'
-          : '🎁 Estimated Rewards: Milestone keys & cash bonus multipliers upon completion!',
-        badgeLabel: 'JOURNEY UNLOCKED',
+          ? 'Milestone rewards unlock as you progress — already earned, guilt-free.'
+          : 'Earn milestone cash rewards as you make progress.',
+        badgeLabel: 'JOURNEY CREATED',
       });
     }
   };
@@ -311,15 +326,15 @@ export default function CollectionsScreen() {
       });
       setIsWaypointModalOpen(false);
 
-      // Trigger Celebration Dopamine Feedback for Waypoint creation
+      // Trigger celebration feedback for Waypoint creation
       triggerConfetti();
       feedback('select');
       setCelebrationInfo({
-        title: 'WAYPOINT ADDED!',
-        subtitle: `Waypoint "${waypointTitle.trim()}" added to your journey targets.`,
+        title: 'Waypoint added',
+        subtitle: `"${waypointTitle.trim()}" added to your journey targets.`,
         iconType: 'target',
-        payoutText: `🎯 Target: ${isNaN(targetVal) ? 'Custom' : targetVal} units | Timeframe: ${waypointMonth ? MONTH_NAMES[parseInt(waypointMonth, 10) - 1] : ''} ${waypointYear || 'Ongoing'}`,
-        badgeLabel: 'WAYPOINT SET',
+        payoutText: `Target: ${isNaN(targetVal) ? 'Custom' : targetVal} units · ${waypointMonth ? MONTH_NAMES[parseInt(waypointMonth, 10) - 1] : ''} ${waypointYear || 'Ongoing'}`,
+        badgeLabel: 'WAYPOINT ADDED',
       });
     }
   };
@@ -380,11 +395,11 @@ export default function CollectionsScreen() {
           triggerConfetti();
           feedback('milestone');
           setCelebrationInfo({
-            title: 'WAYPOINT CONQUERED!',
-            subtitle: `You completed 100% of "${wp?.title || 'Waypoint'}"!`,
+            title: 'Waypoint complete',
+            subtitle: `You finished every item in "${wp?.title || 'Waypoint'}".`,
             iconType: 'award',
-            payoutText: '💰 Milestone Payout Credited! Progress synced to Summit.',
-            badgeLabel: 'WAYPOINT COMPLETE 100%',
+            payoutText: 'Milestone reward added. Progress synced to your Summit.',
+            badgeLabel: 'WAYPOINT COMPLETE',
           });
           return;
         }
@@ -397,11 +412,11 @@ export default function CollectionsScreen() {
         triggerConfetti();
         feedback('milestone');
         setCelebrationInfo({
-          title: 'JOURNEY MASTERED!',
-          subtitle: `Congratulations! You conquered all tasks in this Journey!`,
+          title: 'Journey complete',
+          subtitle: `You finished every task in this journey. Well done.`,
           iconType: 'crown',
-          payoutText: '🔥 Discipline Booster unlocked! +1 Completed Journey logged.',
-          badgeLabel: 'JOURNEY COMPLETED 🏆',
+          payoutText: 'Journey added to your record. Keep the momentum going.',
+          badgeLabel: 'JOURNEY COMPLETE',
         });
       }
     }
@@ -426,6 +441,8 @@ export default function CollectionsScreen() {
   const eligibleParents = journeyLinkMode === 'new'
     ? getEligibleParents(summits, null, 'productive', newSummitMetricType)
     : [];
+
+  const celebrationAccent = celebrationInfo ? getCelebrationAccent(celebrationInfo.iconType) : '#BF5AF2';
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }} edges={['top']}>
@@ -703,34 +720,110 @@ export default function CollectionsScreen() {
         )}
       </ScrollView>
 
-      {/* Celebration Dopamine Modal */}
+      {/* Celebration feedback modal */}
       <Modal visible={!!celebrationInfo} animationType="fade" transparent={true}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-          <View style={{ backgroundColor: '#1C1C1E', borderRadius: 24, padding: 28, alignItems: 'center', borderWidth: 2, borderColor: '#BF5AF2', maxWidth: 480, width: '100%' }}>
-            <View style={{ backgroundColor: '#BF5AF222', width: 88, height: 88, borderRadius: 44, justifyContent: 'center', alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#BF5AF255' }}>
-              {celebrationInfo && <CelebrationVectorIcon type={celebrationInfo.iconType} category={celebrationInfo.category} />}
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.78)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View
+            style={{
+              backgroundColor: '#1C1C1E',
+              borderRadius: 28,
+              paddingTop: 32,
+              paddingBottom: 24,
+              paddingHorizontal: 26,
+              alignItems: 'center',
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.08)',
+              maxWidth: 400,
+              width: '100%',
+              shadowColor: celebrationAccent,
+              shadowOffset: { width: 0, height: 16 },
+              shadowOpacity: 0.35,
+              shadowRadius: 32,
+              elevation: 20,
+            }}
+          >
+            <View
+              style={{
+                width: 96,
+                height: 96,
+                borderRadius: 48,
+                backgroundColor: `${celebrationAccent}14`,
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginBottom: 20,
+              }}
+            >
+              <View
+                style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 36,
+                  backgroundColor: `${celebrationAccent}26`,
+                  borderWidth: 1,
+                  borderColor: `${celebrationAccent}40`,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                {celebrationInfo && <CelebrationVectorIcon type={celebrationInfo.iconType} category={celebrationInfo.category} />}
+              </View>
             </View>
-            <View style={{ backgroundColor: '#BF5AF222', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#BF5AF2' }}>
-              <Text style={{ color: '#BF5AF2', fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: `${celebrationAccent}1A`,
+                paddingHorizontal: 12,
+                paddingVertical: 5,
+                borderRadius: 20,
+                marginBottom: 14,
+              }}
+            >
+              <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: celebrationAccent, marginRight: 6 }} />
+              <Text style={{ color: celebrationAccent, fontSize: 11, fontWeight: '700', letterSpacing: 0.6 }}>
                 {celebrationInfo?.badgeLabel}
               </Text>
             </View>
-            <Text style={{ color: '#FFF', fontSize: 24, fontWeight: '900', textAlign: 'center', marginBottom: 8 }}>
+            <Text style={{ color: '#FFF', fontSize: 21, fontWeight: '800', letterSpacing: 0.1, textAlign: 'center', marginBottom: 8 }}>
               {celebrationInfo?.title}
             </Text>
-            <Text style={{ color: '#8E8E93', fontSize: 14, textAlign: 'center', marginBottom: 16, lineHeight: 20 }}>
+            <Text style={{ color: '#8E8E93', fontSize: 14, textAlign: 'center', marginBottom: 20, lineHeight: 20, paddingHorizontal: 8 }}>
               {celebrationInfo?.subtitle}
             </Text>
-            <View style={{ backgroundColor: '#252528', padding: 14, borderRadius: 14, width: '100%', marginBottom: 24, borderWidth: 1, borderColor: '#3A3A3C' }}>
-              <Text style={{ color: '#5AC8FA', fontSize: 13, fontWeight: '700', textAlign: 'center' }}>
+            <View
+              style={{
+                backgroundColor: '#232326',
+                paddingVertical: 13,
+                paddingHorizontal: 14,
+                borderRadius: 14,
+                width: '100%',
+                marginBottom: 22,
+                borderLeftWidth: 3,
+                borderLeftColor: celebrationAccent,
+              }}
+            >
+              <Text style={{ color: celebrationAccent, fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
                 {celebrationInfo?.payoutText}
               </Text>
             </View>
             <Pressable
               onPress={() => setCelebrationInfo(null)}
-              style={{ backgroundColor: '#BF5AF2', width: '100%', padding: 16, borderRadius: 16, alignItems: 'center' }}
+              style={{
+                backgroundColor: celebrationAccent,
+                width: '100%',
+                paddingVertical: 15,
+                borderRadius: 16,
+                alignItems: 'center',
+                shadowColor: celebrationAccent,
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.4,
+                shadowRadius: 12,
+                elevation: 6,
+              }}
             >
-              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '800' }}>Claim & Continue 🔥</Text>
+              <Text style={{ color: celebrationAccent === '#FFD700' ? '#1C1C1E' : '#FFF', fontSize: 15, fontWeight: '700' }}>
+                Continue
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -1234,7 +1327,7 @@ export default function CollectionsScreen() {
               return null;
             })()}
 
-            <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Estimated Time (Minutes) [Optional]</Text>
+            <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Estimated Time (Minutes) (Optional)</Text>
             <PremiumInput
               style={{ backgroundColor: '#252528', color: '#FFF', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, fontSize: 15, marginBottom: 20, borderWidth: 1, borderColor: '#3A3A3C' }}
               placeholder="e.g., 480"
