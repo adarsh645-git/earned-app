@@ -6,10 +6,11 @@ interface RewardToastProps {
   visible: boolean;
   message: string;
   subtext?: string;
+  chainTrail?: string[]; // leaf-first, e.g. ["Elden Ring", "RPG Backlog"] — shown as "Elden Ring → RPG Backlog"
   onDismiss: () => void;
 }
 
-export default function RewardToast({ visible, message, subtext, onDismiss }: RewardToastProps) {
+export default function RewardToast({ visible, message, subtext, chainTrail, onDismiss }: RewardToastProps) {
   useEffect(() => {
     if (visible) {
       const timer = setTimeout(() => {
@@ -56,6 +57,11 @@ export default function RewardToast({ visible, message, subtext, onDismiss }: Re
         {subtext ? (
           <Text style={{ color: '#A1A1AA', fontSize: 11, fontWeight: '500', marginTop: 2 }}>
             {subtext}
+          </Text>
+        ) : null}
+        {chainTrail && chainTrail.length > 1 ? (
+          <Text style={{ color: '#BF5AF2', fontSize: 11, fontWeight: '600', marginTop: 2 }} numberOfLines={1}>
+            ↳ Contributed to: {chainTrail.slice(1).join(' → ')}
           </Text>
         ) : null}
       </View>

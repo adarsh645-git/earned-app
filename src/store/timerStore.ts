@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { useEconomyStore } from './economyStore';
 import { useTaskStore } from './taskStore';
-import { useMacroGoalStore, UnlockedMilestoneInfo } from './macroGoalStore';
+import { useMacroGoalStore, UnlockedMilestoneInfo, getChainTrail } from './macroGoalStore';
 import * as Notifications from 'expo-notifications';
 
 Notifications.setNotificationHandler({
@@ -19,6 +19,7 @@ export type SessionCompletionResult = {
   hoursEarnedMinutes: number;
   unlockedMilestones: UnlockedMilestoneInfo[];
   tagType: 'earner' | 'burner';
+  chainTrail: string[]; // leaf-first; length <= 1 means not part of a chain
 };
 
 export type StartTimerResult = {
@@ -163,7 +164,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
 
   completeSession: () => {
     const { activeTaskId, secondsElapsed, scheduledNotificationId } = get();
-    if (!activeTaskId) return { dollarsEarned: 0, hoursEarnedMinutes: 0, unlockedMilestones: [], tagType: 'earner' };
+    if (!activeTaskId) return { dollarsEarned: 0, hoursEarnedMinutes: 0, unlockedMilestones: [], tagType: 'earner', chainTrail: [] };
 
     // Cancel notification
     if (scheduledNotificationId) {
@@ -198,13 +199,16 @@ export const useTimerStore = create<TimerState>((set, get) => ({
 
     // Roll up progress to Macro Goal if linked & capture milestone rewards (awards Dollars at milestones)
     let unlockedMilestones: UnlockedMilestoneInfo[] = [];
+    let chainTrail: string[] = [];
     if (task?.macroGoalId) {
       unlockedMilestones = useMacroGoalStore.getState().applyLeafProgress(task.macroGoalId, minutesElapsed);
+      chainTrail = getChainTrail(useMacroGoalStore.getState().macroGoals, task.macroGoalId);
     }
 
     const result: SessionCompletionResult = {
       dollarsEarned: 0, // Milestone rewards handled by addProgress
       hoursEarnedMinutes,
+      chainTrail,
       unlockedMilestones,
       tagType,
     };

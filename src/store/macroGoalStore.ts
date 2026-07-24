@@ -29,6 +29,84 @@ export type MacroGoal = {
   paysCurrency?: boolean; // The one level in a chain that pays currency. Undefined = pays (back-compat).
 };
 
+// Chains are capped at 3 levels (depth 0, 1, 2) to keep progress legible —
+// e.g. Book(2) -> Series(1) -> "20 Books"(0). Root = depth 0.
+export const MAX_CHAIN_DEPTH = 2;
+
+export function getChainDepth(macroGoals: MacroGoal[], goalId: string): number {
+  let depth = 0;
+  let cur = macroGoals.find(g => g.id === goalId);
+  const seen = new Set<string>();
+  while (cur?.parentId && !seen.has(cur.id)) {
+    seen.add(cur.id);
+    depth++;
+    cur = macroGoals.find(g => g.id === cur!.parentId);
+  }
+  return depth;
+}
+
+export function getDescendantIds(macroGoals: MacroGoal[], goalId: string): Set<string> {
+  const result = new Set<string>();
+  const stack = [goalId];
+  while (stack.length) {
+    const cur = stack.pop()!;
+    macroGoals.forEach(g => {
+      if (g.parentId === cur && !result.has(g.id)) {
+        result.add(g.id);
+        stack.push(g.id);
+      }
+    });
+  }
+  return result;
+}
+
+export function getChainRoot(macroGoals: MacroGoal[], goalId: string): MacroGoal | undefined {
+  let cur = macroGoals.find(g => g.id === goalId);
+  const seen = new Set<string>();
+  while (cur?.parentId && !seen.has(cur.id)) {
+    seen.add(cur.id);
+    const parent = macroGoals.find(g => g.id === cur!.parentId);
+    if (!parent) break;
+    cur = parent;
+  }
+  return cur;
+}
+
+// Titles from `goalId` up to its chain root, leaf-first (e.g. ["Elden Ring",
+// "RPG Backlog"]). Length 1 means the goal isn't part of a chain — callers
+// use that to decide whether cascade-legibility feedback is worth showing.
+export function getChainTrail(macroGoals: MacroGoal[], goalId: string): string[] {
+  const trail: string[] = [];
+  let cur = macroGoals.find(g => g.id === goalId);
+  const seen = new Set<string>();
+  while (cur && !seen.has(cur.id)) {
+    seen.add(cur.id);
+    trail.push(cur.title);
+    cur = cur.parentId ? macroGoals.find(g => g.id === cur!.parentId) : undefined;
+  }
+  return trail;
+}
+
+// Valid parents for `goal` (or for a not-yet-created goal, pass null): same
+// type (productive/entertainment stay separate pyramids) and same metricType
+// (chains are homogeneous), excluding self/descendants (no cycles) and
+// anything already at max depth (no chain longer than MAX_CHAIN_DEPTH + 1).
+export function getEligibleParents(
+  macroGoals: MacroGoal[],
+  goal: MacroGoal | null,
+  type: MacroGoalType,
+  metricType: 'minutes' | 'units'
+): MacroGoal[] {
+  const excludeIds = goal ? new Set([goal.id, ...getDescendantIds(macroGoals, goal.id)]) : new Set<string>();
+  return macroGoals.filter(g => {
+    if (excludeIds.has(g.id)) return false;
+    if ((g.type || 'productive') !== type) return false;
+    if ((g.metricType || 'minutes') !== metricType) return false;
+    if (getChainDepth(macroGoals, g.id) >= MAX_CHAIN_DEPTH) return false;
+    return true;
+  });
+}
+
 export const getMilestoneDollars = (targetMinutes: number, milestone: number, goalType: MacroGoalType = 'productive'): number => {
   // Entertainment goals are already paid for with earned Hours — no Dollar double-dip on completion.
   if (goalType === 'entertainment') return 0;
@@ -67,6 +145,9 @@ interface MacroGoalState {
   // a discrete completion is +1 to a count goal; effort is minutes to a time goal.
   applyLeafProgress: (goalId: string, minutes: number) => UnlockedMilestoneInfo[];
   revokeLeafProgress: (goalId: string, minutes: number) => void;
+  // Makes `goalId` the one paying level of its whole chain (root + all
+  // descendants), clearing paysCurrency everywhere else in that chain.
+  setPayingLevel: (goalId: string) => void;
 }
 
 export const useMacroGoalStore = create<MacroGoalState>()(
@@ -104,6 +185,16 @@ export const useMacroGoalStore = create<MacroGoalState>()(
       updateMacroGoal: (id, updates) => set((state) => ({
         macroGoals: state.macroGoals.map(g => g.id === id ? { ...g, ...updates } : g)
       })),
+      setPayingLevel: (goalId) => set((state) => {
+        const root = getChainRoot(state.macroGoals, goalId);
+        if (!root) return state;
+        const chainIds = new Set([root.id, ...getDescendantIds(state.macroGoals, root.id)]);
+        return {
+          macroGoals: state.macroGoals.map(g =>
+            chainIds.has(g.id) ? { ...g, paysCurrency: g.id === goalId } : g
+          ),
+        };
+      }),
       deleteMacroGoal: (id) => {
         // Sub-goals are structurally dependent on their parent — remove them too.
         // Anything else that merely references this goal (tasks, Journeys) is

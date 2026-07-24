@@ -5,6 +5,7 @@ import { useTimerStore, calculateDollarsEarned } from '../store/timerStore';
 import { useTaskStore } from '../store/taskStore';
 import MilestoneModal from './MilestoneModal';
 import ConfirmModal from './ConfirmModal';
+import RewardToast from './RewardToast';
 import { feedback } from '../utils/feedback';
 import { useConfettiStore } from '../store/confettiStore';
 
@@ -26,8 +27,15 @@ export default function TimerOverlay() {
   const { tasks, tags } = useTaskStore();
   const [zenMode, setZenMode] = useState(false);
   const [abandonVisible, setAbandonVisible] = useState(false);
+  const [chainToastDismissed, setChainToastDismissed] = useState(false);
 
   const [appState, setAppState] = useState(AppState.currentState);
+
+  // A new completion result means a new session finished — surface its
+  // chain toast again (independent of the milestone modal's own dismissal).
+  useEffect(() => {
+    if (recentCompletionResult) setChainToastDismissed(false);
+  }, [recentCompletionResult]);
 
   // AppState Listener to fast-forward timer when returning from background
   useEffect(() => {
@@ -128,14 +136,24 @@ export default function TimerOverlay() {
 
 
   const showMilestoneModal = !!recentCompletionResult && recentCompletionResult.unlockedMilestones.length > 0;
+  const chainTrail = recentCompletionResult?.chainTrail || [];
+  const showChainToast = !!recentCompletionResult && chainTrail.length > 1 && !chainToastDismissed;
 
   if (!isActive || !activeTaskId) {
     return (
-      <MilestoneModal
-        visible={showMilestoneModal}
-        milestones={recentCompletionResult?.unlockedMilestones || []}
-        onClose={clearCompletionResult}
-      />
+      <>
+        <MilestoneModal
+          visible={showMilestoneModal}
+          milestones={recentCompletionResult?.unlockedMilestones || []}
+          onClose={clearCompletionResult}
+        />
+        <RewardToast
+          visible={showChainToast}
+          message={recentCompletionResult?.tagType === 'earner' ? 'Session logged' : 'Leisure session logged'}
+          chainTrail={chainTrail}
+          onDismiss={() => setChainToastDismissed(true)}
+        />
+      </>
     );
   }
 
