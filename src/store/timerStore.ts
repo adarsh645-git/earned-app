@@ -199,7 +199,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     // Roll up progress to Macro Goal if linked & capture milestone rewards (awards Dollars at milestones)
     let unlockedMilestones: UnlockedMilestoneInfo[] = [];
     if (task?.macroGoalId) {
-      unlockedMilestones = useMacroGoalStore.getState().addProgress(task.macroGoalId, minutesElapsed);
+      unlockedMilestones = useMacroGoalStore.getState().applyLeafProgress(task.macroGoalId, minutesElapsed);
     }
 
     const result: SessionCompletionResult = {

@@ -137,19 +137,9 @@ export const useCollectionStore = create<CollectionState>()(
             const macroGoal = useMacroGoalStore.getState().macroGoals.find(g => g.id === collection.macroGoalId);
             
             if (macroGoal) {
-              // Determine amount to progress based on metricType
-              let progressAmount = 0;
-              if (macroGoal.metricType === 'units') {
-                progressAmount = 1; // 1 item completed = 1 unit
-              } else {
-                // If it's a minutes-based goal, use the estimated minutes or default to 60 (1 hour)
-                progressAmount = item.estimatedMinutes || 60;
-              }
-              
-              // Only add positive progress
-              if (progressAmount > 0) {
-                useMacroGoalStore.getState().addProgress(macroGoal.id, progressAmount);
-              }
+              // Routes to +1 for a count chain or the item's minutes for a time
+              // chain; cascades up the chain from there.
+              useMacroGoalStore.getState().applyLeafProgress(macroGoal.id, item.estimatedMinutes || 60);
             }
           }
         }

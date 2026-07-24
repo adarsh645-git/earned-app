@@ -52,7 +52,10 @@ CREATE TABLE IF NOT EXISTS public.macro_goals (
   metric_type TEXT DEFAULT 'minutes',
   target_metric INTEGER,
   completed_metric INTEGER DEFAULT 0,
-  unlocked_milestones JSONB DEFAULT '[]'::jsonb
+  unlocked_milestones JSONB DEFAULT '[]'::jsonb,
+  parent_id TEXT,
+  pays_currency BOOLEAN DEFAULT TRUE,
+  category TEXT
 );
 
 -- 6. Collections (Journeys & Backlogs) Table

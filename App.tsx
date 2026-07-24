@@ -26,6 +26,7 @@ export default function App() {
       waitForHydration(useMacroGoalStore),
     ]).then(() => {
       useEconomyStore.getState().applyEntertainmentClawback();
+      useMacroGoalStore.getState().applyPaysCurrencyDefaults();
     });
   }, []);
 
