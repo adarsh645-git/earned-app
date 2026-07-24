@@ -21,6 +21,12 @@ function mergeById<T extends { id: string }>(local: T[], cloud: T[]): T[] {
   return Array.from(merged.values());
 }
 
+/** Ids present in `prevItems` but no longer in `currentItems` — i.e. locally deleted. */
+function diffRemovedIds<T extends { id: string }>(prevItems: T[], currentItems: T[]): string[] {
+  const currentIds = new Set(currentItems.map((item) => item.id));
+  return prevItems.map((item) => item.id).filter((id) => !currentIds.has(id));
+}
+
 export function useCloudSync() {
   const { user, initializeAuth } = useAuthStore();
 
@@ -40,22 +46,48 @@ export function useCloudSync() {
       pushEconomyToCloud(user.id, state);
     });
 
-    const unsubTasks = useTaskStore.subscribe((state) => {
+    const unsubTasks = useTaskStore.subscribe((state, prevState) => {
+      const removedTaskIds = diffRemovedIds(prevState.tasks, state.tasks);
+      if (removedTaskIds.length > 0) {
+        deleteTasksFromCloud(user.id, removedTaskIds);
+      }
       pushAllTasksToCloud(user.id, state.tasks);
       pushAllPillarsToCloud(user.id, state.pillars);
       pushAllTagsToCloud(user.id, state.tags);
     });
 
-    const unsubRewards = useRewardStore.subscribe((state) => {
+    const unsubRewards = useRewardStore.subscribe((state, prevState) => {
+      const removedRewardIds = diffRemovedIds(prevState.rewards, state.rewards);
+      if (removedRewardIds.length > 0) {
+        deleteRewardsFromCloud(user.id, removedRewardIds);
+      }
       pushAllRewardsToCloud(user.id, state.rewards);
     });
 
-    const unsubMacroGoals = useMacroGoalStore.subscribe((state) => {
+    const unsubMacroGoals = useMacroGoalStore.subscribe((state, prevState) => {
+      const removedIds = diffRemovedIds(prevState.macroGoals, state.macroGoals);
+      if (removedIds.length > 0) {
+        deleteMacroGoalsFromCloud(user.id, removedIds);
+      }
       pushAllMacroGoalsToCloud(user.id, state.macroGoals);
     });
 
-    const unsubCollections = useCollectionStore.subscribe((state) => {
-      pushAllCollectionsToCloud(user.id, state.collections, state.items);
+    const unsubCollections = useCollectionStore.subscribe((state, prevState) => {
+      const removedCollectionIds = diffRemovedIds(prevState.collections, state.collections);
+      const removedSubGoalIds = diffRemovedIds(prevState.subGoals || [], state.subGoals || []);
+      const removedItemIds = diffRemovedIds(prevState.items, state.items);
+
+      if (removedCollectionIds.length > 0) {
+        deleteCollectionsFromCloud(user.id, removedCollectionIds);
+      }
+      if (removedSubGoalIds.length > 0) {
+        deleteSubGoalsFromCloud(user.id, removedSubGoalIds);
+      }
+      if (removedItemIds.length > 0) {
+        deleteItemsFromCloud(removedItemIds);
+      }
+
+      pushAllCollectionsToCloud(user.id, state.collections, state.items, state.subGoals);
     });
 
     // 3. Subscribe to Realtime remote database changes
@@ -281,6 +313,15 @@ export async function pushEconomyToCloud(userId: string, state: any) {
   }
 }
 
+export async function deleteTasksFromCloud(userId: string, ids: string[]) {
+  if (!isSupabaseConfigured() || ids.length === 0) return;
+  try {
+    await supabase.from('tasks').delete().eq('user_id', userId).in('id', ids);
+  } catch (err) {
+    console.log('Error deleting tasks from cloud:', err);
+  }
+}
+
 export async function pushAllTasksToCloud(userId: string, tasks: Task[]) {
   if (!isSupabaseConfigured() || tasks.length === 0) return;
   try {
@@ -334,6 +375,15 @@ export async function pushAllTagsToCloud(userId: string, tags: Tag[]) {
   }
 }
 
+export async function deleteRewardsFromCloud(userId: string, ids: string[]) {
+  if (!isSupabaseConfigured() || ids.length === 0) return;
+  try {
+    await supabase.from('rewards').delete().eq('user_id', userId).in('id', ids);
+  } catch (err) {
+    console.log('Error deleting rewards from cloud:', err);
+  }
+}
+
 export async function pushAllRewardsToCloud(userId: string, rewards: Reward[]) {
   if (!isSupabaseConfigured() || rewards.length === 0) return;
   try {
@@ -347,6 +397,15 @@ export async function pushAllRewardsToCloud(userId: string, rewards: Reward[]) {
     await supabase.from('rewards').upsert(payload, { onConflict: 'id' });
   } catch (err) {
     console.log('Error pushing rewards to cloud:', err);
+  }
+}
+
+export async function deleteMacroGoalsFromCloud(userId: string, ids: string[]) {
+  if (!isSupabaseConfigured() || ids.length === 0) return;
+  try {
+    await supabase.from('macro_goals').delete().eq('user_id', userId).in('id', ids);
+  } catch (err) {
+    console.log('Error deleting macro goals from cloud:', err);
   }
 }
 
@@ -372,6 +431,35 @@ export async function pushAllMacroGoalsToCloud(userId: string, goals: MacroGoal[
     await supabase.from('macro_goals').upsert(payload, { onConflict: 'id' });
   } catch (err) {
     console.log('Error pushing macro goals to cloud:', err);
+  }
+}
+
+export async function deleteCollectionsFromCloud(userId: string, ids: string[]) {
+  if (!isSupabaseConfigured() || ids.length === 0) return;
+  try {
+    await supabase.from('collections').delete().eq('user_id', userId).in('id', ids);
+  } catch (err) {
+    console.log('Error deleting collections from cloud:', err);
+  }
+}
+
+export async function deleteSubGoalsFromCloud(userId: string, ids: string[]) {
+  if (!isSupabaseConfigured() || ids.length === 0) return;
+  try {
+    await supabase.from('journey_sub_goals').delete().eq('user_id', userId).in('id', ids);
+  } catch (err) {
+    console.log('Error deleting journey sub-goals from cloud:', err);
+  }
+}
+
+export async function deleteItemsFromCloud(ids: string[]) {
+  // collection_items has no user_id column; ownership is enforced by RLS via
+  // the parent collection, same as the upsert path for this table.
+  if (!isSupabaseConfigured() || ids.length === 0) return;
+  try {
+    await supabase.from('collection_items').delete().in('id', ids);
+  } catch (err) {
+    console.log('Error deleting collection items from cloud:', err);
   }
 }
 
