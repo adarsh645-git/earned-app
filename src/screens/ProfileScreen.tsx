@@ -6,7 +6,7 @@ import { useEconomyStore, IOU_CAP } from '../store/economyStore';
 import { usePreferencesStore } from '../store/preferencesStore';
 import { feedback } from '../utils/feedback';
 import { useTaskStore } from '../store/taskStore';
-import { useMacroGoalStore, MacroGoal, getMilestoneDollars } from '../store/macroGoalStore';
+import { useMacroGoalStore, MacroGoal, getMilestoneDollars, getEligibleParents } from '../store/macroGoalStore';
 import { useAuthStore } from '../store/authStore';
 import { PrimaryButton } from '../components/PrimaryButton';
 import EditMacroGoalModal from '../components/EditMacroGoalModal';
@@ -53,6 +53,9 @@ export default function ProfileScreen() {
   const [title, setTitle] = useState('');
   const [horizon, setHorizon] = useState<'monthly' | 'yearly'>('monthly');
   const [targetHours, setTargetHours] = useState('');
+  const [newGoalMetricType, setNewGoalMetricType] = useState<'minutes' | 'units'>('minutes');
+  const [targetCount, setTargetCount] = useState('');
+  const [newGoalParentId, setNewGoalParentId] = useState('');
   const [validationError, setValidationError] = useState('');
 
   // Taxonomy State
@@ -77,20 +80,39 @@ export default function ProfileScreen() {
       return;
     }
 
-    const hours = parseFloat(targetHours);
-    if (isNaN(hours) || hours <= 0) {
-      setValidationError('Target hours must be a valid positive number');
-      return;
+    if (newGoalMetricType === 'units') {
+      const count = parseInt(targetCount, 10);
+      if (isNaN(count) || count <= 0) {
+        setValidationError('Target count must be a valid positive number');
+        return;
+      }
+      addMacroGoal({
+        title: title.trim(),
+        horizon,
+        targetMinutes: 0,
+        metricType: 'units',
+        targetMetric: count,
+        parentId: newGoalParentId || undefined,
+      });
+    } else {
+      const hours = parseFloat(targetHours);
+      if (isNaN(hours) || hours <= 0) {
+        setValidationError('Target hours must be a valid positive number');
+        return;
+      }
+      addMacroGoal({
+        title: title.trim(),
+        horizon,
+        targetMinutes: Math.round(hours * 60),
+        parentId: newGoalParentId || undefined,
+      });
     }
-
-    addMacroGoal({
-      title: title.trim(),
-      horizon,
-      targetMinutes: Math.round(hours * 60),
-    });
 
     setTitle('');
     setTargetHours('');
+    setTargetCount('');
+    setNewGoalParentId('');
+    setNewGoalMetricType('minutes');
     setModalVisible(false);
   };
 
@@ -144,17 +166,62 @@ export default function ProfileScreen() {
             className="text-white rounded-2xl p-4 mb-4 text-sm font-semibold"
           />
 
-          {/* Target Hours Input */}
-          <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Target Hours</Text>
-          <PremiumInput
-            value={targetHours}
-            onChangeText={setTargetHours}
-            placeholder="e.g. 50"
-            placeholderTextColor="#8E8E93"
-            keyboardType="numeric"
-            style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }}
-            className="text-white rounded-2xl p-4 mb-4 text-sm font-semibold"
-          />
+          {/* Track By: Time vs Count */}
+          <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Track By</Text>
+          <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="flex-row p-1 rounded-xl mb-4">
+            {([
+              { key: 'minutes' as const, label: 'Time' },
+              { key: 'units' as const, label: 'Count' },
+            ]).map(({ key, label }) => {
+              const isActive = newGoalMetricType === key;
+              return (
+                <Pressable
+                  key={key}
+                  onPress={() => setNewGoalMetricType(key)}
+                  style={({ hovered }: any) => ({
+                    flex: 1,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                    backgroundColor: isActive ? (hovered ? '#3A2053' : '#2C183E') : 'transparent',
+                    borderWidth: isActive ? 1 : 0,
+                    borderColor: isActive ? (hovered ? '#5A3382' : '#4D2A6B') : 'transparent',
+                    transition: 'all 0.15s ease-in-out',
+                  })}
+                >
+                  <Text className={`font-semibold text-xs ${isActive ? 'text-white' : 'text-[#8E8E93]'}`}>
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Target Input */}
+          <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">
+            {newGoalMetricType === 'units' ? 'Target Count' : 'Target Hours'}
+          </Text>
+          {newGoalMetricType === 'units' ? (
+            <PremiumInput
+              value={targetCount}
+              onChangeText={setTargetCount}
+              placeholder="e.g. 20 (books, games, workouts...)"
+              placeholderTextColor="#8E8E93"
+              keyboardType="numeric"
+              style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }}
+              className="text-white rounded-2xl p-4 mb-4 text-sm font-semibold"
+            />
+          ) : (
+            <PremiumInput
+              value={targetHours}
+              onChangeText={setTargetHours}
+              placeholder="e.g. 50"
+              placeholderTextColor="#8E8E93"
+              keyboardType="numeric"
+              style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }}
+              className="text-white rounded-2xl p-4 mb-4 text-sm font-semibold"
+            />
+          )}
 
           {/* Horizon Toggle */}
           <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Time Horizon</Text>
@@ -183,6 +250,53 @@ export default function ProfileScreen() {
               );
             })}
           </View>
+
+          {/* Parent Chain (Optional) */}
+          {(() => {
+            const eligibleParents = getEligibleParents(allMacroGoals, null, 'productive', newGoalMetricType);
+            if (eligibleParents.length === 0) return null;
+            return (
+              <View className="mb-6">
+                <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Contributes To (Optional)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <Pressable
+                    onPress={() => setNewGoalParentId('')}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      borderRadius: 9999,
+                      borderWidth: 1,
+                      marginRight: 8,
+                      backgroundColor: !newGoalParentId ? '#2C183E' : '#1C1C1E',
+                      borderColor: !newGoalParentId ? '#4D2A6B' : 'rgba(255,255,255,0.08)',
+                    }}
+                  >
+                    <Text className={`text-xs ${!newGoalParentId ? 'text-white font-bold' : 'text-[#8E8E93] font-medium'}`}>None</Text>
+                  </Pressable>
+                  {eligibleParents.map((p) => {
+                    const isSelected = newGoalParentId === p.id;
+                    return (
+                      <Pressable
+                        key={p.id}
+                        onPress={() => setNewGoalParentId(p.id)}
+                        style={{
+                          paddingHorizontal: 16,
+                          paddingVertical: 10,
+                          borderRadius: 9999,
+                          borderWidth: 1,
+                          marginRight: 8,
+                          backgroundColor: isSelected ? '#2C183E' : '#1C1C1E',
+                          borderColor: isSelected ? '#4D2A6B' : 'rgba(255,255,255,0.08)',
+                        }}
+                      >
+                        <Text className={`text-xs ${isSelected ? 'text-white font-bold' : 'text-[#8E8E93] font-medium'}`}>{p.title}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            );
+          })()}
 
           {/* Submit Button */}
           <PrimaryButton

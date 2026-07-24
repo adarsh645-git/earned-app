@@ -8,7 +8,7 @@ import { feedback } from '../utils/feedback';
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-import { useMacroGoalStore } from '../store/macroGoalStore';
+import { useMacroGoalStore, getChainTrail } from '../store/macroGoalStore';
 import { useEconomyStore } from '../store/economyStore';
 import { useTimerStore } from '../store/timerStore';
 import { PrimaryButton } from '../components/PrimaryButton';
@@ -48,6 +48,7 @@ export default function TasksScreen() {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastSubtext, setToastSubtext] = useState('');
+  const [toastChainTrail, setToastChainTrail] = useState<string[]>([]);
 
   // Show a reward toast when completing a task (was previously silent)
   const handleToggle = (id: string) => {
@@ -63,6 +64,7 @@ export default function TasksScreen() {
         setToastMessage(`-${(task.estimatedMinutes / 60).toFixed(1)}h leisure spent`);
         setToastSubtext(`Enjoyed "${task.title}" guilt-free`);
       }
+      setToastChainTrail(task.macroGoalId ? getChainTrail(macroGoals, task.macroGoalId) : []);
       setToastVisible(true);
     }
     toggleTask(id);
@@ -310,6 +312,7 @@ export default function TasksScreen() {
         visible={toastVisible}
         message={toastMessage}
         subtext={toastSubtext}
+        chainTrail={toastChainTrail}
         onDismiss={() => setToastVisible(false)}
       />
 

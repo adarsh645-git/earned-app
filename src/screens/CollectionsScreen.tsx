@@ -5,10 +5,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useCollectionStore, CollectionCategory, JourneySubGoal } from '../store/collectionStore';
-import { useMacroGoalStore } from '../store/macroGoalStore';
+import { useMacroGoalStore, getChainTrail } from '../store/macroGoalStore';
 import { useConfettiStore } from '../store/confettiStore';
 import { PrimaryButton } from '../components/PrimaryButton';
 import AnimatedProgressBar from '../components/AnimatedProgressBar';
+import RewardToast from '../components/RewardToast';
 import { feedback } from '../utils/feedback';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -116,6 +117,10 @@ export default function CollectionsScreen() {
 
   // Celebration Dopamine Modal
   const [celebrationInfo, setCelebrationInfo] = useState<CelebrationInfo | null>(null);
+
+  // Chain-legibility toast (shown when a completed item feeds a macro-goal chain)
+  const [chainToastVisible, setChainToastVisible] = useState(false);
+  const [chainToastTrail, setChainToastTrail] = useState<string[]>([]);
 
   // Create/Edit Journey Modal
   const [isJourneyModalOpen, setIsJourneyModalOpen] = useState(false);
@@ -310,6 +315,17 @@ export default function CollectionsScreen() {
     // If completing (not uncompleting), check if it completes a Sub-Goal or Journey!
     if (!wasCompleted) {
       feedback('taskComplete');
+
+      // Surface the linked macro-goal chain reacting, if any (Phase 4 legibility).
+      const collection = collections.find(c => c.id === collectionId);
+      if (collection?.macroGoalId) {
+        const trail = getChainTrail(macroGoals, collection.macroGoalId);
+        if (trail.length > 1) {
+          setChainToastTrail(trail);
+          setChainToastVisible(true);
+        }
+      }
+
       if (subGoalId) {
         const sgItems = items.filter(i => i.subGoalId === subGoalId);
         const sgCompletedCount = sgItems.filter(i => i.completed).length + 1; // including current
@@ -363,6 +379,13 @@ export default function CollectionsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }} edges={['top']}>
+      <RewardToast
+        visible={chainToastVisible}
+        message="Progress logged"
+        chainTrail={chainToastTrail}
+        onDismiss={() => setChainToastVisible(false)}
+      />
+
       {/* Executive Summary Header Stats Bar (Shadcn-inspired) */}
       <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>

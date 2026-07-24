@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { PrimaryButton } from './PrimaryButton';
-import { MacroGoal } from '../store/macroGoalStore';
+import { MacroGoal, useMacroGoalStore, getEligibleParents } from '../store/macroGoalStore';
 import TimeSelectorModal from './TimeSelectorModal';
 import ConfirmModal from './ConfirmModal';
 
@@ -21,6 +21,8 @@ export default function EditMacroGoalModal({
   onSave,
   onDelete,
 }: EditMacroGoalModalProps) {
+  const { macroGoals: allGoals, setPayingLevel } = useMacroGoalStore();
+
   const [title, setTitle] = useState('');
   const [horizon, setHorizon] = useState<'monthly' | 'yearly'>('monthly');
   const [targetMinutes, setTargetMinutes] = useState(0);
@@ -28,6 +30,8 @@ export default function EditMacroGoalModal({
   const [isOpenEnded, setIsOpenEnded] = useState(false);
   const [showTimeSelector, setShowTimeSelector] = useState(false);
   const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
+  const [parentId, setParentId] = useState('');
+  const [paysCurrency, setPaysCurrency] = useState(true);
 
   const isUnits = goal?.metricType === 'units';
 
@@ -38,15 +42,19 @@ export default function EditMacroGoalModal({
       setTargetMinutes(goal.targetMinutes);
       setTargetMetric(String(goal.targetMetric || ''));
       setIsOpenEnded((goal.targetMetric ?? goal.targetMinutes) === 0);
+      setParentId(goal.parentId || '');
+      setPaysCurrency(goal.paysCurrency !== false);
     }
   }, [goal, visible]);
 
   if (!goal) return null;
 
+  const eligibleParents = getEligibleParents(allGoals, goal, goal.type || 'productive', goal.metricType || 'minutes');
+
   const handleSave = () => {
     if (!title.trim()) return;
 
-    const updates: Partial<MacroGoal> = { title: title.trim(), horizon };
+    const updates: Partial<MacroGoal> = { title: title.trim(), horizon, parentId: parentId || undefined };
 
     if (isUnits) {
       updates.targetMetric = isOpenEnded ? 0 : parseInt(targetMetric, 10) || 0;
@@ -55,6 +63,13 @@ export default function EditMacroGoalModal({
     }
 
     onSave(goal.id, updates);
+    // setPayingLevel re-reads the just-saved parentId to correctly enforce
+    // "exactly one payer" across the whole chain, wherever this goal now sits.
+    if (paysCurrency) {
+      setPayingLevel(goal.id);
+    } else {
+      onSave(goal.id, { paysCurrency: false });
+    }
     onClose();
   };
 
@@ -104,8 +119,84 @@ export default function EditMacroGoalModal({
               />
             </View>
 
+            {/* Parent Chain */}
+            {eligibleParents.length > 0 && (
+              <View style={{ marginBottom: 24 }}>
+                <Text style={{ color: '#A1A1AA', fontSize: 13, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase' }}>
+                  Contributes To (Optional)
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <Pressable
+                    onPress={() => setParentId('')}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      borderRadius: 9999,
+                      borderWidth: 1,
+                      marginRight: 8,
+                      backgroundColor: !parentId ? '#FFFFFF' : '#18181B',
+                      borderColor: !parentId ? '#FFFFFF' : '#27272A',
+                    }}
+                  >
+                    <Text style={{ color: !parentId ? '#000000' : '#A1A1AA', fontSize: 13, fontWeight: !parentId ? '700' : '500' }}>
+                      None
+                    </Text>
+                  </Pressable>
+                  {eligibleParents.map((p) => {
+                    const isSelected = parentId === p.id;
+                    return (
+                      <Pressable
+                        key={p.id}
+                        onPress={() => setParentId(p.id)}
+                        style={{
+                          paddingHorizontal: 16,
+                          paddingVertical: 10,
+                          borderRadius: 9999,
+                          borderWidth: 1,
+                          marginRight: 8,
+                          backgroundColor: isSelected ? '#FFFFFF' : '#18181B',
+                          borderColor: isSelected ? '#FFFFFF' : '#27272A',
+                        }}
+                      >
+                        <Text style={{ color: isSelected ? '#000000' : '#A1A1AA', fontSize: 13, fontWeight: isSelected ? '700' : '500' }}>
+                          {p.title}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+                <Text style={{ color: '#52525B', fontSize: 11, marginTop: 6 }}>
+                  Progress here drips up automatically. {isUnits ? 'Finishing this contributes +1 up the chain.' : 'Minutes cascade up the chain.'}
+                </Text>
+              </View>
+            )}
+
+            {/* Rewards Paid At This Level */}
+            <View style={{ marginBottom: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#18181B', borderColor: '#27272A', borderWidth: 1, borderRadius: 12, padding: 16 }}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}>Rewards Paid Here</Text>
+                <Text style={{ color: '#8E8E93', fontSize: 11, marginTop: 2 }}>
+                  Only one level per chain pays currency. Turning this on turns it off everywhere else in the chain.
+                </Text>
+              </View>
+              <Pressable onPress={() => setPaysCurrency(!paysCurrency)}>
+                <View
+                  style={{
+                    width: 44,
+                    height: 26,
+                    borderRadius: 13,
+                    padding: 3,
+                    backgroundColor: paysCurrency ? '#30D158' : '#3A3A3C',
+                    alignItems: paysCurrency ? 'flex-end' : 'flex-start',
+                  }}
+                >
+                  <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFFFFF' }} />
+                </View>
+              </Pressable>
+            </View>
+
             {/* Horizon */}
-            {!goal.parentId && (
+            {!parentId && (
               <View style={{ marginBottom: 24 }}>
                 <Text style={{ color: '#A1A1AA', fontSize: 13, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase' }}>
                   Horizon

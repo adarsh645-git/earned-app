@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEconomyStore, IOU_CAP } from '../store/economyStore';
 import { useRewardStore, Reward } from '../store/rewardStore';
-import { useMacroGoalStore, MacroGoal } from '../store/macroGoalStore';
+import { useMacroGoalStore, MacroGoal, getEligibleParents } from '../store/macroGoalStore';
 import TimeSelectorModal from '../components/TimeSelectorModal';
 import { feedback } from '../utils/feedback';
 import { useConfettiStore } from '../store/confettiStore';
@@ -54,6 +54,8 @@ export default function StoreScreen() {
   
   const [projectCategory, setProjectCategory] = useState<'video-game' | 'movie' | 'tv-show' | 'youtube' | 'custom'>('custom');
   const [isOpenEnded, setIsOpenEnded] = useState(false);
+  const [projectMetricType, setProjectMetricType] = useState<'minutes' | 'units'>('minutes');
+  const [targetCount, setTargetCount] = useState('');
 
   const { addTask } = useTaskStore();
   const { startTimer } = useTimerStore();
@@ -94,33 +96,53 @@ export default function StoreScreen() {
       setValidationError('Title is required');
       return;
     }
-    
-    // For Parent project, must have a target duration > 0
-    if (!selectedParentId && projectMinutes <= 0) {
-      setValidationError('Parent projects must have a target duration > 0');
-      return;
-    }
-    
-    // For Sub-projects, if it's not open ended, it must have duration
-    if (selectedParentId && !isOpenEnded && projectMinutes <= 0) {
-      setValidationError('Please set a target duration or mark as Open Ended');
-      return;
-    }
 
-    addMacroGoal({
-      title: title.trim(),
-      horizon: 'yearly',
-      targetMinutes: (selectedParentId && isOpenEnded) ? 0 : projectMinutes,
-      type: 'entertainment',
-      parentId: selectedParentId || undefined,
-      category: !selectedParentId ? projectCategory : undefined,
-    });
+    if (projectMetricType === 'units') {
+      const count = parseInt(targetCount, 10);
+      if (isNaN(count) || count <= 0) {
+        setValidationError('Target count must be a valid positive number');
+        return;
+      }
+      addMacroGoal({
+        title: title.trim(),
+        horizon: 'yearly',
+        targetMinutes: 0,
+        metricType: 'units',
+        targetMetric: count,
+        type: 'entertainment',
+        parentId: selectedParentId || undefined,
+        category: !selectedParentId ? projectCategory : undefined,
+      });
+    } else {
+      // For a root project, must have a target duration > 0
+      if (!selectedParentId && projectMinutes <= 0) {
+        setValidationError('Parent projects must have a target duration > 0');
+        return;
+      }
+
+      // For sub-projects, if it's not open ended, it must have duration
+      if (selectedParentId && !isOpenEnded && projectMinutes <= 0) {
+        setValidationError('Please set a target duration or mark as Open Ended');
+        return;
+      }
+
+      addMacroGoal({
+        title: title.trim(),
+        horizon: 'yearly',
+        targetMinutes: (selectedParentId && isOpenEnded) ? 0 : projectMinutes,
+        type: 'entertainment',
+        parentId: selectedParentId || undefined,
+        category: !selectedParentId ? projectCategory : undefined,
+      });
+    }
 
     setTitle('');
     setProjectMinutes(0);
+    setTargetCount('');
     setSelectedParentId('');
     setProjectCategory('custom');
     setIsOpenEnded(false);
+    setProjectMetricType('minutes');
     setShowAddModal(false);
   };
 
@@ -269,7 +291,36 @@ export default function StoreScreen() {
             </View>
           ) : null}
 
-          {activeTab === 'time' && entertainmentGoals.filter(g => !g.parentId).length > 0 && (
+          {activeTab === 'time' && !selectedParentId && (
+            <View className="mb-4">
+              <Text className="text-[#8E8E93] text-xs font-semibold mb-2">Track By</Text>
+              <View style={{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }} className="flex-row p-1 rounded-lg">
+                {([
+                  { key: 'minutes' as const, label: 'Time' },
+                  { key: 'units' as const, label: 'Count' },
+                ]).map(({ key, label }) => {
+                  const isActive = projectMetricType === key;
+                  return (
+                    <Pressable
+                      key={key}
+                      onPress={() => setProjectMetricType(key)}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 8,
+                        borderRadius: 6,
+                        alignItems: 'center',
+                        backgroundColor: isActive ? 'rgba(90,200,250,0.2)' : 'transparent',
+                      }}
+                    >
+                      <Text style={{ color: isActive ? '#FFF' : '#A1A1AA', fontWeight: isActive ? '700' : '500', fontSize: 13 }}>{label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {activeTab === 'time' && getEligibleParents(entertainmentGoals, null, 'entertainment', projectMetricType).length > 0 && (
             <View className="mb-4">
               <Text className="text-[#8E8E93] text-xs font-semibold mb-2">Parent Project (Optional)</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -287,7 +338,7 @@ export default function StoreScreen() {
                 >
                   <Text style={{ color: !selectedParentId ? '#FFF' : '#A1A1AA', fontWeight: !selectedParentId ? '700' : '500' }}>None</Text>
                 </Pressable>
-                {entertainmentGoals.filter(g => !g.parentId).map(g => {
+                {getEligibleParents(entertainmentGoals, null, 'entertainment', projectMetricType).map(g => {
                   const isSelected = selectedParentId === g.id;
                   return (
                     <Pressable
@@ -308,6 +359,7 @@ export default function StoreScreen() {
                   );
                 })}
               </ScrollView>
+              <Text style={{ color: '#52525B', fontSize: 11, marginTop: 6 }}>Only projects tracked the same way ({projectMetricType === 'units' ? 'Count' : 'Time'}) can be chained together.</Text>
             </View>
           )}
 
@@ -367,9 +419,9 @@ export default function StoreScreen() {
           <View className="mb-6">
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <Text className="text-[#8E8E93] text-xs font-semibold mb-2">
-                {activeTab === 'material' ? 'Cost ($)' : 'Target Duration'}
+                {activeTab === 'material' ? 'Cost ($)' : projectMetricType === 'units' ? 'Target Count' : 'Target Duration'}
               </Text>
-              {activeTab === 'time' && selectedParentId && (
+              {activeTab === 'time' && selectedParentId && projectMetricType === 'minutes' && (
                 <Pressable onPress={() => setIsOpenEnded(!isOpenEnded)} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                   <Ionicons name={isOpenEnded ? "checkbox" : "square-outline"} size={16} color={isOpenEnded ? "#5AC8FA" : "#8E8E93"} />
                   <Text style={{ color: isOpenEnded ? '#5AC8FA' : '#8E8E93', fontSize: 12, marginLeft: 4 }}>Open Ended</Text>
@@ -386,13 +438,23 @@ export default function StoreScreen() {
                 style={{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }}
                 className="text-white rounded-lg p-3 text-sm"
               />
+            ) : projectMetricType === 'units' ? (
+              <TextInput
+                value={targetCount}
+                onChangeText={setTargetCount}
+                placeholder="e.g. 10 (games, seasons, runs...)"
+                placeholderTextColor="#52525B"
+                keyboardType="numeric"
+                style={{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }}
+                className="text-white rounded-lg p-3 text-sm"
+              />
             ) : (
               isOpenEnded ? (
                 <View style={{ backgroundColor: '#1C1C1E', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#27272A', alignItems: 'center' }}>
                   <Text style={{ color: '#8E8E93', fontSize: 13, fontStyle: 'italic' }}>Will count up hours logged without a target.</Text>
                 </View>
               ) : (
-                <Pressable 
+                <Pressable
                   onPress={() => setShowTimeSelector(true)}
                   style={{
                     backgroundColor: '#09090B',
