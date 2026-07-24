@@ -8,7 +8,7 @@ import { feedback } from '../utils/feedback';
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-import { useMacroGoalStore, getChainTrail } from '../store/macroGoalStore';
+import { useSummitStore, getChainTrail } from '../store/summitStore';
 import { useEconomyStore } from '../store/economyStore';
 import { useTimerStore } from '../store/timerStore';
 import { PrimaryButton } from '../components/PrimaryButton';
@@ -22,7 +22,7 @@ import LinkProgressPicker from '../components/LinkProgressPicker';
 
 export default function TasksScreen() {
   const { tasks, tags, pillars, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox } = useTaskStore();
-  const { macroGoals } = useMacroGoalStore();
+  const { summits } = useSummitStore();
   const { startTimer } = useTimerStore();
   
   const [modalVisible, setModalVisible] = useState(false);
@@ -66,7 +66,7 @@ export default function TasksScreen() {
         setToastMessage(`-${(task.estimatedMinutes / 60).toFixed(1)}h leisure spent`);
         setToastSubtext(`Enjoyed "${task.title}" guilt-free`);
       }
-      setToastChainTrail(task.macroGoalId ? getChainTrail(macroGoals, task.macroGoalId) : []);
+      setToastChainTrail(task.summitId ? getChainTrail(summits, task.summitId) : []);
       setToastVisible(true);
     }
     toggleTask(id);
@@ -112,7 +112,7 @@ export default function TasksScreen() {
       title: title.trim(),
       tagId: selectedTagId,
       estimatedMinutes: estimatedMinutes,
-      macroGoalId: selectedMacroId || undefined,
+      summitId: selectedMacroId || undefined,
       collectionId: selectedCollectionId || undefined,
       isIcebox: sendDirectlyToIcebox,
     });
@@ -223,11 +223,11 @@ export default function TasksScreen() {
             <LinkProgressPicker
               tagType={isBurner ? 'burner' : 'earner'}
               collectionId={selectedCollectionId}
-              macroGoalId={selectedMacroId}
-              onChange={(collectionId, macroGoalId) => {
+              summitId={selectedMacroId}
+              onChange={(collectionId, summitId) => {
                 feedback('select');
                 setSelectedCollectionId(collectionId);
-                setSelectedMacroId(macroGoalId);
+                setSelectedMacroId(summitId);
               }}
               accentColor={isBurner ? '#5AC8FA' : '#BF5AF2'}
             />

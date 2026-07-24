@@ -4,8 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useCollectionStore, CollectionCategory, JourneySubGoal } from '../store/collectionStore';
-import { useMacroGoalStore, getChainTrail } from '../store/macroGoalStore';
+import { useCollectionStore, CollectionCategory, Waypoint } from '../store/collectionStore';
+import { useSummitStore, getChainTrail, getEligibleParents } from '../store/summitStore';
 import { useConfettiStore } from '../store/confettiStore';
 import { PrimaryButton } from '../components/PrimaryButton';
 import AnimatedProgressBar from '../components/AnimatedProgressBar';
@@ -45,6 +45,7 @@ const MONTH_NAMES = [
 ];
 
 type TimeframeFilter = 'all' | 'year' | 'month';
+type JourneyLinkMode = 'none' | 'existing' | 'new';
 
 type CelebrationInfo = {
   title: string;
@@ -75,20 +76,20 @@ function CelebrationVectorIcon({ type, category }: { type: CelebrationInfo['icon
 export default function CollectionsScreen() {
   const {
     collections,
-    subGoals,
+    waypoints,
     items,
     addCollection,
     updateCollection,
     deleteCollection,
-    addSubGoal,
-    updateSubGoal,
-    deleteSubGoal,
+    addWaypoint,
+    updateWaypoint,
+    deleteWaypoint,
     addItem,
     toggleItemCompletion,
     deleteItem,
   } = useCollectionStore();
 
-  const { macroGoals, deleteMacroGoal } = useMacroGoalStore();
+  const { summits, addSummit, deleteSummit } = useSummitStore();
   const { triggerConfetti } = useConfettiStore();
 
   // Timeframe filter state
@@ -99,7 +100,7 @@ export default function CollectionsScreen() {
   // Celebration Dopamine Modal
   const [celebrationInfo, setCelebrationInfo] = useState<CelebrationInfo | null>(null);
 
-  // Chain-legibility toast (shown when a completed item feeds a macro-goal chain)
+  // Chain-legibility toast (shown when a completed item feeds a Summit chain)
   const [chainToastVisible, setChainToastVisible] = useState(false);
   const [chainToastTrail, setChainToastTrail] = useState<string[]>([]);
 
@@ -108,43 +109,63 @@ export default function CollectionsScreen() {
   const [editingJourneyId, setEditingJourneyId] = useState<string | null>(null);
   const [journeyTitle, setJourneyTitle] = useState('');
   const [journeyCategory, setJourneyCategory] = useState<CollectionCategory>('books');
+  const [journeyValidationError, setJourneyValidationError] = useState('');
+
+  // Journey's Summit link — goal creation is Journey-only, so this modal is
+  // also the only place a Summit gets created: None / link an existing one /
+  // create a brand new one inline (title/track-by/target/horizon/chain-parent).
+  const [journeyLinkMode, setJourneyLinkMode] = useState<JourneyLinkMode>('none');
   const [selectedMacroId, setSelectedMacroId] = useState('');
+  const [newSummitTitle, setNewSummitTitle] = useState('');
+  const [newSummitMetricType, setNewSummitMetricType] = useState<'minutes' | 'units'>('minutes');
+  const [newSummitTargetHours, setNewSummitTargetHours] = useState('');
+  const [newSummitTargetCount, setNewSummitTargetCount] = useState('');
+  const [newSummitHorizon, setNewSummitHorizon] = useState<'monthly' | 'yearly'>('monthly');
+  const [newSummitParentId, setNewSummitParentId] = useState('');
 
   // Delete Journey Confirmation Modal
   const [deletingJourneyId, setDeletingJourneyId] = useState<string | null>(null);
 
-  // Create/Edit Sub-Goal Modal
-  const [isSubGoalModalOpen, setIsSubGoalModalOpen] = useState(false);
-  const [editingSubGoalId, setEditingSubGoalId] = useState<string | null>(null);
-  const [activeSubGoalCollectionId, setActiveSubGoalCollectionId] = useState('');
-  const [subGoalTitle, setSubGoalTitle] = useState('');
-  const [subGoalTargetMetric, setSubGoalTargetMetric] = useState('');
-  const [subGoalYear, setSubGoalYear] = useState<string>(currentYear.toString());
-  const [subGoalMonth, setSubGoalMonth] = useState<string>(currentMonth.toString());
+  // Create/Edit Waypoint Modal
+  const [isWaypointModalOpen, setIsWaypointModalOpen] = useState(false);
+  const [editingWaypointId, setEditingWaypointId] = useState<string | null>(null);
+  const [activeWaypointCollectionId, setActiveWaypointCollectionId] = useState('');
+  const [waypointTitle, setWaypointTitle] = useState('');
+  const [waypointTargetMetric, setWaypointTargetMetric] = useState('');
+  const [waypointYear, setWaypointYear] = useState<string>(currentYear.toString());
+  const [waypointMonth, setWaypointMonth] = useState<string>(currentMonth.toString());
 
   // Create Item Modal
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [activeCollectionId, setActiveCollectionId] = useState('');
-  const [selectedSubGoalId, setSelectedSubGoalId] = useState<string>('');
+  const [selectedWaypointId, setSelectedWaypointId] = useState<string>('');
   const [itemTitle, setItemTitle] = useState('');
   const [itemEstimatedMinutes, setItemEstimatedMinutes] = useState('');
 
   // Accordion State
-  const [expandedSubGoals, setExpandedSubGoals] = useState<Record<string, boolean>>({});
-  const toggleSubGoal = (id: string) => {
+  const [expandedWaypoints, setExpandedWaypoints] = useState<Record<string, boolean>>({});
+  const toggleWaypoint = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     feedback('expand');
-    setExpandedSubGoals(prev => ({ ...prev, [id]: !prev[id] }));
+    setExpandedWaypoints(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const categories: CollectionCategory[] = ['books', 'games', 'stocks', 'fitness', 'courses', 'travel', 'other'];
+  const categories: CollectionCategory[] = ['books', 'games', 'stocks', 'fitness', 'courses', 'travel', 'general'];
 
   // Journey CRUD
   const handleOpenNewJourney = () => {
     setEditingJourneyId(null);
     setJourneyTitle('');
     setJourneyCategory('books');
+    setJourneyValidationError('');
+    setJourneyLinkMode('none');
     setSelectedMacroId('');
+    setNewSummitTitle('');
+    setNewSummitMetricType('minutes');
+    setNewSummitTargetHours('');
+    setNewSummitTargetCount('');
+    setNewSummitHorizon('monthly');
+    setNewSummitParentId('');
     setIsJourneyModalOpen(true);
   };
 
@@ -154,109 +175,151 @@ export default function CollectionsScreen() {
     setEditingJourneyId(cId);
     setJourneyTitle(col.title);
     setJourneyCategory(col.category);
-    setSelectedMacroId(col.macroGoalId || '');
+    setJourneyValidationError('');
+    setJourneyLinkMode(col.summitId ? 'existing' : 'none');
+    setSelectedMacroId(col.summitId || '');
     setIsJourneyModalOpen(true);
   };
 
   const handleSaveJourney = () => {
     if (!journeyTitle.trim()) return;
+    setJourneyValidationError('');
+
+    let linkedSummitId: string | undefined;
+
+    if (journeyLinkMode === 'existing') {
+      linkedSummitId = selectedMacroId || undefined;
+    } else if (journeyLinkMode === 'new') {
+      if (!newSummitTitle.trim()) {
+        setJourneyValidationError('Summit title is required');
+        return;
+      }
+      if (newSummitMetricType === 'units') {
+        const count = parseInt(newSummitTargetCount, 10);
+        if (isNaN(count) || count <= 0) {
+          setJourneyValidationError('Target count must be a valid positive number');
+          return;
+        }
+        linkedSummitId = addSummit({
+          title: newSummitTitle.trim(),
+          horizon: newSummitHorizon,
+          targetMinutes: 0,
+          metricType: 'units',
+          targetMetric: count,
+          parentId: newSummitParentId || undefined,
+        });
+      } else {
+        const hours = parseFloat(newSummitTargetHours);
+        if (isNaN(hours) || hours <= 0) {
+          setJourneyValidationError('Target hours must be a valid positive number');
+          return;
+        }
+        linkedSummitId = addSummit({
+          title: newSummitTitle.trim(),
+          horizon: newSummitHorizon,
+          targetMinutes: Math.round(hours * 60),
+          parentId: newSummitParentId || undefined,
+        });
+      }
+    }
+
     if (editingJourneyId) {
       updateCollection(editingJourneyId, {
         title: journeyTitle.trim(),
         category: journeyCategory,
-        macroGoalId: selectedMacroId || undefined,
+        summitId: linkedSummitId,
       });
       setIsJourneyModalOpen(false);
     } else {
       addCollection({
         title: journeyTitle.trim(),
         category: journeyCategory,
-        macroGoalId: selectedMacroId || undefined,
+        summitId: linkedSummitId,
       });
       setIsJourneyModalOpen(false);
 
       // Trigger Celebration Dopamine Feedback
       triggerConfetti();
       feedback('select');
-      const linkedGoal = macroGoals.find(g => g.id === selectedMacroId);
+      const linkedGoal = summits.find(g => g.id === linkedSummitId) || (journeyLinkMode === 'new' ? { type: 'productive' } : undefined);
       const isEntertainment = linkedGoal?.type === 'entertainment';
       setCelebrationInfo({
-        title: 'QUEST LAUNCHED!',
+        title: 'JOURNEY STARTED!',
         subtitle: `Journey "${journeyTitle.trim()}" is live in your Discipline Economy.`,
         iconType: 'rocket',
         category: journeyCategory,
         payoutText: isEntertainment
           ? '🎁 Milestone badges unlock as you make progress — already earned, guilt-free!'
           : '🎁 Estimated Rewards: Milestone keys & cash bonus multipliers upon completion!',
-        badgeLabel: 'MAIN QUEST UNLOCKED',
+        badgeLabel: 'JOURNEY UNLOCKED',
       });
     }
   };
 
-  const handleConfirmDeleteJourney = (alsoDeleteMacroGoal: boolean) => {
+  const handleConfirmDeleteJourney = (alsoDeleteSummit: boolean) => {
     if (!deletingJourneyId) return;
     const col = collections.find(c => c.id === deletingJourneyId);
-    if (col && col.macroGoalId && alsoDeleteMacroGoal) {
-      deleteMacroGoal(col.macroGoalId);
+    if (col && col.summitId && alsoDeleteSummit) {
+      deleteSummit(col.summitId);
     }
     deleteCollection(deletingJourneyId);
     setDeletingJourneyId(null);
   };
 
-  // Sub-Goal CRUD
-  const handleOpenNewSubGoal = (collectionId: string) => {
-    setActiveSubGoalCollectionId(collectionId);
-    setEditingSubGoalId(null);
-    setSubGoalTitle('');
-    setSubGoalTargetMetric('');
-    setSubGoalYear(currentYear.toString());
-    setSubGoalMonth(currentMonth.toString());
-    setIsSubGoalModalOpen(true);
+  // Waypoint CRUD
+  const handleOpenNewWaypoint = (collectionId: string) => {
+    setActiveWaypointCollectionId(collectionId);
+    setEditingWaypointId(null);
+    setWaypointTitle('');
+    setWaypointTargetMetric('');
+    setWaypointYear(currentYear.toString());
+    setWaypointMonth(currentMonth.toString());
+    setIsWaypointModalOpen(true);
   };
 
-  const handleOpenEditSubGoal = (subGoal: JourneySubGoal) => {
-    setActiveSubGoalCollectionId(subGoal.collectionId);
-    setEditingSubGoalId(subGoal.id);
-    setSubGoalTitle(subGoal.title);
-    setSubGoalTargetMetric(subGoal.targetMetric ? subGoal.targetMetric.toString() : '');
-    setSubGoalYear(subGoal.year ? subGoal.year.toString() : '');
-    setSubGoalMonth(subGoal.month ? subGoal.month.toString() : '');
-    setIsSubGoalModalOpen(true);
+  const handleOpenEditWaypoint = (waypoint: Waypoint) => {
+    setActiveWaypointCollectionId(waypoint.collectionId);
+    setEditingWaypointId(waypoint.id);
+    setWaypointTitle(waypoint.title);
+    setWaypointTargetMetric(waypoint.targetMetric ? waypoint.targetMetric.toString() : '');
+    setWaypointYear(waypoint.year ? waypoint.year.toString() : '');
+    setWaypointMonth(waypoint.month ? waypoint.month.toString() : '');
+    setIsWaypointModalOpen(true);
   };
 
-  const handleSaveSubGoal = () => {
-    if (!subGoalTitle.trim() || !activeSubGoalCollectionId) return;
-    const targetVal = parseInt(subGoalTargetMetric, 10);
-    const yrVal = parseInt(subGoalYear, 10);
-    const moVal = parseInt(subGoalMonth, 10);
+  const handleSaveWaypoint = () => {
+    if (!waypointTitle.trim() || !activeWaypointCollectionId) return;
+    const targetVal = parseInt(waypointTargetMetric, 10);
+    const yrVal = parseInt(waypointYear, 10);
+    const moVal = parseInt(waypointMonth, 10);
 
-    if (editingSubGoalId) {
-      updateSubGoal(editingSubGoalId, {
-        title: subGoalTitle.trim(),
+    if (editingWaypointId) {
+      updateWaypoint(editingWaypointId, {
+        title: waypointTitle.trim(),
         targetMetric: isNaN(targetVal) ? undefined : targetVal,
         year: isNaN(yrVal) ? undefined : yrVal,
         month: isNaN(moVal) ? undefined : moVal,
       });
-      setIsSubGoalModalOpen(false);
+      setIsWaypointModalOpen(false);
     } else {
-      addSubGoal({
-        collectionId: activeSubGoalCollectionId,
-        title: subGoalTitle.trim(),
+      addWaypoint({
+        collectionId: activeWaypointCollectionId,
+        title: waypointTitle.trim(),
         targetMetric: isNaN(targetVal) ? undefined : targetVal,
         year: isNaN(yrVal) ? undefined : yrVal,
         month: isNaN(moVal) ? undefined : moVal,
       });
-      setIsSubGoalModalOpen(false);
+      setIsWaypointModalOpen(false);
 
-      // Trigger Celebration Dopamine Feedback for Sub-Goal creation
+      // Trigger Celebration Dopamine Feedback for Waypoint creation
       triggerConfetti();
       feedback('select');
       setCelebrationInfo({
-        title: 'SUB-QUEST CREATED!',
-        subtitle: `Sub-Goal "${subGoalTitle.trim()}" added to your journey targets.`,
+        title: 'WAYPOINT ADDED!',
+        subtitle: `Waypoint "${waypointTitle.trim()}" added to your journey targets.`,
         iconType: 'target',
-        payoutText: `🎯 Target: ${isNaN(targetVal) ? 'Custom' : targetVal} units | Timeframe: ${subGoalMonth ? MONTH_NAMES[parseInt(subGoalMonth, 10) - 1] : ''} ${subGoalYear || 'Ongoing'}`,
-        badgeLabel: 'SUB-QUEST INITIALIZED',
+        payoutText: `🎯 Target: ${isNaN(targetVal) ? 'Custom' : targetVal} units | Timeframe: ${waypointMonth ? MONTH_NAMES[parseInt(waypointMonth, 10) - 1] : ''} ${waypointYear || 'Ongoing'}`,
+        badgeLabel: 'WAYPOINT SET',
       });
     }
   };
@@ -264,7 +327,7 @@ export default function CollectionsScreen() {
   // Item CRUD
   const handleOpenNewItem = (collectionId: string) => {
     setActiveCollectionId(collectionId);
-    setSelectedSubGoalId('');
+    setSelectedWaypointId('');
     setItemTitle('');
     setItemEstimatedMinutes('');
     setIsItemModalOpen(true);
@@ -275,53 +338,53 @@ export default function CollectionsScreen() {
     const est = parseInt(itemEstimatedMinutes, 10);
     addItem({
       collectionId: activeCollectionId,
-      subGoalId: selectedSubGoalId || undefined,
+      waypointId: selectedWaypointId || undefined,
       title: itemTitle.trim(),
       estimatedMinutes: isNaN(est) ? undefined : est,
       isAddedLater: true,
     });
     setItemTitle('');
     setItemEstimatedMinutes('');
-    setSelectedSubGoalId('');
+    setSelectedWaypointId('');
     setIsItemModalOpen(false);
   };
 
-  const handleToggleItem = (itemId: string, collectionId: string, subGoalId?: string) => {
+  const handleToggleItem = (itemId: string, collectionId: string, waypointId?: string) => {
     const targetItem = items.find(i => i.id === itemId);
     if (!targetItem) return;
 
     const wasCompleted = targetItem.completed;
     toggleItemCompletion(itemId);
 
-    // If completing (not uncompleting), check if it completes a Sub-Goal or Journey!
+    // If completing (not uncompleting), check if it completes a Waypoint or Journey!
     if (!wasCompleted) {
       feedback('taskComplete');
 
-      // Surface the linked macro-goal chain reacting, if any (Phase 4 legibility).
+      // Surface the linked Summit chain reacting, if any (Phase 4 legibility).
       const collection = collections.find(c => c.id === collectionId);
-      if (collection?.macroGoalId) {
-        const trail = getChainTrail(macroGoals, collection.macroGoalId);
+      if (collection?.summitId) {
+        const trail = getChainTrail(summits, collection.summitId);
         if (trail.length > 1) {
           setChainToastTrail(trail);
           setChainToastVisible(true);
         }
       }
 
-      if (subGoalId) {
-        const sgItems = items.filter(i => i.subGoalId === subGoalId);
-        const sgCompletedCount = sgItems.filter(i => i.completed).length + 1; // including current
-        const sg = subGoals.find(s => s.id === subGoalId);
-        const targetVal = sg?.targetMetric || sgItems.length;
+      if (waypointId) {
+        const wpItems = items.filter(i => i.waypointId === waypointId);
+        const wpCompletedCount = wpItems.filter(i => i.completed).length + 1; // including current
+        const wp = waypoints.find(w => w.id === waypointId);
+        const targetVal = wp?.targetMetric || wpItems.length;
 
-        if (sgCompletedCount >= targetVal && targetVal > 0) {
+        if (wpCompletedCount >= targetVal && targetVal > 0) {
           triggerConfetti();
           feedback('milestone');
           setCelebrationInfo({
-            title: 'SUB-GOAL CONQUERED!',
-            subtitle: `You completed 100% of "${sg?.title || 'Sub-Goal'}"!`,
+            title: 'WAYPOINT CONQUERED!',
+            subtitle: `You completed 100% of "${wp?.title || 'Waypoint'}"!`,
             iconType: 'award',
-            payoutText: '💰 Milestone Payout Credited! Progress synced to Macro Goal.',
-            badgeLabel: 'SUB-GOAL COMPLETE 100%',
+            payoutText: '💰 Milestone Payout Credited! Progress synced to Summit.',
+            badgeLabel: 'WAYPOINT COMPLETE 100%',
           });
           return;
         }
@@ -344,19 +407,25 @@ export default function CollectionsScreen() {
     }
   };
 
-  // Filter collections and sub-goals by timeframe filter
-  const filteredSubGoals = (subGoals || []).filter(sg => {
+  // Filter collections and waypoints by timeframe filter
+  const filteredWaypoints = (waypoints || []).filter(wp => {
     if (timeframeFilter === 'all') return true;
-    if (timeframeFilter === 'year') return sg.year === currentYear;
-    if (timeframeFilter === 'month') return sg.year === currentYear && sg.month === currentMonth;
+    if (timeframeFilter === 'year') return wp.year === currentYear;
+    if (timeframeFilter === 'month') return wp.year === currentYear && wp.month === currentMonth;
     return true;
   });
 
-  const totalQuests = collections.length;
-  const activeSubGoalsCount = filteredSubGoals.length;
+  const totalJourneys = collections.length;
+  const activeWaypointsCount = filteredWaypoints.length;
   const totalItems = items.length;
   const completedItems = items.filter(i => i.completed).length;
   const overallCompletionRate = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+  // Eligible chain-parents for a Summit being created inline (root goals only,
+  // same type/metricType, no cycles) — mirrors the old Profile creation form.
+  const eligibleParents = journeyLinkMode === 'new'
+    ? getEligibleParents(summits, null, 'productive', newSummitMetricType)
+    : [];
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }} edges={['top']}>
@@ -383,10 +452,10 @@ export default function CollectionsScreen() {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <View style={{ flex: 1, backgroundColor: '#1C1C1E', borderRadius: 16, padding: 16, marginRight: 8, borderWidth: 1, borderColor: '#2C2C2E' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <Text style={{ color: '#8E8E93', fontSize: 13, fontWeight: '600' }}>Total Quests</Text>
+              <Text style={{ color: '#8E8E93', fontSize: 13, fontWeight: '600' }}>Total Journeys</Text>
               <Ionicons name="map-outline" size={16} color="#8E8E93" />
             </View>
-            <Text style={{ color: '#FFF', fontSize: 28, fontWeight: '800' }}>{totalQuests}</Text>
+            <Text style={{ color: '#FFF', fontSize: 28, fontWeight: '800' }}>{totalJourneys}</Text>
           </View>
           <View style={{ flex: 1, backgroundColor: '#1C1C1E', borderRadius: 16, padding: 16, marginLeft: 8, borderWidth: 1, borderColor: '#2C2C2E' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -403,7 +472,7 @@ export default function CollectionsScreen() {
         <View style={{ backgroundColor: '#1C1C1E', borderRadius: 12, padding: 4, flexDirection: 'row', borderWidth: 1, borderColor: '#2C2C2E' }}>
           {(['all', 'year', 'month'] as TimeframeFilter[]).map((filter) => {
             const isActive = timeframeFilter === filter;
-            const label = filter === 'all' ? 'All Quests' : filter === 'year' ? currentYear.toString() : `${MONTH_NAMES[currentMonth - 1]} ${currentYear}`;
+            const label = filter === 'all' ? 'All Journeys' : filter === 'year' ? currentYear.toString() : `${MONTH_NAMES[currentMonth - 1]} ${currentYear}`;
             return (
               <Pressable
                 key={filter}
@@ -435,7 +504,7 @@ export default function CollectionsScreen() {
             </View>
             <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '700', textAlign: 'center' }}>No Active Journeys</Text>
             <Text style={{ color: '#8E8E93', marginTop: 8, fontSize: 14, textAlign: 'center', lineHeight: 20 }}>
-              Launch your first RPG-style Journey to track reading targets, fitness quests, and multi-month discipline milestones!
+              Launch your first Journey to track reading targets, fitness goals, and multi-month discipline milestones!
             </Text>
             <PrimaryButton
               onPress={handleOpenNewJourney}
@@ -445,11 +514,11 @@ export default function CollectionsScreen() {
           </View>
         ) : (
           collections.map(collection => {
-            const collectionSubGoals = filteredSubGoals.filter(s => s.collectionId === collection.id);
+            const collectionWaypoints = filteredWaypoints.filter(w => w.collectionId === collection.id);
             const collectionItems = items.filter(i => i.collectionId === collection.id);
             const completedCount = collectionItems.filter(i => i.completed).length;
             const progress = collectionItems.length > 0 ? Math.round((completedCount / collectionItems.length) * 100) : 0;
-            const linkedMacro = macroGoals.find(g => g.id === collection.macroGoalId);
+            const linkedSummit = summits.find(g => g.id === collection.summitId);
             const isFullyComplete = progress === 100 && collectionItems.length > 0;
 
             return (
@@ -470,10 +539,10 @@ export default function CollectionsScreen() {
                             {collection.category}
                           </Text>
                         </View>
-                        {linkedMacro && (
+                        {linkedSummit && (
                           <View style={{ backgroundColor: '#5AC8FA15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#5AC8FA44', flexDirection: 'row', alignItems: 'center' }}>
                             <FontAwesome5 name="bullseye" size={10} color="#5AC8FA" style={{ marginRight: 6 }} />
-                            <Text style={{ color: '#5AC8FA', fontSize: 11, fontWeight: '700' }}>{linkedMacro.title}</Text>
+                            <Text style={{ color: '#5AC8FA', fontSize: 11, fontWeight: '700' }}>{linkedSummit.title}</Text>
                           </View>
                         )}
                       </View>
@@ -503,40 +572,40 @@ export default function CollectionsScreen() {
                   </View>
                 </View>
 
-                {/* Sub-Goals Area (Shadcn Accordion Style) */}
+                {/* Waypoints Area (Shadcn Accordion Style) */}
                 <View style={{ padding: 16, backgroundColor: '#1C1C1E' }}>
-                  {collectionSubGoals.map(sg => {
-                    const sgItems = collectionItems.filter(i => i.subGoalId === sg.id);
-                    const sgCompleted = sgItems.filter(i => i.completed).length;
-                    const targetMetric = sg.targetMetric || sgItems.length || 1;
-                    const sgPct = Math.min(100, Math.round((sgCompleted / targetMetric) * 100));
-                    const isSgComplete = sgPct === 100;
-                    const timeframeLabel = sg.month && sg.year
-                      ? `${MONTH_NAMES[sg.month - 1]} ${sg.year}`
-                      : sg.year
-                      ? `${sg.year}`
+                  {collectionWaypoints.map(wp => {
+                    const wpItems = collectionItems.filter(i => i.waypointId === wp.id);
+                    const wpCompleted = wpItems.filter(i => i.completed).length;
+                    const targetMetric = wp.targetMetric || wpItems.length || 1;
+                    const wpPct = Math.min(100, Math.round((wpCompleted / targetMetric) * 100));
+                    const isWpComplete = wpPct === 100;
+                    const timeframeLabel = wp.month && wp.year
+                      ? `${MONTH_NAMES[wp.month - 1]} ${wp.year}`
+                      : wp.year
+                      ? `${wp.year}`
                       : 'Ongoing';
 
-                    const isExpanded = !!expandedSubGoals[sg.id];
+                    const isExpanded = !!expandedWaypoints[wp.id];
 
                     return (
-                      <View key={sg.id} style={{ marginBottom: 12, backgroundColor: '#252528', borderRadius: 12, borderWidth: 1, borderColor: isSgComplete ? '#30D15844' : '#3A3A3C', overflow: 'hidden' }}>
-                        <Pressable 
-                          onPress={() => toggleSubGoal(sg.id)}
+                      <View key={wp.id} style={{ marginBottom: 12, backgroundColor: '#252528', borderRadius: 12, borderWidth: 1, borderColor: isWpComplete ? '#30D15844' : '#3A3A3C', overflow: 'hidden' }}>
+                        <Pressable
+                          onPress={() => toggleWaypoint(wp.id)}
                           style={{ padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
                         >
                           <View style={{ flex: 1 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                              {isSgComplete ? (
+                              {isWpComplete ? (
                                 <Ionicons name="checkmark-circle" size={18} color="#30D158" style={{ marginRight: 8 }} />
                               ) : (
                                 <Ionicons name="flag" size={18} color="#5AC8FA" style={{ marginRight: 8 }} />
                               )}
-                              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>{sg.title}</Text>
+                              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>{wp.title}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                               <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '500', marginRight: 12 }}>
-                                {sgCompleted} / {sg.targetMetric ? sg.targetMetric : sgItems.length} ({sgPct}%)
+                                {wpCompleted} / {wp.targetMetric ? wp.targetMetric : wpItems.length} ({wpPct}%)
                               </Text>
                               <View style={{ backgroundColor: '#1C1C1E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                                 <Text style={{ color: '#5AC8FA', fontSize: 10, fontWeight: '600' }}>{timeframeLabel}</Text>
@@ -544,7 +613,7 @@ export default function CollectionsScreen() {
                             </View>
                           </View>
                           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Pressable onPress={() => handleOpenEditSubGoal(sg)} style={{ padding: 8, marginRight: 4 }}>
+                            <Pressable onPress={() => handleOpenEditWaypoint(wp)} style={{ padding: 8, marginRight: 4 }}>
                               <Ionicons name="ellipsis-horizontal" size={18} color="#8E8E93" />
                             </Pressable>
                             <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color="#8E8E93" />
@@ -554,10 +623,10 @@ export default function CollectionsScreen() {
                         {/* Accordion Content */}
                         {isExpanded && (
                           <View style={{ paddingHorizontal: 16, paddingBottom: 16, borderTopWidth: 1, borderTopColor: '#3A3A3C' }}>
-                            {sgItems.length > 0 ? (
-                              sgItems.map(item => (
+                            {wpItems.length > 0 ? (
+                              wpItems.map(item => (
                                 <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}>
-                                  <Pressable onPress={() => handleToggleItem(item.id, collection.id, item.subGoalId)} style={{ marginRight: 12 }}>
+                                  <Pressable onPress={() => handleToggleItem(item.id, collection.id, item.waypointId)} style={{ marginRight: 12 }}>
                                     <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: item.completed ? '#BF5AF2' : '#8E8E93', backgroundColor: item.completed ? '#BF5AF2' : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
                                       {item.completed && <Ionicons name="checkmark" size={16} color="#FFF" />}
                                     </View>
@@ -575,10 +644,10 @@ export default function CollectionsScreen() {
                             )}
 
                             {/* Shadcn Quick-Add Task Chip */}
-                            <Pressable 
+                            <Pressable
                               onPress={() => {
                                 handleOpenNewItem(collection.id);
-                                setSelectedSubGoalId(sg.id);
+                                setSelectedWaypointId(wp.id);
                               }}
                               style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, alignSelf: 'flex-start', backgroundColor: '#1C1C1E', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#2C2C2E' }}
                             >
@@ -591,8 +660,8 @@ export default function CollectionsScreen() {
                     );
                   })}
 
-                  {/* Root-Level Items (Items without a Sub-Goal) */}
-                  {collectionItems.filter(i => !i.subGoalId).map(item => (
+                  {/* Root-Level Items (Items without a Waypoint) */}
+                  {collectionItems.filter(i => !i.waypointId).map(item => (
                     <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' }}>
                       <Pressable onPress={() => handleToggleItem(item.id, collection.id)} style={{ marginRight: 12 }}>
                         <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: item.completed ? '#BF5AF2' : '#8E8E93', backgroundColor: item.completed ? '#BF5AF2' : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
@@ -611,14 +680,14 @@ export default function CollectionsScreen() {
                   {/* Quick Action Chips Footer */}
                   <View style={{ flexDirection: 'row', marginTop: 16 }}>
                     <Pressable
-                      onPress={() => handleOpenNewSubGoal(collection.id)}
+                      onPress={() => handleOpenNewWaypoint(collection.id)}
                       style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#252528', paddingVertical: 12, borderRadius: 10, marginRight: 6, borderWidth: 1, borderColor: '#3A3A3C' }}
                     >
                       <Ionicons name="folder-open" size={16} color="#5AC8FA" style={{ marginRight: 8 }} />
-                      <Text style={{ color: '#5AC8FA', fontSize: 13, fontWeight: '700' }}>+ Sub-Goal</Text>
+                      <Text style={{ color: '#5AC8FA', fontSize: 13, fontWeight: '700' }}>+ Waypoint</Text>
                     </Pressable>
-                    
-                    <Pressable 
+
+                    <Pressable
                       onPress={() => handleOpenNewItem(collection.id)}
                       style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#BF5AF215', paddingVertical: 12, borderRadius: 10, marginLeft: 6, borderWidth: 1, borderColor: '#BF5AF233' }}
                     >
@@ -670,7 +739,7 @@ export default function CollectionsScreen() {
       {/* Journey Create/Edit Modal */}
       <Modal visible={isJourneyModalOpen} animationType="fade" transparent={true}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-          <View style={{ backgroundColor: '#0E0E10', borderRadius: 24, padding: 24, maxWidth: 480, width: '100%', borderWidth: 1, borderColor: '#2C2C2E', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 20 }}>
+          <View style={{ backgroundColor: '#0E0E10', borderRadius: 24, padding: 24, maxWidth: 480, width: '100%', maxHeight: '90%', borderWidth: 1, borderColor: '#2C2C2E', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 20 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <Text style={{ color: '#FFF', fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{editingJourneyId ? 'Edit Journey' : 'New Journey'}</Text>
               <Pressable onPress={() => setIsJourneyModalOpen(false)} style={{ backgroundColor: '#2C2C2E', padding: 6, borderRadius: 12 }}>
@@ -678,88 +747,234 @@ export default function CollectionsScreen() {
               </Pressable>
             </View>
 
-            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Journey Title</Text>
-            <PremiumInput
-              style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 16, borderRadius: 16, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2C2C2E' }}
-              placeholder="e.g., Reading List 2026, Fitness Quest"
-              placeholderTextColor="#5C5C5E"
-              value={journeyTitle}
-              onChangeText={setJourneyTitle}
-              autoFocus
-            />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {journeyValidationError ? (
+                <View style={{ backgroundColor: 'rgba(255,69,58,0.15)', borderColor: 'rgba(255,69,58,0.4)', borderWidth: 1, padding: 14, borderRadius: 16, marginBottom: 16 }}>
+                  <Text style={{ color: '#FF453A', fontSize: 12, fontWeight: '600', textAlign: 'center' }}>{journeyValidationError}</Text>
+                </View>
+              ) : null}
 
-            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Category</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
-              {categories.map(c => {
-                const isActive = journeyCategory === c;
-                return (
-                  <Pressable 
-                    key={c}
-                    onPress={() => setJourneyCategory(c)}
-                    style={{ 
-                      backgroundColor: isActive ? 'rgba(191,90,242,0.15)' : '#151517',
-                      paddingHorizontal: 16,
-                      paddingVertical: 10,
-                      borderRadius: 12,
-                      marginRight: 10,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      borderWidth: 1,
-                      borderColor: isActive ? 'rgba(191,90,242,0.3)' : '#2C2C2E'
-                    }}
-                  >
-                    <View style={{ marginRight: 8 }}>
-                      <CategoryVectorIcon category={c} size={16} color={isActive ? "#FFFFFF" : "#8E8E93"} />
+              <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Journey Title</Text>
+              <PremiumInput
+                style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 16, borderRadius: 16, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2C2C2E' }}
+                placeholder="e.g., Reading List 2026, Marathon Training"
+                placeholderTextColor="#5C5C5E"
+                value={journeyTitle}
+                onChangeText={setJourneyTitle}
+                autoFocus
+              />
+
+              <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Category</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
+                {categories.map(c => {
+                  const isActive = journeyCategory === c;
+                  return (
+                    <Pressable
+                      key={c}
+                      onPress={() => setJourneyCategory(c)}
+                      style={{
+                        backgroundColor: isActive ? 'rgba(191,90,242,0.15)' : '#151517',
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
+                        borderRadius: 12,
+                        marginRight: 10,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        borderWidth: 1,
+                        borderColor: isActive ? 'rgba(191,90,242,0.3)' : '#2C2C2E'
+                      }}
+                    >
+                      <View style={{ marginRight: 8 }}>
+                        <CategoryVectorIcon category={c} size={16} color={isActive ? "#FFFFFF" : "#8E8E93"} />
+                      </View>
+                      <Text style={{ color: isActive ? '#FFFFFF' : '#8E8E93', fontWeight: isActive ? '700' : '500', fontSize: 14, textTransform: 'capitalize' }}>{c}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
+              <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Track Progress (Optional)</Text>
+              <View style={{ backgroundColor: '#151517', borderColor: '#2C2C2E', borderWidth: 1 }} className="flex-row p-1 rounded-xl mb-4">
+                {([
+                  { key: 'none' as const, label: 'None' },
+                  { key: 'existing' as const, label: 'Link Existing' },
+                  ...(!editingJourneyId ? [{ key: 'new' as const, label: 'Create New' }] : []),
+                ]).map(({ key, label }) => {
+                  const isActive = journeyLinkMode === key;
+                  return (
+                    <Pressable
+                      key={key}
+                      onPress={() => setJourneyLinkMode(key)}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        alignItems: 'center',
+                        backgroundColor: isActive ? 'rgba(191,90,242,0.15)' : 'transparent',
+                      }}
+                    >
+                      <Text style={{ color: isActive ? '#FFFFFF' : '#8E8E93', fontWeight: isActive ? '700' : '500', fontSize: 13 }}>{label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {journeyLinkMode === 'existing' && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
+                  {summits.map((mg) => {
+                    const isActive = selectedMacroId === mg.id;
+                    return (
+                      <Pressable
+                        key={mg.id}
+                        onPress={() => setSelectedMacroId(mg.id)}
+                        style={{
+                          backgroundColor: isActive ? 'rgba(191,90,242,0.15)' : '#151517',
+                          paddingHorizontal: 16,
+                          paddingVertical: 10,
+                          borderRadius: 12,
+                          marginRight: 10,
+                          borderWidth: 1,
+                          borderColor: isActive ? 'rgba(191,90,242,0.3)' : '#2C2C2E'
+                        }}
+                      >
+                        <Text style={{ color: isActive ? '#FFFFFF' : '#8E8E93', fontWeight: isActive ? '700' : '500', fontSize: 14 }}>{mg.title}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              )}
+
+              {journeyLinkMode === 'new' && (
+                <View style={{ marginBottom: 8 }}>
+                  <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Summit Title</Text>
+                  <PremiumInput
+                    style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 16, borderRadius: 16, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2C2C2E' }}
+                    placeholder="e.g. Hike 100 miles, Write a Novel, Learn French"
+                    placeholderTextColor="#5C5C5E"
+                    value={newSummitTitle}
+                    onChangeText={setNewSummitTitle}
+                  />
+
+                  <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Track By</Text>
+                  <View style={{ backgroundColor: '#151517', borderColor: '#2C2C2E', borderWidth: 1 }} className="flex-row p-1 rounded-xl mb-4">
+                    {([
+                      { key: 'minutes' as const, label: 'Time' },
+                      { key: 'units' as const, label: 'Count' },
+                    ]).map(({ key, label }) => {
+                      const isActive = newSummitMetricType === key;
+                      return (
+                        <Pressable
+                          key={key}
+                          onPress={() => setNewSummitMetricType(key)}
+                          style={{
+                            flex: 1,
+                            paddingVertical: 8,
+                            borderRadius: 8,
+                            alignItems: 'center',
+                            backgroundColor: isActive ? 'rgba(191,90,242,0.15)' : 'transparent',
+                          }}
+                        >
+                          <Text style={{ color: isActive ? '#FFFFFF' : '#8E8E93', fontWeight: isActive ? '700' : '500', fontSize: 13 }}>{label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>
+                    {newSummitMetricType === 'units' ? 'Target Count' : 'Target Hours'}
+                  </Text>
+                  {newSummitMetricType === 'units' ? (
+                    <PremiumInput
+                      style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 16, borderRadius: 16, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2C2C2E' }}
+                      placeholder="e.g. 20 (books, games, workouts...)"
+                      placeholderTextColor="#5C5C5E"
+                      keyboardType="numeric"
+                      value={newSummitTargetCount}
+                      onChangeText={setNewSummitTargetCount}
+                    />
+                  ) : (
+                    <PremiumInput
+                      style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 16, borderRadius: 16, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2C2C2E' }}
+                      placeholder="e.g. 50"
+                      placeholderTextColor="#5C5C5E"
+                      keyboardType="numeric"
+                      value={newSummitTargetHours}
+                      onChangeText={setNewSummitTargetHours}
+                    />
+                  )}
+
+                  <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Time Horizon</Text>
+                  <View style={{ backgroundColor: '#151517', borderColor: '#2C2C2E', borderWidth: 1 }} className="flex-row p-1 rounded-xl mb-4">
+                    {(['monthly', 'yearly'] as const).map((h) => {
+                      const isActive = newSummitHorizon === h;
+                      return (
+                        <Pressable
+                          key={h}
+                          onPress={() => setNewSummitHorizon(h)}
+                          style={{
+                            flex: 1,
+                            paddingVertical: 8,
+                            borderRadius: 8,
+                            alignItems: 'center',
+                            backgroundColor: isActive ? 'rgba(191,90,242,0.15)' : 'transparent',
+                          }}
+                        >
+                          <Text style={{ color: isActive ? '#FFFFFF' : '#8E8E93', fontWeight: isActive ? '700' : '500', fontSize: 13, textTransform: 'capitalize' }}>{h}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  {eligibleParents.length > 0 && (
+                    <View style={{ marginBottom: 8 }}>
+                      <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Contributes To (Optional)</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        <Pressable
+                          onPress={() => setNewSummitParentId('')}
+                          style={{
+                            paddingHorizontal: 16,
+                            paddingVertical: 10,
+                            borderRadius: 9999,
+                            borderWidth: 1,
+                            marginRight: 8,
+                            backgroundColor: !newSummitParentId ? 'rgba(191,90,242,0.15)' : '#151517',
+                            borderColor: !newSummitParentId ? 'rgba(191,90,242,0.3)' : '#2C2C2E',
+                          }}
+                        >
+                          <Text style={{ color: !newSummitParentId ? '#FFFFFF' : '#8E8E93', fontSize: 13, fontWeight: !newSummitParentId ? '700' : '500' }}>None</Text>
+                        </Pressable>
+                        {eligibleParents.map((p) => {
+                          const isSelected = newSummitParentId === p.id;
+                          return (
+                            <Pressable
+                              key={p.id}
+                              onPress={() => setNewSummitParentId(p.id)}
+                              style={{
+                                paddingHorizontal: 16,
+                                paddingVertical: 10,
+                                borderRadius: 9999,
+                                borderWidth: 1,
+                                marginRight: 8,
+                                backgroundColor: isSelected ? 'rgba(191,90,242,0.15)' : '#151517',
+                                borderColor: isSelected ? 'rgba(191,90,242,0.3)' : '#2C2C2E',
+                              }}
+                            >
+                              <Text style={{ color: isSelected ? '#FFFFFF' : '#8E8E93', fontSize: 13, fontWeight: isSelected ? '700' : '500' }}>{p.title}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </ScrollView>
                     </View>
-                    <Text style={{ color: isActive ? '#FFFFFF' : '#8E8E93', fontWeight: isActive ? '700' : '500', fontSize: 14, textTransform: 'capitalize' }}>{c}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+                  )}
+                </View>
+              )}
 
-            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Linked Macro Goal (Optional)</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 32 }}>
-              <Pressable
-                onPress={() => setSelectedMacroId('')}
-                style={{
-                  backgroundColor: selectedMacroId === '' ? 'rgba(191,90,242,0.15)' : '#151517',
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
-                  borderRadius: 12,
-                  marginRight: 10,
-                  borderWidth: 1,
-                  borderColor: selectedMacroId === '' ? 'rgba(191,90,242,0.3)' : '#2C2C2E'
-                }}
-              >
-                <Text style={{ color: selectedMacroId === '' ? '#FFFFFF' : '#8E8E93', fontWeight: selectedMacroId === '' ? '700' : '500', fontSize: 14 }}>None</Text>
-              </Pressable>
-              {macroGoals.map((mg) => {
-                const isActive = selectedMacroId === mg.id;
-                return (
-                  <Pressable
-                    key={mg.id}
-                    onPress={() => setSelectedMacroId(mg.id)}
-                    style={{
-                      backgroundColor: isActive ? 'rgba(191,90,242,0.15)' : '#151517',
-                      paddingHorizontal: 16,
-                      paddingVertical: 10,
-                      borderRadius: 12,
-                      marginRight: 10,
-                      borderWidth: 1,
-                      borderColor: isActive ? 'rgba(191,90,242,0.3)' : '#2C2C2E'
-                    }}
-                  >
-                    <Text style={{ color: isActive ? '#FFFFFF' : '#8E8E93', fontWeight: isActive ? '700' : '500', fontSize: 14 }}>{mg.title}</Text>
-                  </Pressable>
-                );
-              })}
+              <PrimaryButton
+                onPress={handleSaveJourney}
+                title={editingJourneyId ? 'Save Changes' : 'Launch Journey'}
+                style={{ width: '100%', marginTop: 8 }}
+              />
             </ScrollView>
-
-            <PrimaryButton
-              onPress={handleSaveJourney}
-              title={editingJourneyId ? 'Save Changes' : 'Launch Journey'}
-              style={{ width: '100%' }}
-            />
           </View>
         </View>
       </Modal>
@@ -776,27 +991,27 @@ export default function CollectionsScreen() {
               Are you sure you want to delete this journey? Historically earned milestone cash rewards will remain safe in your balance.
             </Text>
 
-            {/* Check if linked to macro goal */}
+            {/* Check if linked to a Summit */}
             {(() => {
               const col = collections.find(c => c.id === deletingJourneyId);
-              const hasMacro = col && col.macroGoalId;
-              if (hasMacro) {
+              const hasSummit = col && col.summitId;
+              if (hasSummit) {
                 return (
                   <View style={{ marginBottom: 16 }}>
                     <Text style={{ color: '#5AC8FA', fontSize: 12, textAlign: 'center', marginBottom: 12, fontWeight: '600' }}>
-                      This journey is linked to a Macro Goal.
+                      This journey is linked to a Summit.
                     </Text>
                     <Pressable
                       onPress={() => handleConfirmDeleteJourney(true)}
                       style={{ backgroundColor: '#FF453A', padding: 14, borderRadius: 12, alignItems: 'center', marginBottom: 10 }}
                     >
-                      <Text style={{ color: '#FFF', fontSize: 14, fontWeight: '700' }}>Delete Journey & Linked Macro Goal</Text>
+                      <Text style={{ color: '#FFF', fontSize: 14, fontWeight: '700' }}>Delete Journey & Linked Summit</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => handleConfirmDeleteJourney(false)}
                       style={{ backgroundColor: '#2C2C2E', padding: 14, borderRadius: 12, alignItems: 'center', marginBottom: 10 }}
                     >
-                      <Text style={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}>Delete Journey Only (Keep Macro Goal)</Text>
+                      <Text style={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}>Delete Journey Only (Keep Summit)</Text>
                     </Pressable>
                   </View>
                 );
@@ -821,25 +1036,25 @@ export default function CollectionsScreen() {
         </View>
       </Modal>
 
-      {/* Sub-Goal Create/Edit Modal - Centered Compact Card with 2-Row Month Grid */}
-      <Modal visible={isSubGoalModalOpen} animationType="fade" transparent={true}>
+      {/* Waypoint Create/Edit Modal - Centered Compact Card with 2-Row Month Grid */}
+      <Modal visible={isWaypointModalOpen} animationType="fade" transparent={true}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
           <View style={{ backgroundColor: '#1C1C1E', borderRadius: 24, padding: 24, maxWidth: 480, width: '100%', borderWidth: 1, borderColor: '#3A3A3C' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '800' }}>{editingSubGoalId ? 'Edit Sub-Goal' : 'New Sub-Goal'}</Text>
-              <Pressable onPress={() => setIsSubGoalModalOpen(false)}>
+              <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '800' }}>{editingWaypointId ? 'Edit Waypoint' : 'New Waypoint'}</Text>
+              <Pressable onPress={() => setIsWaypointModalOpen(false)}>
                 <Ionicons name="close" size={24} color="#8E8E93" />
               </Pressable>
             </View>
 
-            {/* Goal Title Input */}
-            <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Goal Title</Text>
+            {/* Waypoint Title Input */}
+            <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Waypoint Title</Text>
             <PremiumInput
               style={{ backgroundColor: '#252528', color: '#FFF', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, fontSize: 15, marginBottom: 14, borderWidth: 1, borderColor: '#3A3A3C' }}
               placeholder="e.g., Fiction, Self-Help, Economics, Hikes, Running"
               placeholderTextColor="#8E8E93"
-              value={subGoalTitle}
-              onChangeText={setSubGoalTitle}
+              value={waypointTitle}
+              onChangeText={setWaypointTitle}
               autoFocus
             />
 
@@ -851,8 +1066,8 @@ export default function CollectionsScreen() {
                   style={{ backgroundColor: '#252528', color: '#FFF', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, fontSize: 15, borderWidth: 1, borderColor: '#3A3A3C' }}
                   placeholder="e.g., 3 books"
                   placeholderTextColor="#8E8E93"
-                  value={subGoalTargetMetric}
-                  onChangeText={setSubGoalTargetMetric}
+                  value={waypointTargetMetric}
+                  onChangeText={setWaypointTargetMetric}
                   keyboardType="numeric"
                 />
               </View>
@@ -862,8 +1077,8 @@ export default function CollectionsScreen() {
                   style={{ backgroundColor: '#252528', color: '#FFF', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, fontSize: 15, borderWidth: 1, borderColor: '#3A3A3C' }}
                   placeholder={`e.g., ${currentYear}`}
                   placeholderTextColor="#8E8E93"
-                  value={subGoalYear}
-                  onChangeText={setSubGoalYear}
+                  value={waypointYear}
+                  onChangeText={setWaypointYear}
                   keyboardType="numeric"
                 />
               </View>
@@ -875,14 +1090,14 @@ export default function CollectionsScreen() {
             {/* Row 1: All Year + Jan-May */}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
               <Pressable
-                onPress={() => setSubGoalMonth('')}
+                onPress={() => setWaypointMonth('')}
                 style={{
-                  backgroundColor: subGoalMonth === '' ? '#BF5AF2' : '#252528',
+                  backgroundColor: waypointMonth === '' ? '#BF5AF2' : '#252528',
                   paddingHorizontal: 10,
                   paddingVertical: 7,
                   borderRadius: 10,
                   borderWidth: 1,
-                  borderColor: subGoalMonth === '' ? '#BF5AF2' : '#3A3A3C',
+                  borderColor: waypointMonth === '' ? '#BF5AF2' : '#3A3A3C',
                   flex: 1,
                   alignItems: 'center',
                   minWidth: 70
@@ -892,11 +1107,11 @@ export default function CollectionsScreen() {
               </Pressable>
               {MONTH_NAMES.slice(0, 5).map((mName, idx) => {
                 const mNum = (idx + 1).toString();
-                const isSel = subGoalMonth === mNum;
+                const isSel = waypointMonth === mNum;
                 return (
                   <Pressable
                     key={mNum}
-                    onPress={() => setSubGoalMonth(mNum)}
+                    onPress={() => setWaypointMonth(mNum)}
                     style={{
                       backgroundColor: isSel ? '#BF5AF2' : '#252528',
                       paddingHorizontal: 10,
@@ -919,11 +1134,11 @@ export default function CollectionsScreen() {
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
               {MONTH_NAMES.slice(5).map((mName, idx) => {
                 const mNum = (idx + 6).toString();
-                const isSel = subGoalMonth === mNum;
+                const isSel = waypointMonth === mNum;
                 return (
                   <Pressable
                     key={mNum}
-                    onPress={() => setSubGoalMonth(mNum)}
+                    onPress={() => setWaypointMonth(mNum)}
                     style={{
                       backgroundColor: isSel ? '#BF5AF2' : '#252528',
                       paddingHorizontal: 10,
@@ -944,8 +1159,8 @@ export default function CollectionsScreen() {
 
             {/* Action Button */}
             <PrimaryButton
-              onPress={handleSaveSubGoal}
-              title={editingSubGoalId ? 'Save Sub-Goal' : 'Create Sub-Goal'}
+              onPress={handleSaveWaypoint}
+              title={editingWaypointId ? 'Save Waypoint' : 'Create Waypoint'}
               style={{ width: '100%' }}
             />
           </View>
@@ -973,43 +1188,43 @@ export default function CollectionsScreen() {
               autoFocus
             />
 
-            {/* Sub-Goal Assignment Selector */}
+            {/* Waypoint Assignment Selector */}
             {(() => {
-              const availableSubGoals = (subGoals || []).filter(s => s.collectionId === activeCollectionId);
-              if (availableSubGoals.length > 0) {
+              const availableWaypoints = (waypoints || []).filter(w => w.collectionId === activeCollectionId);
+              if (availableWaypoints.length > 0) {
                 return (
                   <View style={{ marginBottom: 14 }}>
-                    <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Sub-Goal Assignment</Text>
+                    <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Waypoint Assignment</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                       <Pressable
-                        onPress={() => setSelectedSubGoalId('')}
+                        onPress={() => setSelectedWaypointId('')}
                         style={{
-                          backgroundColor: selectedSubGoalId === '' ? '#BF5AF2' : '#252528',
+                          backgroundColor: selectedWaypointId === '' ? '#BF5AF2' : '#252528',
                           paddingHorizontal: 12,
                           paddingVertical: 7,
                           borderRadius: 10,
                           marginRight: 6,
                           borderWidth: 1,
-                          borderColor: selectedSubGoalId === '' ? '#BF5AF2' : '#3A3A3C'
+                          borderColor: selectedWaypointId === '' ? '#BF5AF2' : '#3A3A3C'
                         }}
                       >
                         <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>General (None)</Text>
                       </Pressable>
-                      {availableSubGoals.map((sg) => (
+                      {availableWaypoints.map((wp) => (
                         <Pressable
-                          key={sg.id}
-                          onPress={() => setSelectedSubGoalId(sg.id)}
+                          key={wp.id}
+                          onPress={() => setSelectedWaypointId(wp.id)}
                           style={{
-                            backgroundColor: selectedSubGoalId === sg.id ? '#BF5AF2' : '#252528',
+                            backgroundColor: selectedWaypointId === wp.id ? '#BF5AF2' : '#252528',
                             paddingHorizontal: 12,
                             paddingVertical: 7,
                             borderRadius: 10,
                             marginRight: 6,
                             borderWidth: 1,
-                            borderColor: selectedSubGoalId === sg.id ? '#BF5AF2' : '#3A3A3C'
+                            borderColor: selectedWaypointId === wp.id ? '#BF5AF2' : '#3A3A3C'
                           }}
                         >
-                          <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>{sg.title}</Text>
+                          <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>{wp.title}</Text>
                         </Pressable>
                       ))}
                     </ScrollView>

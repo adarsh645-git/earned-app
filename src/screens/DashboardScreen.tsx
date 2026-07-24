@@ -4,13 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEconomyStore } from '../store/economyStore';
 import { useTaskStore, Task } from '../store/taskStore';
-import { useMacroGoalStore, MacroGoal } from '../store/macroGoalStore';
+import { useSummitStore, Summit } from '../store/summitStore';
 import { useTimerStore } from '../store/timerStore';
 import { feedback } from '../utils/feedback';
 import { useConfettiStore } from '../store/confettiStore';
 import ConfirmModal from '../components/ConfirmModal';
 import AnimatedTaskRow from '../components/AnimatedTaskRow';
-import AnimatedMacroGoalCard from '../components/AnimatedMacroGoalCard';
+import AnimatedSummitCard from '../components/AnimatedSummitCard';
 import AnimatedProgressRing from '../components/AnimatedProgressRing';
 import CurrencyPill from '../components/CurrencyPill';
 import EditTaskModal from '../components/EditTaskModal';
@@ -25,13 +25,13 @@ export default function DashboardScreen() {
   const [activePillarId, setActivePillarId] = useState<string>('');
   const [blockedModal, setBlockedModal] = useState<{ title: string; message: string } | null>(null);
   const [editTask, setEditTask] = useState<Task | null>(null);
-  const [quickStartGoal, setQuickStartGoal] = useState<MacroGoal | null>(null);
+  const [quickStartGoal, setQuickStartGoal] = useState<Summit | null>(null);
   
   const { dollarBalance, hoursBalanceMinutes, debt, streak, lastCheckInDate } = useEconomyStore();
   const { tasks, tags, pillars, toggleTask, moveToIcebox, deleteTask, updateTask, addTask } = useTaskStore();
   const activePillars = pillars.filter(p => !p.isArchived);
   const currentPillarId = activePillarId || activePillars[0]?.id;
-  const { macroGoals } = useMacroGoalStore();
+  const { summits } = useSummitStore();
   const { startTimer } = useTimerStore();
 
   const today = new Date().toISOString().split('T')[0];
@@ -49,7 +49,7 @@ export default function DashboardScreen() {
   const completedMinutes = activeBucketTasks.reduce((acc, t) => acc + (t.completed ? t.estimatedMinutes : 0), 0);
   const progressPercent = totalMinutes > 0 ? Math.min(100, Math.round((completedMinutes / totalMinutes) * 100)) : 0;
 
-  const rootGoals = macroGoals.filter((g) => !g.parentId);
+  const rootGoals = summits.filter((g) => !g.parentId);
   const productiveGoals = rootGoals.filter(g => !g.type || g.type === 'productive');
   const entertainmentGoals = rootGoals.filter(g => g.type === 'entertainment');
 
@@ -75,7 +75,7 @@ export default function DashboardScreen() {
       title,
       tagId,
       estimatedMinutes: minutes,
-      macroGoalId: targetId,
+      summitId: targetId,
       isIcebox: false,
     });
     handleStartTimer(newTaskId, minutes);
@@ -282,17 +282,17 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Pyramid Progress (Productive Macro Goals) */}
+        {/* Summit Progress (Productive Summits) */}
         {productiveGoals.length > 0 && (
           <View className="mt-5">
             <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3">
-              Pyramid Targets
+              Summits
             </Text>
             {productiveGoals.map((goal) => (
-              <AnimatedMacroGoalCard
+              <AnimatedSummitCard
                 key={goal.id}
                 goal={goal}
-                subGoals={macroGoals.filter(g => g.parentId === goal.id)}
+                subGoals={summits.filter(g => g.parentId === goal.id)}
                 accentColor="#BF5AF2"
                 onQuickStart={setQuickStartGoal}
               />
@@ -300,17 +300,17 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Entertainment Projects (Burner Macro Goals) */}
+        {/* Entertainment Projects (Burner Summits) */}
         {entertainmentGoals.length > 0 && (
           <View className="mt-5">
             <Text className="text-[#5AC8FA] font-bold text-xs uppercase tracking-[1.5px] mb-3">
               Entertainment Projects
             </Text>
             {entertainmentGoals.map((goal) => (
-              <AnimatedMacroGoalCard
+              <AnimatedSummitCard
                 key={goal.id}
                 goal={goal}
-                subGoals={macroGoals.filter(g => g.parentId === goal.id)}
+                subGoals={summits.filter(g => g.parentId === goal.id)}
                 accentColor="#5AC8FA"
                 showIcon
                 iconName="game-controller"
@@ -353,7 +353,7 @@ export default function DashboardScreen() {
           visible={!!quickStartGoal}
           onClose={() => setQuickStartGoal(null)}
           goal={quickStartGoal}
-          subGoals={macroGoals.filter(g => g.parentId === quickStartGoal.id)}
+          subGoals={summits.filter(g => g.parentId === quickStartGoal.id)}
           onStart={handleQuickStart}
         />
       )}

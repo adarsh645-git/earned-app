@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, Modal, Pressable } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { UnlockedMilestoneInfo } from '../store/macroGoalStore';
+import { UnlockedMilestoneInfo } from '../store/summitStore';
 import { feedback } from '../utils/feedback';
 
 interface MilestoneModalProps {

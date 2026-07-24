@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Pressable, Modal, ScrollView, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MacroGoal } from '../store/macroGoalStore';
+import { Summit } from '../store/summitStore';
 import { useTaskStore } from '../store/taskStore';
 import TimeSelectorModal from './TimeSelectorModal';
 
 interface QuickStartModalProps {
   visible: boolean;
   onClose: () => void;
-  goal: MacroGoal;
-  subGoals: MacroGoal[];
+  goal: Summit;
+  subGoals: Summit[];
   onStart: (title: string, tagId: string, targetId: string, minutes: number) => void;
 }
 

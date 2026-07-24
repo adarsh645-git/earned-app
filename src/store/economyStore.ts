@@ -35,7 +35,7 @@ export interface EconomyState {
   debt: number;
   debtTakenDate: string | null;
   completedTasksCount: number;
-  completedMacroGoalsCount: number;
+  completedSummitsCount: number;
   entertainmentClawbackApplied: boolean;
 
   // Getters
@@ -51,7 +51,7 @@ export interface EconomyState {
   spendHours: (minutes: number) => boolean;
   incrementCompletedTasks: () => void;
   decrementCompletedTasks: () => void;
-  incrementCompletedMacroGoals: () => void;
+  incrementCompletedSummits: () => void;
   incrementStreak: () => void;
   checkInDaily: () => CheckInResult;
   clearDebtForTesting: () => void;
@@ -64,7 +64,7 @@ export const IOU_CAP = 25.0;
 
 // Historical payout formula, frozen as of the entertainment reward-asymmetry fix.
 // Used only once, to claw back Dollars already paid out under the old (type-agnostic)
-// milestone rule. Must NOT be updated if the live formula in macroGoalStore changes later.
+// milestone rule. Must NOT be updated if the live formula in summitStore changes later.
 const calculateLegacyEntertainmentMilestoneDollars = (targetMinutes: number, milestone: number): number => {
   const totalBonusKeys = Math.max(1, Math.round(targetMinutes / 60));
   const keys25 = Math.round(totalBonusKeys * 0.2);
@@ -88,12 +88,12 @@ const calculateLegacyEntertainmentMilestoneDollars = (targetMinutes: number, mil
 export const calculateDisciplineScore = (state: {
   streak: number;
   completedTasksCount: number;
-  completedMacroGoalsCount: number;
+  completedSummitsCount: number;
 }): number => {
   let score = 600; // Base score
   score += Math.min(150, state.streak * 10);
   score += Math.min(100, state.completedTasksCount * 5);
-  score += Math.min(200, state.completedMacroGoalsCount * 50);
+  score += Math.min(200, state.completedSummitsCount * 50);
 
   return Math.max(300, Math.min(850, score));
 };
@@ -112,12 +112,12 @@ export const useEconomyStore = create<EconomyState>()(
       debt: 0,
       debtTakenDate: null,
       completedTasksCount: 0,
-      completedMacroGoalsCount: 0,
+      completedSummitsCount: 0,
       entertainmentClawbackApplied: false,
 
       getDisciplineScore: () => {
-        const { streak, completedTasksCount, completedMacroGoalsCount } = get();
-        return calculateDisciplineScore({ streak, completedTasksCount, completedMacroGoalsCount });
+        const { streak, completedTasksCount, completedSummitsCount } = get();
+        return calculateDisciplineScore({ streak, completedTasksCount, completedSummitsCount });
       },
 
       getConversionRate: () => {
@@ -224,8 +224,8 @@ export const useEconomyStore = create<EconomyState>()(
         completedTasksCount: Math.max(0, state.completedTasksCount - 1)
       })),
 
-      incrementCompletedMacroGoals: () => set((state) => ({
-        completedMacroGoalsCount: state.completedMacroGoalsCount + 1
+      incrementCompletedSummits: () => set((state) => ({
+        completedSummitsCount: state.completedSummitsCount + 1
       })),
 
       clearDebtForTesting: () => set({
@@ -236,12 +236,12 @@ export const useEconomyStore = create<EconomyState>()(
       applyEntertainmentClawback: () => {
         if (get().entertainmentClawbackApplied) return;
 
-        // Required to avoid a circular import with macroGoalStore, which imports this store.
-        const { useMacroGoalStore } = require('./macroGoalStore');
-        const macroGoals = useMacroGoalStore.getState().macroGoals;
+        // Required to avoid a circular import with summitStore, which imports this store.
+        const { useSummitStore } = require('./summitStore');
+        const summits = useSummitStore.getState().summits;
 
         let totalToClawBack = 0;
-        macroGoals
+        summits
           .filter((g: { type?: string }) => g.type === 'entertainment')
           .forEach((g: { targetMinutes: number; unlockedMilestones: number[] }) => {
             (g.unlockedMilestones || []).forEach((m: number) => {

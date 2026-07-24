@@ -1,13 +1,13 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { safeStorage } from './safeStorage';
-import { useMacroGoalStore } from './macroGoalStore';
+import { useSummitStore } from './summitStore';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 
-export type CollectionCategory = 'books' | 'games' | 'stocks' | 'fitness' | 'courses' | 'travel' | 'other';
+export type CollectionCategory = 'books' | 'games' | 'stocks' | 'fitness' | 'courses' | 'travel' | 'general';
 
-export type JourneySubGoal = {
+export type Waypoint = {
   id: string;
   collectionId: string;
   title: string; // e.g. "Fiction", "Economics", "Hikes", "Running"
@@ -21,14 +21,14 @@ export type Collection = {
   id: string;
   title: string;
   category: CollectionCategory;
-  macroGoalId?: string; // Links to a Macro Goal
+  summitId?: string; // Links to a Summit
   dateCreated: string;
 };
 
 export type CollectionItem = {
   id: string;
   collectionId: string;
-  subGoalId?: string;
+  waypointId?: string;
   title: string;
   estimatedMinutes?: number;
   completed: boolean;
@@ -38,26 +38,33 @@ export type CollectionItem = {
 
 interface CollectionState {
   collections: Collection[];
-  subGoals: JourneySubGoal[];
+  waypoints: Waypoint[];
   items: CollectionItem[];
+  journeyBackfillApplied: boolean;
   addCollection: (collection: Omit<Collection, 'id' | 'dateCreated'>) => string;
   updateCollection: (id: string, updates: Partial<Collection>) => void;
   deleteCollection: (id: string) => void;
-  addSubGoal: (subGoal: Omit<JourneySubGoal, 'id' | 'dateCreated'>) => string;
-  updateSubGoal: (id: string, updates: Partial<JourneySubGoal>) => void;
-  deleteSubGoal: (id: string) => void;
+  addWaypoint: (waypoint: Omit<Waypoint, 'id' | 'dateCreated'>) => string;
+  updateWaypoint: (id: string, updates: Partial<Waypoint>) => void;
+  deleteWaypoint: (id: string) => void;
   addItem: (item: Omit<CollectionItem, 'id' | 'completed' | 'dateCreated'>) => string;
   updateItem: (id: string, updates: Partial<CollectionItem>) => void;
   toggleItemCompletion: (id: string) => void;
   deleteItem: (id: string) => void;
+  // One-time: goals could previously be created without a Journey at all. Now
+  // that goal creation is Journey-only, any pre-existing Journey-less Summit
+  // gets an auto-created Journey wrapper so it stays reachable from task
+  // creation's Journey-only LinkProgressPicker instead of going silently dark.
+  backfillJourneysForOrphanSummits: () => void;
 }
 
 export const useCollectionStore = create<CollectionState>()(
   persist(
     (set, get) => ({
       collections: [],
-      subGoals: [],
+      waypoints: [],
       items: [],
+      journeyBackfillApplied: false,
 
       addCollection: (collectionData) => {
         const id = uuidv4();
@@ -79,32 +86,32 @@ export const useCollectionStore = create<CollectionState>()(
       deleteCollection: (id) => {
         set((state) => ({
           collections: state.collections.filter((c) => c.id !== id),
-          subGoals: (state.subGoals || []).filter((s) => s.collectionId !== id),
+          waypoints: (state.waypoints || []).filter((w) => w.collectionId !== id),
           items: state.items.filter((i) => i.collectionId !== id),
         }));
       },
 
-      addSubGoal: (subGoalData) => {
+      addWaypoint: (waypointData) => {
         const id = uuidv4();
         set((state) => ({
-          subGoals: [
-            ...(state.subGoals || []),
-            { ...subGoalData, id, dateCreated: new Date().toISOString() },
+          waypoints: [
+            ...(state.waypoints || []),
+            { ...waypointData, id, dateCreated: new Date().toISOString() },
           ],
         }));
         return id;
       },
 
-      updateSubGoal: (id, updates) => {
+      updateWaypoint: (id, updates) => {
         set((state) => ({
-          subGoals: (state.subGoals || []).map((s) => (s.id === id ? { ...s, ...updates } : s)),
+          waypoints: (state.waypoints || []).map((w) => (w.id === id ? { ...w, ...updates } : w)),
         }));
       },
 
-      deleteSubGoal: (id) => {
+      deleteWaypoint: (id) => {
         set((state) => ({
-          subGoals: (state.subGoals || []).filter((s) => s.id !== id),
-          items: state.items.map((i) => (i.subGoalId === id ? { ...i, subGoalId: undefined } : i)),
+          waypoints: (state.waypoints || []).filter((w) => w.id !== id),
+          items: state.items.map((i) => (i.waypointId === id ? { ...i, waypointId: undefined } : i)),
         }));
       },
 
@@ -133,13 +140,13 @@ export const useCollectionStore = create<CollectionState>()(
         // Only trigger progress logic if we are completing it (not un-completing)
         if (!isCurrentlyCompleted) {
           const collection = get().collections.find((c) => c.id === item.collectionId);
-          if (collection && collection.macroGoalId) {
-            const macroGoal = useMacroGoalStore.getState().macroGoals.find(g => g.id === collection.macroGoalId);
-            
-            if (macroGoal) {
+          if (collection && collection.summitId) {
+            const summit = useSummitStore.getState().summits.find(g => g.id === collection.summitId);
+
+            if (summit) {
               // Routes to +1 for a count chain or the item's minutes for a time
               // chain; cascades up the chain from there.
-              useMacroGoalStore.getState().applyLeafProgress(macroGoal.id, item.estimatedMinutes || 60);
+              useSummitStore.getState().applyLeafProgress(summit.id, item.estimatedMinutes || 60);
             }
           }
         }
@@ -154,6 +161,31 @@ export const useCollectionStore = create<CollectionState>()(
         set((state) => ({
           items: state.items.filter((i) => i.id !== id),
         }));
+      },
+
+      backfillJourneysForOrphanSummits: () => {
+        if (get().journeyBackfillApplied) return;
+
+        const summits = useSummitStore.getState().summits;
+        const referencedSummitIds = new Set(
+          get().collections.map((c) => c.summitId).filter(Boolean)
+        );
+        const orphanSummits = summits.filter((s) => !referencedSummitIds.has(s.id));
+
+        if (orphanSummits.length > 0) {
+          const newCollections: Collection[] = orphanSummits.map((s) => ({
+            id: uuidv4(),
+            title: s.title,
+            category: 'general',
+            summitId: s.id,
+            dateCreated: new Date().toISOString(),
+          }));
+          set((state) => ({
+            collections: [...state.collections, ...newCollections],
+          }));
+        }
+
+        set({ journeyBackfillApplied: true });
       },
     }),
     {

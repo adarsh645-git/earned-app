@@ -1,5 +1,5 @@
 export * from './economyStore';
 export * from './taskStore';
-export * from './macroGoalStore';
+export * from './summitStore';
 export * from './timerStore';
 export * from './rewardStore';

@@ -11,9 +11,9 @@ export type UnlockedMilestoneInfo = {
   goalTitle: string;
 };
 
-export type MacroGoalType = 'productive' | 'entertainment';
+export type SummitType = 'productive' | 'entertainment';
 
-export type MacroGoal = {
+export type Summit = {
   id: string;
   title: string;
   horizon: 'monthly' | 'yearly';
@@ -23,8 +23,8 @@ export type MacroGoal = {
   targetMetric?: number;
   completedMetric?: number;
   unlockedMilestones: number[]; // e.g. [25, 50, 75, 100]
-  type?: MacroGoalType;
-  parentId?: string; // If set, this is a sub-project nested under a parent MacroGoal
+  type?: SummitType;
+  parentId?: string; // If set, this is a sub-project nested under a parent Summit
   category?: 'video-game' | 'movie' | 'tv-show' | 'youtube' | 'custom'; // For dynamic categorization
   paysCurrency?: boolean; // The one level in a chain that pays currency. Undefined = pays (back-compat).
 };
@@ -33,24 +33,24 @@ export type MacroGoal = {
 // e.g. Book(2) -> Series(1) -> "20 Books"(0). Root = depth 0.
 export const MAX_CHAIN_DEPTH = 2;
 
-export function getChainDepth(macroGoals: MacroGoal[], goalId: string): number {
+export function getChainDepth(summits: Summit[], goalId: string): number {
   let depth = 0;
-  let cur = macroGoals.find(g => g.id === goalId);
+  let cur = summits.find(g => g.id === goalId);
   const seen = new Set<string>();
   while (cur?.parentId && !seen.has(cur.id)) {
     seen.add(cur.id);
     depth++;
-    cur = macroGoals.find(g => g.id === cur!.parentId);
+    cur = summits.find(g => g.id === cur!.parentId);
   }
   return depth;
 }
 
-export function getDescendantIds(macroGoals: MacroGoal[], goalId: string): Set<string> {
+export function getDescendantIds(summits: Summit[], goalId: string): Set<string> {
   const result = new Set<string>();
   const stack = [goalId];
   while (stack.length) {
     const cur = stack.pop()!;
-    macroGoals.forEach(g => {
+    summits.forEach(g => {
       if (g.parentId === cur && !result.has(g.id)) {
         result.add(g.id);
         stack.push(g.id);
@@ -60,12 +60,12 @@ export function getDescendantIds(macroGoals: MacroGoal[], goalId: string): Set<s
   return result;
 }
 
-export function getChainRoot(macroGoals: MacroGoal[], goalId: string): MacroGoal | undefined {
-  let cur = macroGoals.find(g => g.id === goalId);
+export function getChainRoot(summits: Summit[], goalId: string): Summit | undefined {
+  let cur = summits.find(g => g.id === goalId);
   const seen = new Set<string>();
   while (cur?.parentId && !seen.has(cur.id)) {
     seen.add(cur.id);
-    const parent = macroGoals.find(g => g.id === cur!.parentId);
+    const parent = summits.find(g => g.id === cur!.parentId);
     if (!parent) break;
     cur = parent;
   }
@@ -73,41 +73,41 @@ export function getChainRoot(macroGoals: MacroGoal[], goalId: string): MacroGoal
 }
 
 // Titles from `goalId` up to its chain root, leaf-first (e.g. ["Elden Ring",
-// "RPG Backlog"]). Length 1 means the goal isn't part of a chain — callers
+// "Games Backlog"]). Length 1 means the goal isn't part of a chain — callers
 // use that to decide whether cascade-legibility feedback is worth showing.
-export function getChainTrail(macroGoals: MacroGoal[], goalId: string): string[] {
+export function getChainTrail(summits: Summit[], goalId: string): string[] {
   const trail: string[] = [];
-  let cur = macroGoals.find(g => g.id === goalId);
+  let cur = summits.find(g => g.id === goalId);
   const seen = new Set<string>();
   while (cur && !seen.has(cur.id)) {
     seen.add(cur.id);
     trail.push(cur.title);
-    cur = cur.parentId ? macroGoals.find(g => g.id === cur!.parentId) : undefined;
+    cur = cur.parentId ? summits.find(g => g.id === cur!.parentId) : undefined;
   }
   return trail;
 }
 
 // Valid parents for `goal` (or for a not-yet-created goal, pass null): same
-// type (productive/entertainment stay separate pyramids) and same metricType
-// (chains are homogeneous), excluding self/descendants (no cycles) and
-// anything already at max depth (no chain longer than MAX_CHAIN_DEPTH + 1).
+// type (productive/entertainment stay separate Summit trees) and same
+// metricType (chains are homogeneous), excluding self/descendants (no cycles)
+// and anything already at max depth (no chain longer than MAX_CHAIN_DEPTH + 1).
 export function getEligibleParents(
-  macroGoals: MacroGoal[],
-  goal: MacroGoal | null,
-  type: MacroGoalType,
+  summits: Summit[],
+  goal: Summit | null,
+  type: SummitType,
   metricType: 'minutes' | 'units'
-): MacroGoal[] {
-  const excludeIds = goal ? new Set([goal.id, ...getDescendantIds(macroGoals, goal.id)]) : new Set<string>();
-  return macroGoals.filter(g => {
+): Summit[] {
+  const excludeIds = goal ? new Set([goal.id, ...getDescendantIds(summits, goal.id)]) : new Set<string>();
+  return summits.filter(g => {
     if (excludeIds.has(g.id)) return false;
     if ((g.type || 'productive') !== type) return false;
     if ((g.metricType || 'minutes') !== metricType) return false;
-    if (getChainDepth(macroGoals, g.id) >= MAX_CHAIN_DEPTH) return false;
+    if (getChainDepth(summits, g.id) >= MAX_CHAIN_DEPTH) return false;
     return true;
   });
 }
 
-export const getMilestoneDollars = (targetMinutes: number, milestone: number, goalType: MacroGoalType = 'productive'): number => {
+export const getMilestoneDollars = (targetMinutes: number, milestone: number, goalType: SummitType = 'productive'): number => {
   // Entertainment goals are already paid for with earned Hours — no Dollar double-dip on completion.
   if (goalType === 'entertainment') return 0;
 
@@ -129,13 +129,13 @@ export const getMilestoneDollars = (targetMinutes: number, milestone: number, go
   return Math.round((keys * 0.02) * 100) / 100;
 };
 
-interface MacroGoalState {
-  macroGoals: MacroGoal[];
+interface SummitState {
+  summits: Summit[];
   paysCurrencyDefaultsApplied: boolean;
   applyPaysCurrencyDefaults: () => void;
-  addMacroGoal: (goal: Omit<MacroGoal, 'id' | 'completedMinutes' | 'completedMetric' | 'unlockedMilestones'>) => void;
-  updateMacroGoal: (id: string, updates: Partial<MacroGoal>) => void;
-  deleteMacroGoal: (id: string) => void;
+  addSummit: (goal: Omit<Summit, 'id' | 'completedMinutes' | 'completedMetric' | 'unlockedMilestones'>) => string;
+  updateSummit: (id: string, updates: Partial<Summit>) => void;
+  deleteSummit: (id: string) => void;
   addProgress: (id: string, amount: number) => UnlockedMilestoneInfo[];
   removeProgress: (id: string, amount: number) => void;
   // Walks a units (count) chain from parentId to root, stepping each ancestor's
@@ -150,10 +150,10 @@ interface MacroGoalState {
   setPayingLevel: (goalId: string) => void;
 }
 
-export const useMacroGoalStore = create<MacroGoalState>()(
+export const useSummitStore = create<SummitState>()(
   persist(
     (set, get) => ({
-      macroGoals: [],
+      summits: [],
       paysCurrencyDefaultsApplied: false,
 
       // One-time: existing chains predate the single-paying-level rule and would
@@ -163,47 +163,51 @@ export const useMacroGoalStore = create<MacroGoalState>()(
         if (get().paysCurrencyDefaultsApplied) return;
         set((state) => ({
           paysCurrencyDefaultsApplied: true,
-          macroGoals: state.macroGoals.map(g => ({
+          summits: state.summits.map(g => ({
             ...g,
             paysCurrency: g.paysCurrency !== undefined ? g.paysCurrency : !g.parentId,
           })),
         }));
       },
 
-      addMacroGoal: (goal) => set((state) => ({
-        macroGoals: [...state.macroGoals, { 
-          ...goal, 
-          id: uuidv4(),
-          type: goal.type || 'productive',
-          parentId: goal.parentId,
-          completedMinutes: 0,
-          completedMetric: 0,
-          metricType: goal.metricType || 'minutes',
-          unlockedMilestones: [],
-        }]
-      })),
-      updateMacroGoal: (id, updates) => set((state) => ({
-        macroGoals: state.macroGoals.map(g => g.id === id ? { ...g, ...updates } : g)
+      addSummit: (goal) => {
+        const id = uuidv4();
+        set((state) => ({
+          summits: [...state.summits, {
+            ...goal,
+            id,
+            type: goal.type || 'productive',
+            parentId: goal.parentId,
+            completedMinutes: 0,
+            completedMetric: 0,
+            metricType: goal.metricType || 'minutes',
+            unlockedMilestones: [],
+          }]
+        }));
+        return id;
+      },
+      updateSummit: (id, updates) => set((state) => ({
+        summits: state.summits.map(g => g.id === id ? { ...g, ...updates } : g)
       })),
       setPayingLevel: (goalId) => set((state) => {
-        const root = getChainRoot(state.macroGoals, goalId);
+        const root = getChainRoot(state.summits, goalId);
         if (!root) return state;
-        const chainIds = new Set([root.id, ...getDescendantIds(state.macroGoals, root.id)]);
+        const chainIds = new Set([root.id, ...getDescendantIds(state.summits, root.id)]);
         return {
-          macroGoals: state.macroGoals.map(g =>
+          summits: state.summits.map(g =>
             chainIds.has(g.id) ? { ...g, paysCurrency: g.id === goalId } : g
           ),
         };
       }),
-      deleteMacroGoal: (id) => {
+      deleteSummit: (id) => {
         // Sub-goals are structurally dependent on their parent — remove them too.
         // Anything else that merely references this goal (tasks, Journeys) is
         // unlinked, not deleted, so unrelated work is never silently destroyed.
-        const childIds = get().macroGoals.filter(g => g.parentId === id).map(g => g.id);
+        const childIds = get().summits.filter(g => g.parentId === id).map(g => g.id);
         const idsToRemove = new Set([id, ...childIds]);
 
         set((state) => ({
-          macroGoals: state.macroGoals.filter(g => !idsToRemove.has(g.id))
+          summits: state.summits.filter(g => !idsToRemove.has(g.id))
         }));
 
         // Dynamic require avoids a circular import (taskStore/collectionStore
@@ -211,19 +215,19 @@ export const useMacroGoalStore = create<MacroGoalState>()(
         const { useTaskStore } = require('./taskStore');
         useTaskStore.setState((s: any) => ({
           tasks: s.tasks.map((t: any) =>
-            t.macroGoalId && idsToRemove.has(t.macroGoalId) ? { ...t, macroGoalId: undefined } : t
+            t.summitId && idsToRemove.has(t.summitId) ? { ...t, summitId: undefined } : t
           ),
         }));
 
         const { useCollectionStore } = require('./collectionStore');
         useCollectionStore.setState((s: any) => ({
           collections: s.collections.map((c: any) =>
-            c.macroGoalId && idsToRemove.has(c.macroGoalId) ? { ...c, macroGoalId: undefined } : c
+            c.summitId && idsToRemove.has(c.summitId) ? { ...c, summitId: undefined } : c
           ),
         }));
       },
       addProgress: (id, amount) => {
-        const goal = get().macroGoals.find(g => g.id === id);
+        const goal = get().summits.find(g => g.id === id);
         if (!goal) return [];
 
         const isUnits = goal.metricType === 'units';
@@ -269,14 +273,14 @@ export const useMacroGoalStore = create<MacroGoalState>()(
               useEconomyStore.getState().addBalance(dollars);
               // Increment Discipline Score booster if 100% milestone reached
               if (m === 100) {
-                useEconomyStore.getState().incrementCompletedMacroGoals();
+                useEconomyStore.getState().incrementCompletedSummits();
               }
             }
           }
         });
 
         set((state) => ({
-          macroGoals: state.macroGoals.map(g =>
+          summits: state.summits.map(g =>
             g.id === id
               ? { ...g, completedMinutes: newMinutes, completedMetric: newMetric, unlockedMilestones: updatedUnlocked }
               : g
@@ -310,7 +314,7 @@ export const useMacroGoalStore = create<MacroGoalState>()(
 
         while (cur && !seen.has(cur)) {
           seen.add(cur);
-          const g = get().macroGoals.find(x => x.id === cur);
+          const g = get().summits.find(x => x.id === cur);
           // Homogeneity guard: stop if the chain breaks or switches metric.
           if (!g || g.metricType !== 'units') break;
 
@@ -330,7 +334,7 @@ export const useMacroGoalStore = create<MacroGoalState>()(
               updated.push(m);
               if (pays) {
                 useEconomyStore.getState().addBalance(dollars);
-                if (m === 100) useEconomyStore.getState().incrementCompletedMacroGoals();
+                if (m === 100) useEconomyStore.getState().incrementCompletedSummits();
               }
             } else if (delta < 0 && existing.includes(m) && nextPct < m) {
               const idx = updated.indexOf(m);
@@ -343,7 +347,7 @@ export const useMacroGoalStore = create<MacroGoalState>()(
 
           const curId = cur;
           set((state) => ({
-            macroGoals: state.macroGoals.map(x =>
+            summits: state.summits.map(x =>
               x.id === curId ? { ...x, completedMetric: next, unlockedMilestones: updated } : x
             ),
           }));
@@ -355,7 +359,7 @@ export const useMacroGoalStore = create<MacroGoalState>()(
       },
 
       applyLeafProgress: (goalId, minutes) => {
-        const goal = get().macroGoals.find(g => g.id === goalId);
+        const goal = get().summits.find(g => g.id === goalId);
         if (!goal) return [];
         // Count chains advance one unit per discrete completion; time chains
         // absorb the minutes of effort. addProgress handles accumulation + the
@@ -364,13 +368,13 @@ export const useMacroGoalStore = create<MacroGoalState>()(
       },
 
       revokeLeafProgress: (goalId, minutes) => {
-        const goal = get().macroGoals.find(g => g.id === goalId);
+        const goal = get().summits.find(g => g.id === goalId);
         if (!goal) return;
         get().removeProgress(goalId, goal.metricType === 'units' ? 1 : minutes);
       },
 
       removeProgress: (id, amount) => {
-        const goal = get().macroGoals.find(g => g.id === id);
+        const goal = get().summits.find(g => g.id === id);
         if (!goal) return;
 
         const isUnits = goal.metricType === 'units';
@@ -416,7 +420,7 @@ export const useMacroGoalStore = create<MacroGoalState>()(
         });
 
         set((state) => ({
-          macroGoals: state.macroGoals.map(g =>
+          summits: state.summits.map(g =>
             g.id === id
               ? { ...g, completedMinutes: newMinutes, completedMetric: newMetric, unlockedMilestones: updatedUnlocked }
               : g
@@ -439,6 +443,9 @@ export const useMacroGoalStore = create<MacroGoalState>()(
       },
     }),
     {
+      // Storage key intentionally left unchanged — this is a Summit/Waypoint
+      // *naming* rename, not a storage migration. Changing this key would
+      // orphan any local-only (unsynced) data for offline users on next load.
       name: 'earned-macro-storage',
       storage: createJSONStorage(() => safeStorage),
     }

@@ -1,20 +1,20 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { View, Text, Animated, Dimensions, Pressable, TextInput } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { MacroGoal, getMilestoneDollars, useMacroGoalStore } from '../store/macroGoalStore';
+import { Summit, getMilestoneDollars, useSummitStore } from '../store/summitStore';
 import { hapticHeavyImpact, hapticMediumImpact } from '../utils/haptics';
 import { useConfettiStore } from '../store/confettiStore';
-import EditMacroGoalModal from './EditMacroGoalModal';
+import EditSummitModal from './EditSummitModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-interface AnimatedMacroGoalCardProps {
-  goal: MacroGoal;
-  subGoals?: MacroGoal[];
+interface AnimatedSummitCardProps {
+  goal: Summit;
+  subGoals?: Summit[];
   accentColor: string; // '#BF5AF2' for productive, '#5AC8FA' for entertainment
   showIcon?: boolean;
   iconName?: string;
-  onQuickStart?: (goal: MacroGoal) => void;
+  onQuickStart?: (goal: Summit) => void;
   onAddSubGoal?: (parentId: string) => void;
 }
 
@@ -240,7 +240,7 @@ function InlineEditableText({
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
-export default function AnimatedMacroGoalCard({
+export default function AnimatedSummitCard({
   goal,
   subGoals = [],
   accentColor,
@@ -248,9 +248,9 @@ export default function AnimatedMacroGoalCard({
   iconName,
   onQuickStart,
   onAddSubGoal,
-}: AnimatedMacroGoalCardProps) {
-  const { updateMacroGoal, deleteMacroGoal } = useMacroGoalStore();
-  const [editingGoal, setEditingGoal] = useState<MacroGoal | null>(null);
+}: AnimatedSummitCardProps) {
+  const { updateSummit, deleteSummit } = useSummitStore();
+  const [editingGoal, setEditingGoal] = useState<Summit | null>(null);
   const isUnits = goal.metricType === 'units';
   const isEntertainment = goal.type === 'entertainment';
   const target = isUnits ? (goal.targetMetric || 1) : goal.targetMinutes;
@@ -342,7 +342,7 @@ export default function AnimatedMacroGoalCard({
           <InlineEditableText
             initialValue={goal.title}
             textStyle={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14 }}
-            onSave={(newTitle) => updateMacroGoal(goal.id, { title: newTitle })}
+            onSave={(newTitle) => updateSummit(goal.id, { title: newTitle })}
           />
           {displayCategory !== '' && (
             <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 4 }}>
@@ -405,7 +405,7 @@ export default function AnimatedMacroGoalCard({
       {(subGoals && subGoals.length > 0 || onAddSubGoal) && (
         <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Milestones & Quests</Text>
+            <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Milestones & Sub-Goals</Text>
             {onAddSubGoal && (
               <Pressable
                 onPress={() => onAddSubGoal(goal.id)}
@@ -447,7 +447,7 @@ export default function AnimatedMacroGoalCard({
                     <InlineEditableText
                       initialValue={subGoal.title}
                       textStyle={{ color: '#EBEBF5', fontSize: 13, fontWeight: '500' }}
-                      onSave={(newTitle) => updateMacroGoal(subGoal.id, { title: newTitle })}
+                      onSave={(newTitle) => updateSummit(subGoal.id, { title: newTitle })}
                       numberOfLines={1}
                     />
                     <Pressable onPress={() => setEditingGoal(subGoal)} style={{ padding: 4 }}>
@@ -506,12 +506,12 @@ export default function AnimatedMacroGoalCard({
         </View>
       )}
 
-      <EditMacroGoalModal
+      <EditSummitModal
         goal={editingGoal}
         visible={!!editingGoal}
         onClose={() => setEditingGoal(null)}
-        onSave={(id, updates) => updateMacroGoal(id, updates)}
-        onDelete={(id) => deleteMacroGoal(id)}
+        onSave={(id, updates) => updateSummit(id, updates)}
+        onDelete={(id) => deleteSummit(id)}
       />
     </View>
   );

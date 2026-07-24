@@ -6,10 +6,9 @@ import { useEconomyStore, IOU_CAP } from '../store/economyStore';
 import { usePreferencesStore } from '../store/preferencesStore';
 import { feedback } from '../utils/feedback';
 import { useTaskStore } from '../store/taskStore';
-import { useMacroGoalStore, MacroGoal, getMilestoneDollars, getEligibleParents } from '../store/macroGoalStore';
+import { useSummitStore, Summit, getMilestoneDollars } from '../store/summitStore';
 import { useAuthStore } from '../store/authStore';
-import { PrimaryButton } from '../components/PrimaryButton';
-import EditMacroGoalModal from '../components/EditMacroGoalModal';
+import EditSummitModal from '../components/EditSummitModal';
 
 const PremiumInput = (props: React.ComponentProps<typeof TextInput>) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -43,20 +42,11 @@ export default function ProfileScreen() {
     clearDebtForTesting
   } = useEconomyStore();
   const { tasks, pillars, tags, addPillar, archivePillar, addTag, archiveTag } = useTaskStore();
-  const { macroGoals: allMacroGoals, addMacroGoal, updateMacroGoal, deleteMacroGoal } = useMacroGoalStore();
-  // Pyramid Targets are productive goals only — entertainment projects live in the Store.
-  const macroGoals = allMacroGoals.filter(g => !g.type || g.type === 'productive');
-  const [editingGoal, setEditingGoal] = useState<MacroGoal | null>(null);
+  const { summits: allSummits, updateSummit, deleteSummit } = useSummitStore();
+  // Summits shown here are productive goals only — entertainment projects live in the Store.
+  const summits = allSummits.filter(g => !g.type || g.type === 'productive');
+  const [editingGoal, setEditingGoal] = useState<Summit | null>(null);
   const { soundEnabled, toggleSound } = usePreferencesStore();
-
-  const [modalVisible, setModalVisible] = useState(false);
-  const [title, setTitle] = useState('');
-  const [horizon, setHorizon] = useState<'monthly' | 'yearly'>('monthly');
-  const [targetHours, setTargetHours] = useState('');
-  const [newGoalMetricType, setNewGoalMetricType] = useState<'minutes' | 'units'>('minutes');
-  const [targetCount, setTargetCount] = useState('');
-  const [newGoalParentId, setNewGoalParentId] = useState('');
-  const [validationError, setValidationError] = useState('');
 
   // Taxonomy State
   const [newPillarName, setNewPillarName] = useState('');
@@ -71,50 +61,6 @@ export default function ProfileScreen() {
     .reduce((acc, t) => acc + t.estimatedMinutes, 0);
 
   const totalHours = (totalCompletedMinutes / 60).toFixed(1);
-
-  const handleAddMacro = () => {
-    setValidationError('');
-
-    if (!title.trim()) {
-      setValidationError('Goal title is required');
-      return;
-    }
-
-    if (newGoalMetricType === 'units') {
-      const count = parseInt(targetCount, 10);
-      if (isNaN(count) || count <= 0) {
-        setValidationError('Target count must be a valid positive number');
-        return;
-      }
-      addMacroGoal({
-        title: title.trim(),
-        horizon,
-        targetMinutes: 0,
-        metricType: 'units',
-        targetMetric: count,
-        parentId: newGoalParentId || undefined,
-      });
-    } else {
-      const hours = parseFloat(targetHours);
-      if (isNaN(hours) || hours <= 0) {
-        setValidationError('Target hours must be a valid positive number');
-        return;
-      }
-      addMacroGoal({
-        title: title.trim(),
-        horizon,
-        targetMinutes: Math.round(hours * 60),
-        parentId: newGoalParentId || undefined,
-      });
-    }
-
-    setTitle('');
-    setTargetHours('');
-    setTargetCount('');
-    setNewGoalParentId('');
-    setNewGoalMetricType('minutes');
-    setModalVisible(false);
-  };
 
   const handleResetData = () => {
     Alert.alert(
@@ -133,186 +79,10 @@ export default function ProfileScreen() {
     );
   };
 
-  // If adding a macro goal, show the form inline
-  if (modalVisible) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }}>
-        <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 40 }}>
-          
-          {/* Form Header */}
-          <View className="flex-row justify-between items-center mt-3 mb-6">
-            <Text className="text-white text-xl font-extrabold tracking-tight">New Pyramid Target</Text>
-            <Pressable onPress={() => setModalVisible(false)} style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 }} className="p-2 rounded-full">
-              <Ionicons name="close" size={20} color="#8E8E93" />
-            </Pressable>
-          </View>
-
-          {validationError ? (
-            <View style={{ backgroundColor: 'rgba(255,69,58,0.15)', borderColor: 'rgba(255,69,58,0.4)', borderWidth: 1 }} className="p-3.5 rounded-2xl mb-4">
-              <Text className="text-[#FF453A] text-xs font-semibold text-center">{validationError}</Text>
-            </View>
-          ) : null}
-
-          {/* Title Input */}
-          <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Pyramid Goal Title</Text>
-          <PremiumInput
-            value={title}
-            onChangeText={setTitle}
-            placeholder="e.g. Hike 100 miles, Write a Novel, Learn French"
-            placeholderTextColor="#8E8E93"
-            spellCheck={true}
-            autoCorrect={true}
-            style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }}
-            className="text-white rounded-2xl p-4 mb-4 text-sm font-semibold"
-          />
-
-          {/* Track By: Time vs Count */}
-          <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Track By</Text>
-          <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="flex-row p-1 rounded-xl mb-4">
-            {([
-              { key: 'minutes' as const, label: 'Time' },
-              { key: 'units' as const, label: 'Count' },
-            ]).map(({ key, label }) => {
-              const isActive = newGoalMetricType === key;
-              return (
-                <Pressable
-                  key={key}
-                  onPress={() => setNewGoalMetricType(key)}
-                  style={({ hovered }: any) => ({
-                    flex: 1,
-                    paddingVertical: 8,
-                    borderRadius: 8,
-                    alignItems: 'center',
-                    backgroundColor: isActive ? (hovered ? '#3A2053' : '#2C183E') : 'transparent',
-                    borderWidth: isActive ? 1 : 0,
-                    borderColor: isActive ? (hovered ? '#5A3382' : '#4D2A6B') : 'transparent',
-                    transition: 'all 0.15s ease-in-out',
-                  })}
-                >
-                  <Text className={`font-semibold text-xs ${isActive ? 'text-white' : 'text-[#8E8E93]'}`}>
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {/* Target Input */}
-          <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">
-            {newGoalMetricType === 'units' ? 'Target Count' : 'Target Hours'}
-          </Text>
-          {newGoalMetricType === 'units' ? (
-            <PremiumInput
-              value={targetCount}
-              onChangeText={setTargetCount}
-              placeholder="e.g. 20 (books, games, workouts...)"
-              placeholderTextColor="#8E8E93"
-              keyboardType="numeric"
-              style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }}
-              className="text-white rounded-2xl p-4 mb-4 text-sm font-semibold"
-            />
-          ) : (
-            <PremiumInput
-              value={targetHours}
-              onChangeText={setTargetHours}
-              placeholder="e.g. 50"
-              placeholderTextColor="#8E8E93"
-              keyboardType="numeric"
-              style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }}
-              className="text-white rounded-2xl p-4 mb-4 text-sm font-semibold"
-            />
-          )}
-
-          {/* Horizon Toggle */}
-          <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Time Horizon</Text>
-          <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="flex-row p-1 rounded-xl mb-6">
-            {(['monthly', 'yearly'] as const).map((h) => {
-              const isActive = horizon === h;
-              return (
-                <Pressable
-                  key={h}
-                  onPress={() => setHorizon(h)}
-                  style={({ hovered }: any) => ({
-                    flex: 1,
-                    paddingVertical: 8,
-                    borderRadius: 8,
-                    alignItems: 'center',
-                    backgroundColor: isActive ? (hovered ? '#3A2053' : '#2C183E') : 'transparent',
-                    borderWidth: isActive ? 1 : 0,
-                    borderColor: isActive ? (hovered ? '#5A3382' : '#4D2A6B') : 'transparent',
-                    transition: 'all 0.15s ease-in-out',
-                  })}
-                >
-                  <Text className={`font-semibold text-xs capitalize ${isActive ? 'text-white' : 'text-[#8E8E93]'}`}>
-                    {h}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {/* Parent Chain (Optional) */}
-          {(() => {
-            const eligibleParents = getEligibleParents(allMacroGoals, null, 'productive', newGoalMetricType);
-            if (eligibleParents.length === 0) return null;
-            return (
-              <View className="mb-6">
-                <Text className="text-[#8E8E93] font-bold text-[10px] tracking-[1.5px] uppercase mb-2">Contributes To (Optional)</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <Pressable
-                    onPress={() => setNewGoalParentId('')}
-                    style={{
-                      paddingHorizontal: 16,
-                      paddingVertical: 10,
-                      borderRadius: 9999,
-                      borderWidth: 1,
-                      marginRight: 8,
-                      backgroundColor: !newGoalParentId ? '#2C183E' : '#1C1C1E',
-                      borderColor: !newGoalParentId ? '#4D2A6B' : 'rgba(255,255,255,0.08)',
-                    }}
-                  >
-                    <Text className={`text-xs ${!newGoalParentId ? 'text-white font-bold' : 'text-[#8E8E93] font-medium'}`}>None</Text>
-                  </Pressable>
-                  {eligibleParents.map((p) => {
-                    const isSelected = newGoalParentId === p.id;
-                    return (
-                      <Pressable
-                        key={p.id}
-                        onPress={() => setNewGoalParentId(p.id)}
-                        style={{
-                          paddingHorizontal: 16,
-                          paddingVertical: 10,
-                          borderRadius: 9999,
-                          borderWidth: 1,
-                          marginRight: 8,
-                          backgroundColor: isSelected ? '#2C183E' : '#1C1C1E',
-                          borderColor: isSelected ? '#4D2A6B' : 'rgba(255,255,255,0.08)',
-                        }}
-                      >
-                        <Text className={`text-xs ${isSelected ? 'text-white font-bold' : 'text-[#8E8E93] font-medium'}`}>{p.title}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            );
-          })()}
-
-          {/* Submit Button */}
-          <PrimaryButton
-            onPress={handleAddMacro}
-            title="Add Pyramid Target"
-            style={{ width: '100%' }}
-          />
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40, maxWidth: 900, width: '100%', alignSelf: 'center' }} className="flex-1 px-5">
-        
+
         {/* Header */}
         <View className="flex-row justify-between items-center mt-3 mb-5">
           <Text className="text-white text-3xl font-extrabold tracking-tight">Profile & Stats</Text>
@@ -333,7 +103,7 @@ export default function ProfileScreen() {
               Daily Streak
             </Text>
           </View>
-          
+
           {/* Total Focus */}
           <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="flex-1 min-w-[45%] p-4 rounded-2xl">
             <View style={{ backgroundColor: 'rgba(191,90,242,0.15)', width: 32, height: 32, borderRadius: 8 }} className="items-center justify-center mb-3">
@@ -355,7 +125,7 @@ export default function ProfileScreen() {
               Banked Cash
             </Text>
           </View>
-          
+
           {/* Completed Tasks */}
           <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="flex-1 min-w-[45%] p-4 rounded-2xl">
             <View style={{ backgroundColor: 'rgba(48,209,88,0.15)', width: 32, height: 32, borderRadius: 8 }} className="items-center justify-center mb-3">
@@ -544,10 +314,10 @@ export default function ProfileScreen() {
                 }
               }}
               disabled={activePillars.length >= 5 || !newPillarName.trim()}
-              style={{ 
-                backgroundColor: activePillars.length >= 5 ? '#2C2C2E' : '#BF5AF2', 
-                marginLeft: 8, 
-                padding: 12, 
+              style={{
+                backgroundColor: activePillars.length >= 5 ? '#2C2C2E' : '#BF5AF2',
+                marginLeft: 8,
+                padding: 12,
                 borderRadius: 8,
                 opacity: (activePillars.length >= 5 || !newPillarName.trim()) ? 0.5 : 1
               }}
@@ -563,10 +333,10 @@ export default function ProfileScreen() {
             const isExpanded = expandedPillarId === pillar.id;
             const pillarTags = tags.filter(t => t.pillarId === pillar.id && !t.isArchived);
             const isLast = index === activePillars.length - 1;
-            
+
             return (
               <View key={pillar.id} style={{ borderBottomWidth: isLast && !isExpanded ? 0 : 0.5, borderBottomColor: 'rgba(255,255,255,0.08)' }}>
-                <Pressable 
+                <Pressable
                   onPress={() => setExpandedPillarId(isExpanded ? null : pillar.id)}
                   style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 }}
                 >
@@ -610,11 +380,11 @@ export default function ProfileScreen() {
                       />
                       <Pressable
                         onPress={() => setNewTagType(newTagType === 'earner' ? 'burner' : 'earner')}
-                        style={{ 
-                          backgroundColor: newTagType === 'earner' ? 'rgba(48,209,88,0.15)' : 'rgba(255,69,58,0.15)', 
-                          paddingHorizontal: 12, 
-                          paddingVertical: 9, 
-                          borderRadius: 6, 
+                        style={{
+                          backgroundColor: newTagType === 'earner' ? 'rgba(48,209,88,0.15)' : 'rgba(255,69,58,0.15)',
+                          paddingHorizontal: 12,
+                          paddingVertical: 9,
+                          borderRadius: 6,
                           marginLeft: 8,
                           borderWidth: 1,
                           borderColor: newTagType === 'earner' ? 'rgba(48,209,88,0.3)' : 'rgba(255,69,58,0.3)'
@@ -644,36 +414,28 @@ export default function ProfileScreen() {
           })}
         </View>
 
-        {/* Macro Goals Section */}
+        {/* Summits Section — created from the Journeys tab; this is a read/edit/delete view */}
         <View className="flex-row justify-between items-center mb-3 mt-1">
           <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px]">
-            Macro Targets (The Pyramid)
+            Summits
           </Text>
-          <Pressable
-            onPress={() => setModalVisible(true)}
-            style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }}
-            className="flex-row items-center px-3 py-1.5 rounded-full"
-          >
-            <Ionicons name="add" size={14} color="#BF5AF2" />
-            <Text className="text-[#BF5AF2] font-bold text-xs ml-1">New Goal</Text>
-          </Pressable>
         </View>
 
-        {macroGoals.length === 0 ? (
+        {summits.length === 0 ? (
           <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl p-8 items-center justify-center border-dashed">
             <Ionicons name="shapes-outline" size={32} color="#8E8E93" />
-            <Text className="text-white text-center font-semibold mt-3">The Pyramid is empty</Text>
-            <Text className="text-[#8E8E93] text-xs text-center mt-1">Create long-term monthly/yearly targets. Direct focus to daily micro-tasks to fill them.</Text>
+            <Text className="text-white text-center font-semibold mt-3">No Summits yet</Text>
+            <Text className="text-[#8E8E93] text-xs text-center mt-1">Create a Journey to start tracking a long-term goal — Journeys are where Summits get created.</Text>
           </View>
         ) : (
           <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl overflow-hidden mb-3">
-            {macroGoals.map((goal, index) => {
+            {summits.map((goal, index) => {
               const completedHours = (goal.completedMinutes / 60).toFixed(1);
               const targetHrs = (goal.targetMinutes / 60).toFixed(1);
               const pct = Math.min(100, Math.round((goal.completedMinutes / goal.targetMinutes) * 100));
               const unlocked = goal.unlockedMilestones || [];
               const milestones = [25, 50, 75, 100];
-              const isLast = index === macroGoals.length - 1;
+              const isLast = index === summits.length - 1;
               return (
                 <View
                   key={goal.id}
@@ -743,12 +505,12 @@ export default function ProfileScreen() {
 
       </ScrollView>
 
-      <EditMacroGoalModal
+      <EditSummitModal
         goal={editingGoal}
         visible={!!editingGoal}
         onClose={() => setEditingGoal(null)}
-        onSave={(id, updates) => updateMacroGoal(id, updates)}
-        onDelete={(id) => deleteMacroGoal(id)}
+        onSave={(id, updates) => updateSummit(id, updates)}
+        onDelete={(id) => deleteSummit(id)}
       />
     </SafeAreaView>
   );

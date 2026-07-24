@@ -4,12 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEconomyStore, IOU_CAP } from '../store/economyStore';
 import { useRewardStore, Reward } from '../store/rewardStore';
-import { useMacroGoalStore, MacroGoal, getEligibleParents } from '../store/macroGoalStore';
+import { useSummitStore, Summit, getEligibleParents } from '../store/summitStore';
 import TimeSelectorModal from '../components/TimeSelectorModal';
 import { feedback } from '../utils/feedback';
 import { useConfettiStore } from '../store/confettiStore';
 import ConfirmModal, { ConfirmAction } from '../components/ConfirmModal';
-import AnimatedMacroGoalCard from '../components/AnimatedMacroGoalCard';
+import AnimatedSummitCard from '../components/AnimatedSummitCard';
 import CountUpText from '../components/CountUpText';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { useTaskStore } from '../store/taskStore';
@@ -34,10 +34,10 @@ export default function StoreScreen() {
     getConversionRate,
   } = useEconomyStore();
   const { rewards, addReward, deleteReward } = useRewardStore();
-  const { macroGoals, addMacroGoal } = useMacroGoalStore();
+  const { summits, addSummit } = useSummitStore();
 
   const conversionInfo = getConversionRate();
-  const entertainmentGoals = macroGoals.filter((g) => g.type === 'entertainment');
+  const entertainmentGoals = summits.filter((g) => g.type === 'entertainment');
 
   // Tab state ('time' vs 'material')
   const [activeTab, setActiveTab] = useState<'time' | 'material'>('time');
@@ -50,7 +50,7 @@ export default function StoreScreen() {
   const [showTimeSelector, setShowTimeSelector] = useState(false);
   const [validationError, setValidationError] = useState('');
   const [selectedParentId, setSelectedParentId] = useState<string>('');
-  const [quickStartGoal, setQuickStartGoal] = useState<MacroGoal | null>(null);
+  const [quickStartGoal, setQuickStartGoal] = useState<Summit | null>(null);
   
   const [projectCategory, setProjectCategory] = useState<'video-game' | 'movie' | 'tv-show' | 'youtube' | 'custom'>('custom');
   const [isOpenEnded, setIsOpenEnded] = useState(false);
@@ -103,7 +103,7 @@ export default function StoreScreen() {
         setValidationError('Target count must be a valid positive number');
         return;
       }
-      addMacroGoal({
+      addSummit({
         title: title.trim(),
         horizon: 'yearly',
         targetMinutes: 0,
@@ -126,7 +126,7 @@ export default function StoreScreen() {
         return;
       }
 
-      addMacroGoal({
+      addSummit({
         title: title.trim(),
         horizon: 'yearly',
         targetMinutes: (selectedParentId && isOpenEnded) ? 0 : projectMinutes,
@@ -151,7 +151,7 @@ export default function StoreScreen() {
       title: t,
       tagId,
       estimatedMinutes: minutes,
-      macroGoalId: targetId,
+      summitId: targetId,
       isIcebox: false,
     });
     const res = startTimer(newTaskId, minutes);
@@ -278,7 +278,7 @@ export default function StoreScreen() {
         <View style={{ width: '100%', maxWidth: 400, backgroundColor: '#09090B', borderWidth: 1, borderColor: '#27272A', borderRadius: 16, padding: 24 }}>
           <View className="flex-row justify-between items-center mb-6">
             <Text className="text-white text-xl font-bold">
-              {activeTab === 'material' ? 'Add Material Reward' : (selectedParentId ? 'Add Milestone/Quest' : 'Add Entertainment Project')}
+              {activeTab === 'material' ? 'Add Material Reward' : (selectedParentId ? 'Add Milestone/Sub-Goal' : 'Add Entertainment Project')}
             </Text>
             <Pressable onPress={() => setShowAddModal(false)} className="p-2 -mr-2 rounded-full">
               <Ionicons name="close" size={20} color="#8E8E93" />
@@ -594,7 +594,7 @@ export default function StoreScreen() {
               {/* Active Entertainment Projects List */}
               <View style={{ marginTop: 8 }}>
                 {entertainmentGoals.filter(g => !g.parentId).map((goal) => (
-                  <AnimatedMacroGoalCard
+                  <AnimatedSummitCard
                     key={goal.id}
                     goal={goal}
                     subGoals={entertainmentGoals.filter(g => g.parentId === goal.id)}
@@ -785,7 +785,7 @@ export default function StoreScreen() {
           visible={!!quickStartGoal}
           onClose={() => setQuickStartGoal(null)}
           goal={quickStartGoal}
-          subGoals={macroGoals.filter(g => g.parentId === quickStartGoal.id)}
+          subGoals={summits.filter(g => g.parentId === quickStartGoal.id)}
           onStart={handleQuickStart}
         />
       )}

@@ -22,7 +22,7 @@ export type Task = {
   id: string;
   title: string;
   tagId: string;
-  macroGoalId?: string;
+  summitId?: string;
   collectionId?: string; // Journey this task belongs to
   estimatedMinutes: number;
   completed: boolean;
@@ -98,10 +98,10 @@ export const useTaskStore = create<TaskState>()(
           
           // Require stores dynamically inside to avoid circular dependencies if any
           const { useEconomyStore } = require('./economyStore');
-          const { useMacroGoalStore } = require('./macroGoalStore');
-          
+          const { useSummitStore } = require('./summitStore');
+
           const economyState = useEconomyStore.getState();
-          const macroState = useMacroGoalStore.getState();
+          const summitState = useSummitStore.getState();
 
           if (isCompleting) {
             // Payout
@@ -112,8 +112,8 @@ export const useTaskStore = create<TaskState>()(
               economyState.incrementStreak();
               economyState.incrementCompletedTasks();
 
-              if (task.macroGoalId) {
-                macroState.applyLeafProgress(task.macroGoalId, task.estimatedMinutes);
+              if (task.summitId) {
+                summitState.applyLeafProgress(task.summitId, task.estimatedMinutes);
               }
             } else if (tag?.type === 'burner') {
               economyState.spendHours(task.estimatedMinutes);
@@ -126,8 +126,8 @@ export const useTaskStore = create<TaskState>()(
               economyState.removeHours(hoursEarned);
               economyState.decrementCompletedTasks();
 
-              if (task.macroGoalId) {
-                macroState.revokeLeafProgress(task.macroGoalId, task.estimatedMinutes);
+              if (task.summitId) {
+                summitState.revokeLeafProgress(task.summitId, task.estimatedMinutes);
               }
             } else if (tag?.type === 'burner') {
               economyState.addHours(task.estimatedMinutes);

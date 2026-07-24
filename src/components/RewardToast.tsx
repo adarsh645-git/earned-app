@@ -6,7 +6,7 @@ interface RewardToastProps {
   visible: boolean;
   message: string;
   subtext?: string;
-  chainTrail?: string[]; // leaf-first, e.g. ["Elden Ring", "RPG Backlog"] — shown as "Elden Ring → RPG Backlog"
+  chainTrail?: string[]; // leaf-first, e.g. ["Elden Ring", "Games Backlog"] — shown as "Elden Ring → Games Backlog"
   onDismiss: () => void;
 }
 

@@ -2,26 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { PrimaryButton } from './PrimaryButton';
-import { MacroGoal, useMacroGoalStore, getEligibleParents } from '../store/macroGoalStore';
+import { Summit, useSummitStore, getEligibleParents } from '../store/summitStore';
 import TimeSelectorModal from './TimeSelectorModal';
 import ConfirmModal from './ConfirmModal';
 
-interface EditMacroGoalModalProps {
-  goal: MacroGoal | null;
+interface EditSummitModalProps {
+  goal: Summit | null;
   visible: boolean;
   onClose: () => void;
-  onSave: (id: string, updates: Partial<MacroGoal>) => void;
+  onSave: (id: string, updates: Partial<Summit>) => void;
   onDelete: (id: string) => void;
 }
 
-export default function EditMacroGoalModal({
+export default function EditSummitModal({
   goal,
   visible,
   onClose,
   onSave,
   onDelete,
-}: EditMacroGoalModalProps) {
-  const { macroGoals: allGoals, setPayingLevel } = useMacroGoalStore();
+}: EditSummitModalProps) {
+  const { summits: allGoals, setPayingLevel } = useSummitStore();
 
   const [title, setTitle] = useState('');
   const [horizon, setHorizon] = useState<'monthly' | 'yearly'>('monthly');
@@ -54,7 +54,7 @@ export default function EditMacroGoalModal({
   const handleSave = () => {
     if (!title.trim()) return;
 
-    const updates: Partial<MacroGoal> = { title: title.trim(), horizon, parentId: parentId || undefined };
+    const updates: Partial<Summit> = { title: title.trim(), horizon, parentId: parentId || undefined };
 
     if (isUnits) {
       updates.targetMetric = isOpenEnded ? 0 : parseInt(targetMetric, 10) || 0;
@@ -88,7 +88,7 @@ export default function EditMacroGoalModal({
         <View style={{ width: '100%', maxWidth: 425, alignSelf: 'center', backgroundColor: '#09090B', borderRadius: 12, padding: 24, borderWidth: 1, borderColor: '#27272A', maxHeight: '90%' }}>
           {/* Header */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-            <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '700' }}>Edit Macro Target</Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '700' }}>Edit Summit</Text>
             <Pressable onPress={onClose} style={{ padding: 4 }}>
               <Ionicons name="close" size={24} color="#A1A1AA" />
             </Pressable>
@@ -310,11 +310,11 @@ export default function EditMacroGoalModal({
         icon="trash-outline"
         iconColor="#FF453A"
         accentColor="#FF453A"
-        title="Delete Macro Target?"
+        title="Delete Summit?"
         message={`"${goal.title}" will be removed${goal.parentId ? '' : ', along with any of its sub-goals'}. Linked tasks and Journeys stay put — they just lose their link to this goal. This cannot be undone.`}
         actions={[
           { label: 'Keep It', onPress: () => {}, style: 'cancel' },
-          { label: 'Delete Macro Target', style: 'destructive', onPress: handleConfirmDelete },
+          { label: 'Delete Summit', style: 'destructive', onPress: handleConfirmDelete },
         ]}
       />
     </Modal>

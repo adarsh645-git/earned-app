@@ -17,7 +17,7 @@ export function CategoryVectorIcon({ category, size = 20, color = '#BF5AF2' }: {
       return <FontAwesome5 name="graduation-cap" size={size - 2} color={color} />;
     case 'travel':
       return <Ionicons name="airplane" size={size + 2} color={color} />;
-    case 'other':
+    case 'general':
     default:
       return <Ionicons name="star" size={size} color={color} />;
   }

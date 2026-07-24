@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   tag_id TEXT NOT NULL,
-  macro_goal_id TEXT,
+  summit_id TEXT,
   collection_id TEXT,
   estimated_minutes INTEGER NOT NULL,
   completed BOOLEAN DEFAULT FALSE,
@@ -41,15 +41,15 @@ CREATE TABLE IF NOT EXISTS public.rewards (
   date_created TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. Macro Goals Pyramid Targets Table
-CREATE TABLE IF NOT EXISTS public.macro_goals (
+-- 5. Summits (long-term goal targets) Table
+CREATE TABLE IF NOT EXISTS public.summits (
   id TEXT PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   horizon TEXT DEFAULT 'monthly' CHECK (horizon IN ('monthly', 'yearly')),
   target_minutes INTEGER NOT NULL,
   completed_minutes INTEGER DEFAULT 0,
-  goal_type TEXT DEFAULT 'productive' CHECK (goal_type IN ('productive', 'entertainment')),
+  summit_type TEXT DEFAULT 'productive' CHECK (summit_type IN ('productive', 'entertainment')),
   metric_type TEXT DEFAULT 'minutes',
   target_metric INTEGER,
   completed_metric INTEGER DEFAULT 0,
@@ -65,14 +65,27 @@ CREATE TABLE IF NOT EXISTS public.collections (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   category TEXT NOT NULL,
-  macro_goal_id TEXT REFERENCES public.macro_goals(id) ON DELETE SET NULL,
+  summit_id TEXT REFERENCES public.summits(id) ON DELETE SET NULL,
   date_created TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 7. Collection Items Table
+-- 7. Waypoints (Journey sub-goal timeframe buckets) Table
+CREATE TABLE IF NOT EXISTS public.waypoints (
+  id TEXT PRIMARY KEY,
+  collection_id TEXT NOT NULL REFERENCES public.collections(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  target_metric INTEGER,
+  year INTEGER,
+  month INTEGER,
+  date_created TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 8. Collection Items Table
 CREATE TABLE IF NOT EXISTS public.collection_items (
   id TEXT PRIMARY KEY,
   collection_id TEXT NOT NULL REFERENCES public.collections(id) ON DELETE CASCADE,
+  waypoint_id TEXT REFERENCES public.waypoints(id) ON DELETE SET NULL,
   title TEXT NOT NULL,
   estimated_minutes INTEGER,
   completed BOOLEAN DEFAULT FALSE,
@@ -105,8 +118,9 @@ CREATE TRIGGER on_auth_user_created
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rewards ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.macro_goals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.summits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.collections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.waypoints ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.collection_items ENABLE ROW LEVEL SECURITY;
 
 -- Profiles Policies
@@ -145,18 +159,18 @@ CREATE POLICY "Users can update own rewards" ON public.rewards FOR UPDATE USING 
 DROP POLICY IF EXISTS "Users can delete own rewards" ON public.rewards;
 CREATE POLICY "Users can delete own rewards" ON public.rewards FOR DELETE USING (auth.uid() = user_id);
 
--- Macro Goals Policies
-DROP POLICY IF EXISTS "Users can view own macro goals" ON public.macro_goals;
-CREATE POLICY "Users can view own macro goals" ON public.macro_goals FOR SELECT USING (auth.uid() = user_id);
+-- Summits Policies
+DROP POLICY IF EXISTS "Users can view own summits" ON public.summits;
+CREATE POLICY "Users can view own summits" ON public.summits FOR SELECT USING (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Users can insert own macro goals" ON public.macro_goals;
-CREATE POLICY "Users can insert own macro goals" ON public.macro_goals FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own summits" ON public.summits;
+CREATE POLICY "Users can insert own summits" ON public.summits FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Users can update own macro goals" ON public.macro_goals;
-CREATE POLICY "Users can update own macro goals" ON public.macro_goals FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own summits" ON public.summits;
+CREATE POLICY "Users can update own summits" ON public.summits FOR UPDATE USING (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Users can delete own macro goals" ON public.macro_goals;
-CREATE POLICY "Users can delete own macro goals" ON public.macro_goals FOR DELETE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own summits" ON public.summits;
+CREATE POLICY "Users can delete own summits" ON public.summits FOR DELETE USING (auth.uid() = user_id);
 
 -- Collections Policies
 DROP POLICY IF EXISTS "Users can view their own collections." ON public.collections;
@@ -170,6 +184,19 @@ CREATE POLICY "Users can update their own collections." ON public.collections FO
 
 DROP POLICY IF EXISTS "Users can delete their own collections." ON public.collections;
 CREATE POLICY "Users can delete their own collections." ON public.collections FOR DELETE USING (auth.uid() = user_id);
+
+-- Waypoints Policies
+DROP POLICY IF EXISTS "Users can view their own waypoints." ON public.waypoints;
+CREATE POLICY "Users can view their own waypoints." ON public.waypoints FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can insert their own waypoints." ON public.waypoints;
+CREATE POLICY "Users can insert their own waypoints." ON public.waypoints FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update their own waypoints." ON public.waypoints;
+CREATE POLICY "Users can update their own waypoints." ON public.waypoints FOR UPDATE USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete their own waypoints." ON public.waypoints;
+CREATE POLICY "Users can delete their own waypoints." ON public.waypoints FOR DELETE USING (auth.uid() = user_id);
 
 -- Collection Items Policies
 DROP POLICY IF EXISTS "Users can view items of their collections." ON public.collection_items;
@@ -195,10 +222,17 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables 
+    SELECT 1 FROM pg_publication_tables
     WHERE pubname = 'supabase_realtime' AND tablename = 'collection_items'
   ) THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.collection_items;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'waypoints'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.waypoints;
   END IF;
 END $$;
 -- ==============================================================================

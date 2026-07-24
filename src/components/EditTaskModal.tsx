@@ -40,7 +40,7 @@ export default function EditTaskModal({
       setTitle(task.title);
       setTagId(task.tagId);
       setEstimatedMinutes(task.estimatedMinutes);
-      setSelectedMacroId(task.macroGoalId || '');
+      setSelectedMacroId(task.summitId || '');
       setSelectedCollectionId(task.collectionId || '');
 
       const tag = tags.find(t => t.id === task.tagId);
@@ -60,7 +60,7 @@ export default function EditTaskModal({
       title: title.trim(),
       tagId,
       estimatedMinutes,
-      macroGoalId: selectedMacroId || undefined,
+      summitId: selectedMacroId || undefined,
       collectionId: selectedCollectionId || undefined,
     });
     onClose();
@@ -235,11 +235,11 @@ export default function EditTaskModal({
             <LinkProgressPicker
               tagType={isBurner ? 'burner' : 'earner'}
               collectionId={selectedCollectionId}
-              macroGoalId={selectedMacroId}
-              onChange={(collectionId, macroGoalId) => {
+              summitId={selectedMacroId}
+              onChange={(collectionId, summitId) => {
                 feedback('select');
                 setSelectedCollectionId(collectionId);
-                setSelectedMacroId(macroGoalId);
+                setSelectedMacroId(summitId);
               }}
               accentColor={isBurner ? '#5AC8FA' : '#BF5AF2'}
             />

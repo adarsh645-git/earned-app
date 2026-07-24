@@ -4,7 +4,7 @@ import { useAuthStore } from './authStore';
 import { useEconomyStore } from './economyStore';
 import { useTaskStore, Task, Pillar, Tag } from './taskStore';
 import { useRewardStore, Reward } from './rewardStore';
-import { useMacroGoalStore, MacroGoal } from './macroGoalStore';
+import { useSummitStore, Summit } from './summitStore';
 import { useCollectionStore, Collection, CollectionItem } from './collectionStore';
 
 /**
@@ -64,30 +64,30 @@ export function useCloudSync() {
       pushAllRewardsToCloud(user.id, state.rewards);
     });
 
-    const unsubMacroGoals = useMacroGoalStore.subscribe((state, prevState) => {
-      const removedIds = diffRemovedIds(prevState.macroGoals, state.macroGoals);
+    const unsubSummits = useSummitStore.subscribe((state, prevState) => {
+      const removedIds = diffRemovedIds(prevState.summits, state.summits);
       if (removedIds.length > 0) {
-        deleteMacroGoalsFromCloud(user.id, removedIds);
+        deleteSummitsFromCloud(user.id, removedIds);
       }
-      pushAllMacroGoalsToCloud(user.id, state.macroGoals);
+      pushAllSummitsToCloud(user.id, state.summits);
     });
 
     const unsubCollections = useCollectionStore.subscribe((state, prevState) => {
       const removedCollectionIds = diffRemovedIds(prevState.collections, state.collections);
-      const removedSubGoalIds = diffRemovedIds(prevState.subGoals || [], state.subGoals || []);
+      const removedWaypointIds = diffRemovedIds(prevState.waypoints || [], state.waypoints || []);
       const removedItemIds = diffRemovedIds(prevState.items, state.items);
 
       if (removedCollectionIds.length > 0) {
         deleteCollectionsFromCloud(user.id, removedCollectionIds);
       }
-      if (removedSubGoalIds.length > 0) {
-        deleteSubGoalsFromCloud(user.id, removedSubGoalIds);
+      if (removedWaypointIds.length > 0) {
+        deleteWaypointsFromCloud(user.id, removedWaypointIds);
       }
       if (removedItemIds.length > 0) {
         deleteItemsFromCloud(removedItemIds);
       }
 
-      pushAllCollectionsToCloud(user.id, state.collections, state.items, state.subGoals);
+      pushAllCollectionsToCloud(user.id, state.collections, state.items, state.waypoints);
     });
 
     // 3. Subscribe to Realtime remote database changes
@@ -106,7 +106,7 @@ export function useCloudSync() {
       unsubEconomy();
       unsubTasks();
       unsubRewards();
-      unsubMacroGoals();
+      unsubSummits();
       unsubCollections();
       supabase.removeChannel(channel);
     };
@@ -152,7 +152,7 @@ export async function pullCloudData(userId: string) {
         id: t.id,
         title: t.title,
         tagId: t.tag_id,
-        macroGoalId: t.macro_goal_id,
+        summitId: t.summit_id,
         collectionId: t.collection_id || undefined,
         estimatedMinutes: t.estimated_minutes,
         completed: t.completed,
@@ -208,20 +208,20 @@ export async function pullCloudData(userId: string) {
       useRewardStore.setState((s) => ({ rewards: mergeById(s.rewards, formattedRewards) }));
     }
 
-    // Fetch Macro Goals
-    const { data: macroGoals } = await supabase
-      .from('macro_goals')
+    // Fetch Summits
+    const { data: summits } = await supabase
+      .from('summits')
       .select('*')
       .eq('user_id', userId);
 
-    if (macroGoals && macroGoals.length > 0) {
-      const formattedMacroGoals = macroGoals.map((g: any) => ({
+    if (summits && summits.length > 0) {
+      const formattedSummits = summits.map((g: any) => ({
         id: g.id,
         title: g.title,
         horizon: (g.horizon || 'monthly') as 'monthly' | 'yearly',
         targetMinutes: g.target_minutes || 0,
         completedMinutes: g.completed_minutes || 0,
-        type: g.goal_type || 'productive',
+        type: g.summit_type || 'productive',
         metricType: g.metric_type || 'minutes',
         targetMetric: g.target_metric || 0,
         completedMetric: g.completed_metric || 0,
@@ -230,7 +230,7 @@ export async function pullCloudData(userId: string) {
         paysCurrency: g.pays_currency !== false,
         category: g.category || undefined,
       }));
-      useMacroGoalStore.setState((s) => ({ macroGoals: mergeById(s.macroGoals, formattedMacroGoals) }));
+      useSummitStore.setState((s) => ({ summits: mergeById(s.summits, formattedSummits) }));
     }
 
     // Fetch Collections
@@ -244,28 +244,28 @@ export async function pullCloudData(userId: string) {
         id: c.id,
         title: c.title,
         category: c.category,
-        macroGoalId: c.macro_goal_id,
+        summitId: c.summit_id,
         dateCreated: c.date_created,
       }));
       useCollectionStore.setState((s) => ({ ...s, collections: mergeById(s.collections, formattedCollections) }));
 
-      // Fetch Journey Sub Goals
-      const { data: subGoals } = await supabase
-        .from('journey_sub_goals')
+      // Fetch Waypoints
+      const { data: waypoints } = await supabase
+        .from('waypoints')
         .select('*')
         .in('collection_id', collections.map(c => c.id));
 
-      if (subGoals && subGoals.length > 0) {
-        const formattedSubGoals = subGoals.map((s: any) => ({
-          id: s.id,
-          collectionId: s.collection_id,
-          title: s.title,
-          targetMetric: s.target_metric,
-          year: s.year,
-          month: s.month,
-          dateCreated: s.date_created,
+      if (waypoints && waypoints.length > 0) {
+        const formattedWaypoints = waypoints.map((w: any) => ({
+          id: w.id,
+          collectionId: w.collection_id,
+          title: w.title,
+          targetMetric: w.target_metric,
+          year: w.year,
+          month: w.month,
+          dateCreated: w.date_created,
         }));
-        useCollectionStore.setState((s) => ({ ...s, subGoals: mergeById(s.subGoals, formattedSubGoals) }));
+        useCollectionStore.setState((s) => ({ ...s, waypoints: mergeById(s.waypoints, formattedWaypoints) }));
       }
     }
 
@@ -280,7 +280,7 @@ export async function pullCloudData(userId: string) {
         const formattedItems = items.map((i: any) => ({
           id: i.id,
           collectionId: i.collection_id,
-          subGoalId: i.sub_goal_id || undefined,
+          waypointId: i.waypoint_id || undefined,
           title: i.title,
           estimatedMinutes: i.estimated_minutes,
           completed: i.completed,
@@ -330,7 +330,7 @@ export async function pushAllTasksToCloud(userId: string, tasks: Task[]) {
       user_id: userId,
       title: t.title,
       tag_id: t.tagId,
-      macro_goal_id: t.macroGoalId || null,
+      summit_id: t.summitId || null,
       collection_id: t.collectionId || null,
       estimated_minutes: t.estimatedMinutes,
       completed: t.completed,
@@ -400,26 +400,26 @@ export async function pushAllRewardsToCloud(userId: string, rewards: Reward[]) {
   }
 }
 
-export async function deleteMacroGoalsFromCloud(userId: string, ids: string[]) {
+export async function deleteSummitsFromCloud(userId: string, ids: string[]) {
   if (!isSupabaseConfigured() || ids.length === 0) return;
   try {
-    await supabase.from('macro_goals').delete().eq('user_id', userId).in('id', ids);
+    await supabase.from('summits').delete().eq('user_id', userId).in('id', ids);
   } catch (err) {
-    console.log('Error deleting macro goals from cloud:', err);
+    console.log('Error deleting summits from cloud:', err);
   }
 }
 
-export async function pushAllMacroGoalsToCloud(userId: string, goals: MacroGoal[]) {
-  if (!isSupabaseConfigured() || goals.length === 0) return;
+export async function pushAllSummitsToCloud(userId: string, summits: Summit[]) {
+  if (!isSupabaseConfigured() || summits.length === 0) return;
   try {
-    const payload = goals.map((g) => ({
+    const payload = summits.map((g) => ({
       id: g.id,
       user_id: userId,
       title: g.title,
       horizon: g.horizon || 'monthly',
       target_minutes: g.targetMinutes || 0,
       completed_minutes: g.completedMinutes || 0,
-      goal_type: g.type || 'productive',
+      summit_type: g.type || 'productive',
       metric_type: g.metricType || 'minutes',
       target_metric: g.targetMetric || 0,
       completed_metric: g.completedMetric || 0,
@@ -428,9 +428,9 @@ export async function pushAllMacroGoalsToCloud(userId: string, goals: MacroGoal[
       pays_currency: g.paysCurrency !== false,
       category: g.category || null,
     }));
-    await supabase.from('macro_goals').upsert(payload, { onConflict: 'id' });
+    await supabase.from('summits').upsert(payload, { onConflict: 'id' });
   } catch (err) {
-    console.log('Error pushing macro goals to cloud:', err);
+    console.log('Error pushing summits to cloud:', err);
   }
 }
 
@@ -443,12 +443,12 @@ export async function deleteCollectionsFromCloud(userId: string, ids: string[]) 
   }
 }
 
-export async function deleteSubGoalsFromCloud(userId: string, ids: string[]) {
+export async function deleteWaypointsFromCloud(userId: string, ids: string[]) {
   if (!isSupabaseConfigured() || ids.length === 0) return;
   try {
-    await supabase.from('journey_sub_goals').delete().eq('user_id', userId).in('id', ids);
+    await supabase.from('waypoints').delete().eq('user_id', userId).in('id', ids);
   } catch (err) {
-    console.log('Error deleting journey sub-goals from cloud:', err);
+    console.log('Error deleting waypoints from cloud:', err);
   }
 }
 
@@ -463,7 +463,7 @@ export async function deleteItemsFromCloud(ids: string[]) {
   }
 }
 
-export async function pushAllCollectionsToCloud(userId: string, collections: Collection[], items: CollectionItem[], subGoals?: any[]) {
+export async function pushAllCollectionsToCloud(userId: string, collections: Collection[], items: CollectionItem[], waypoints?: any[]) {
   if (!isSupabaseConfigured()) return;
   try {
     if (collections.length > 0) {
@@ -472,31 +472,31 @@ export async function pushAllCollectionsToCloud(userId: string, collections: Col
         user_id: userId,
         title: c.title,
         category: c.category,
-        macro_goal_id: c.macroGoalId || null,
+        summit_id: c.summitId || null,
         date_created: c.dateCreated,
       }));
       await supabase.from('collections').upsert(cPayload, { onConflict: 'id' });
     }
 
-    if (subGoals && subGoals.length > 0) {
-      const sPayload = subGoals.map((s) => ({
-        id: s.id,
-        collection_id: s.collectionId,
+    if (waypoints && waypoints.length > 0) {
+      const wPayload = waypoints.map((w) => ({
+        id: w.id,
+        collection_id: w.collectionId,
         user_id: userId,
-        title: s.title,
-        target_metric: s.targetMetric || null,
-        year: s.year || null,
-        month: s.month || null,
-        date_created: s.dateCreated,
+        title: w.title,
+        target_metric: w.targetMetric || null,
+        year: w.year || null,
+        month: w.month || null,
+        date_created: w.dateCreated,
       }));
-      await supabase.from('journey_sub_goals').upsert(sPayload, { onConflict: 'id' });
+      await supabase.from('waypoints').upsert(wPayload, { onConflict: 'id' });
     }
 
     if (items.length > 0) {
       const iPayload = items.map((i) => ({
         id: i.id,
         collection_id: i.collectionId,
-        sub_goal_id: i.subGoalId || null,
+        waypoint_id: i.waypointId || null,
         title: i.title,
         estimated_minutes: i.estimatedMinutes || null,
         completed: i.completed,
