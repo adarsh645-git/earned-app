@@ -15,6 +15,7 @@ This directory contains the feature specification documents and task checklists 
 - **[009-blame-free-economy-iou.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/009-blame-free-economy-iou.md)**: Replaces the punitive credit/interest/default system with a flat-capped, interest-free Dollar IOU and a purely positive Discipline Score.
 - **[010-ui-juice-and-screen-redesigns.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/010-ui-juice-and-screen-redesigns.md)**: Dependency-free Web Audio sound layer, animated ring/pills/bars, tiered haptic+sound feedback, and flow/naming/motion redesigns of Tasks, Store, and Journeys.
 - **[011-cloud-sync-data-loss-fixes.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/011-cloud-sync-data-loss-fixes.md)**: Fixes dropped macro-goal `type` field on sync, destructive pull-overwrite races that erased newly-added tags/items, and an unfiltered Pyramid list on Profile.
+- **[012-macro-goal-edit-delete.md](file:///Users/adarshreddy/Projects/earned-app/docs/sdd/012-macro-goal-edit-delete.md)**: Edit (title/horizon/target) and cascade-safe delete (unlinks tasks/Journeys, removes sub-goals) for macro targets, wired into both `AnimatedMacroGoalCard` and Profile's Pyramid list.
 
 
 

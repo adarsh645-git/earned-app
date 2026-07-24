@@ -78,9 +78,33 @@ export const useMacroGoalStore = create<MacroGoalState>()(
       updateMacroGoal: (id, updates) => set((state) => ({
         macroGoals: state.macroGoals.map(g => g.id === id ? { ...g, ...updates } : g)
       })),
-      deleteMacroGoal: (id) => set((state) => ({
-        macroGoals: state.macroGoals.filter(g => g.id !== id)
-      })),
+      deleteMacroGoal: (id) => {
+        // Sub-goals are structurally dependent on their parent — remove them too.
+        // Anything else that merely references this goal (tasks, Journeys) is
+        // unlinked, not deleted, so unrelated work is never silently destroyed.
+        const childIds = get().macroGoals.filter(g => g.parentId === id).map(g => g.id);
+        const idsToRemove = new Set([id, ...childIds]);
+
+        set((state) => ({
+          macroGoals: state.macroGoals.filter(g => !idsToRemove.has(g.id))
+        }));
+
+        // Dynamic require avoids a circular import (taskStore/collectionStore
+        // already import this store), matching the pattern used in taskStore.ts.
+        const { useTaskStore } = require('./taskStore');
+        useTaskStore.setState((s: any) => ({
+          tasks: s.tasks.map((t: any) =>
+            t.macroGoalId && idsToRemove.has(t.macroGoalId) ? { ...t, macroGoalId: undefined } : t
+          ),
+        }));
+
+        const { useCollectionStore } = require('./collectionStore');
+        useCollectionStore.setState((s: any) => ({
+          collections: s.collections.map((c: any) =>
+            c.macroGoalId && idsToRemove.has(c.macroGoalId) ? { ...c, macroGoalId: undefined } : c
+          ),
+        }));
+      },
       addProgress: (id, amount) => {
         const goal = get().macroGoals.find(g => g.id === id);
         if (!goal) return [];

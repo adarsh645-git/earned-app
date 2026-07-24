@@ -1,9 +1,10 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { View, Text, Animated, Dimensions, Pressable, TextInput } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { MacroGoal, getMilestoneDollars, useMacroGoalStore } from '../store/macroGoalStore';
 import { hapticHeavyImpact, hapticMediumImpact } from '../utils/haptics';
 import { useConfettiStore } from '../store/confettiStore';
+import EditMacroGoalModal from './EditMacroGoalModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -248,7 +249,8 @@ export default function AnimatedMacroGoalCard({
   onQuickStart,
   onAddSubGoal,
 }: AnimatedMacroGoalCardProps) {
-  const { updateMacroGoal } = useMacroGoalStore();
+  const { updateMacroGoal, deleteMacroGoal } = useMacroGoalStore();
+  const [editingGoal, setEditingGoal] = useState<MacroGoal | null>(null);
   const isUnits = goal.metricType === 'units';
   const isEntertainment = goal.type === 'entertainment';
   const target = isUnits ? (goal.targetMetric || 1) : goal.targetMinutes;
@@ -347,6 +349,9 @@ export default function AnimatedMacroGoalCard({
               <Text style={{ color: '#A1A1AA', fontSize: 10, fontWeight: '600' }}>{displayCategory}</Text>
             </View>
           )}
+          <Pressable onPress={() => setEditingGoal(goal)} style={{ padding: 4, marginLeft: 2 }}>
+            <Ionicons name="pencil" size={13} color="#8E8E93" />
+          </Pressable>
         </View>
         {isOpenEnded ? (
           <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '500' }}>
@@ -445,6 +450,9 @@ export default function AnimatedMacroGoalCard({
                       onSave={(newTitle) => updateMacroGoal(subGoal.id, { title: newTitle })}
                       numberOfLines={1}
                     />
+                    <Pressable onPress={() => setEditingGoal(subGoal)} style={{ padding: 4 }}>
+                      <Ionicons name="pencil" size={11} color="#8E8E93" />
+                    </Pressable>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Text style={{ color: '#8E8E93', fontSize: 12 }}>
@@ -497,6 +505,14 @@ export default function AnimatedMacroGoalCard({
           </Pressable>
         </View>
       )}
+
+      <EditMacroGoalModal
+        goal={editingGoal}
+        visible={!!editingGoal}
+        onClose={() => setEditingGoal(null)}
+        onSave={(id, updates) => updateMacroGoal(id, updates)}
+        onDelete={(id) => deleteMacroGoal(id)}
+      />
     </View>
   );
 }
