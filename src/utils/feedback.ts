@@ -3,6 +3,7 @@ import {
   hapticSuccess,
   hapticError,
   hapticLightImpact,
+  hapticMediumImpact,
   hapticHeavyImpact,
 } from './haptics';
 import { playSound, SoundType } from './sound';
@@ -21,6 +22,7 @@ export type FeedbackType =
   | 'milestone' // milestone / streak-up / journey completion
   | 'currency' // dollars / hours earned
   | 'expand' // accordion / sheet open
+  | 'reorderPickup' // lifting a row to drag-reorder it
   | 'error'; // blocked / failed action
 
 const map: Record<FeedbackType, { haptic: () => void; sound: SoundType }> = {
@@ -30,6 +32,7 @@ const map: Record<FeedbackType, { haptic: () => void; sound: SoundType }> = {
   milestone: { haptic: hapticHeavyImpact, sound: 'fanfare' },
   currency: { haptic: hapticLightImpact, sound: 'coin' },
   expand: { haptic: hapticLightImpact, sound: 'whoosh' },
+  reorderPickup: { haptic: hapticMediumImpact, sound: 'whoosh' },
   error: { haptic: hapticError, sound: 'error' },
 };
 

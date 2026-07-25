@@ -24,10 +24,28 @@ export type Task = {
   tagId: string;
   summitId?: string;
   collectionId?: string; // Journey this task belongs to
+  parentId?: string; // ID of the parent task if this is a subtask
   estimatedMinutes: number;
   completed: boolean;
   isIcebox: boolean;
   dateCreated: string;
+  // Manual ordering key — larger sorts lower within its group (a day's active
+  // tasks, or a parent's subtasks). Optional so persisted/cloud rows that
+  // predate this field still typecheck; sortKey() below covers the gap by
+  // falling back to creation time, so an un-reordered list still reads in
+  // creation order with zero backfill.
+  sortOrder?: number;
+}
+
+/**
+ * The manual-order comparator key shared by the store and any screen that
+ * renders a sortable group. Falls back to creation time for tasks that
+ * predate `sortOrder` (or rows pulled from a cloud snapshot that hasn't
+ * synced it yet), so legacy and reordered tasks compose on the same
+ * epoch-ms scale.
+ */
+export function sortKey(t: Task): number {
+  return t.sortOrder ?? Date.parse(t.dateCreated);
 }
 
 interface TaskState {
@@ -41,13 +59,18 @@ interface TaskState {
   // Task Actions
   // title is the only required field — quick-add can create a task from just
   // a title; tagId/estimatedMinutes/isIcebox get safe defaults filled in below.
-  addTask: (task: { title: string; tagId?: string; estimatedMinutes?: number; isIcebox?: boolean; summitId?: string; collectionId?: string }) => string;
+  addTask: (task: { title: string; tagId?: string; estimatedMinutes?: number; isIcebox?: boolean; summitId?: string; collectionId?: string; parentId?: string; }) => string;
   setLastUsedTagId: (id: string) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
   toggleTask: (id: string, isManual?: boolean) => void;
   moveToIcebox: (id: string) => void;
   activateFromIcebox: (id: string) => void;
+  // Persists a manual drag-reorder. `orderedActiveIds` is the full new order
+  // for one sortable group (a day's active tasks, or one parent's active
+  // subtasks) — every other task (other groups, completed rows, icebox) is
+  // left untouched.
+  reorderTasks: (orderedActiveIds: string[]) => void;
   
   // Pillar Actions
   addPillar: (name: string) => void;
@@ -78,14 +101,30 @@ export const useTaskStore = create<TaskState>()(
 
       addTask: (task) => {
         const id = uuidv4();
-        const state = get();
+        
+        if (task.parentId) {
+          const state = get();
+          const parent = state.tasks.find(t => t.id === task.parentId);
+          const siblings = state.tasks.filter(t => t.parentId === task.parentId);
+          if (parent && parent.completed) {
+            if (siblings.length === 0) {
+              // Adding first subtask to a childless completed parent: revert its payout before it becomes a container
+              get().toggleTask(task.parentId, true);
+            } else {
+              // Parent is completed but already has children (meaning they are all completed). Adding an incomplete child uncompletes the parent.
+              get().updateTask(task.parentId, { completed: false });
+            }
+          }
+        }
+
+        const updatedState = get();
 
         // Safe default-fill so any caller (quick-add included) can create a
         // task from just a title — last-used tag, then first non-archived
         // tag, then '' as a last resort.
         const tagId = task.tagId
-          || (state.tags.find(t => t.id === state.lastUsedTagId && !t.isArchived)?.id)
-          || state.tags.find(t => !t.isArchived)?.id
+          || (updatedState.tags.find(t => t.id === updatedState.lastUsedTagId && !t.isArchived)?.id)
+          || updatedState.tags.find(t => !t.isArchived)?.id
           || '';
         const estimatedMinutes = task.estimatedMinutes && task.estimatedMinutes > 0 ? task.estimatedMinutes : 25;
         const isIcebox = task.isIcebox ?? false;
@@ -98,12 +137,17 @@ export const useTaskStore = create<TaskState>()(
             isIcebox,
             summitId: task.summitId,
             collectionId: task.collectionId,
+            parentId: task.parentId,
             id,
             completed: false,
             // Full timestamp (not just the date) so the row can show the
             // creation time — day-grouping (TasksScreen) extracts the date
             // portion itself.
-            dateCreated: new Date().toISOString()
+            dateCreated: new Date().toISOString(),
+            // Epoch-ms puts a brand-new task's key far above any reindexed
+            // group's small integers (see reorderTasks), so it always lands
+            // at the bottom of its group — preserving creation-order default.
+            sortOrder: Date.now(),
           }],
           lastUsedTagId: tagId || state.lastUsedTagId
         }));
@@ -113,16 +157,44 @@ export const useTaskStore = create<TaskState>()(
       updateTask: (id, updates) => set((state) => ({
         tasks: state.tasks.map(t => t.id === id ? { ...t, ...updates } : t)
       })),
-      deleteTask: (id) => set((state) => ({
-        tasks: state.tasks.filter(t => t.id !== id)
-      })),
+      deleteTask: (id) => set((state) => {
+        const taskToDelete = state.tasks.find(t => t.id === id);
+        if (!taskToDelete) return state;
+
+        let newTasks = state.tasks.filter(t => t.id !== id && t.parentId !== id);
+
+        // Edge case: when deleting a subtask, handle the parent's completion state
+        if (taskToDelete.parentId) {
+            const remainingSiblings = newTasks.filter(t => t.parentId === taskToDelete.parentId);
+            if (remainingSiblings.length === 0) {
+                // Parent just became childless. If it's currently completed, force it to false so it doesn't stay in a state where it never paid out but is marked complete.
+                const parentIndex = newTasks.findIndex(t => t.id === taskToDelete.parentId);
+                if (parentIndex !== -1 && newTasks[parentIndex].completed) {
+                    newTasks[parentIndex] = { ...newTasks[parentIndex], completed: false };
+                }
+            } else if (taskToDelete.completed === false) {
+                // We deleted an incomplete sibling. Maybe now all remaining siblings are completed?
+                const allChildrenCompleted = remainingSiblings.every(t => t.completed);
+                if (allChildrenCompleted) {
+                    const parentIndex = newTasks.findIndex(t => t.id === taskToDelete.parentId);
+                    if (parentIndex !== -1 && !newTasks[parentIndex].completed) {
+                        newTasks[parentIndex] = { ...newTasks[parentIndex], completed: true };
+                    }
+                }
+            }
+        }
+        
+        return { tasks: newTasks };
+      }),
       toggleTask: (id, isManual = true) => set((state) => {
         const task = state.tasks.find(t => t.id === id);
         if (!task) return state;
 
         const isCompleting = !task.completed;
+        const subtasks = state.tasks.filter(t => t.parentId === id);
+        const isContainer = subtasks.length > 0;
 
-        if (isManual) {
+        if (isManual && !isContainer) {
           const tag = state.tags.find(t => t.id === task.tagId);
           
           // Require stores dynamically inside to avoid circular dependencies if any
@@ -164,16 +236,44 @@ export const useTaskStore = create<TaskState>()(
           }
         }
 
-        return {
-          tasks: state.tasks.map(t => t.id === id ? { ...t, completed: isCompleting } : t)
-        };
+        const newTasks = state.tasks.map(t => t.id === id ? { ...t, completed: isCompleting } : t);
+
+        // Auto-complete parent bubbling
+        if (task.parentId) {
+          const children = newTasks.filter(t => t.parentId === task.parentId);
+          const allChildrenCompleted = children.every(t => t.completed);
+          
+          if (isCompleting && allChildrenCompleted) {
+             const parentIndex = newTasks.findIndex(t => t.id === task.parentId);
+             if (parentIndex !== -1) newTasks[parentIndex] = { ...newTasks[parentIndex], completed: true };
+          } else if (!isCompleting) {
+             const parentIndex = newTasks.findIndex(t => t.id === task.parentId);
+             if (parentIndex !== -1) newTasks[parentIndex] = { ...newTasks[parentIndex], completed: false };
+          }
+        }
+
+        return { tasks: newTasks };
       }),
       moveToIcebox: (id) => set((state) => ({
-        tasks: state.tasks.map(t => t.id === id ? { ...t, isIcebox: true } : t)
+        // Cascade to subtasks so a parent's children don't strand as
+        // orphaned, unrenderable rows (day view hides them once the parent
+        // is iceboxed; the Icebox list only shows top-level rows).
+        tasks: state.tasks.map(t => (t.id === id || t.parentId === id) ? { ...t, isIcebox: true } : t)
       })),
       activateFromIcebox: (id) => set((state) => ({
-        tasks: state.tasks.map(t => t.id === id ? { ...t, isIcebox: false, dateCreated: new Date().toISOString() } : t)
+        tasks: state.tasks.map(t => (t.id === id || t.parentId === id) ? { ...t, isIcebox: false, dateCreated: new Date().toISOString() } : t)
       })),
+      reorderTasks: (orderedActiveIds) => set((state) => {
+        // Whole-group integer reindex — a personal daily list is tiny
+        // (single-digit active rows per group), so reassigning every id in
+        // the dropped group on every drop is trivially correct and needs no
+        // fractional/gap-based rebalancing. Spacing (1000) is purely for
+        // debug readability, not a real constraint.
+        const newOrder = new Map(orderedActiveIds.map((id, index) => [id, index * 1000]));
+        return {
+          tasks: state.tasks.map(t => newOrder.has(t.id) ? { ...t, sortOrder: newOrder.get(t.id) } : t),
+        };
+      }),
       
       // Pillar Actions
       addPillar: (name) => set((state) => {

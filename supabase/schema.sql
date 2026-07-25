@@ -26,10 +26,12 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   tag_id TEXT NOT NULL,
   summit_id TEXT,
   collection_id TEXT,
+  parent_id TEXT, -- subtask link (one level only); not a FK, see 20260725000004
   estimated_minutes INTEGER NOT NULL,
   completed BOOLEAN DEFAULT FALSE,
   is_icebox BOOLEAN DEFAULT FALSE,
-  date_created TIMESTAMPTZ DEFAULT NOW()
+  date_created TIMESTAMPTZ DEFAULT NOW(),
+  sort_order DOUBLE PRECISION -- manual drag-reorder key; see 20260725000003
 );
 
 -- 4. Indulgence Rewards Store Table
