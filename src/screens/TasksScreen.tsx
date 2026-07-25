@@ -34,6 +34,20 @@ import QuickAddBar from '../components/QuickAddBar';
 import PillPicker from '../components/PillPicker';
 import { getEligibleJourneys } from '../components/LinkProgressPicker';
 
+// "Today's Focus List — Friday, July 25" / "Yesterday" / "Wed, Jul 23"
+function formatDateLabel(dateStr: string, isToday: boolean): string {
+  const d = new Date(`${dateStr}T00:00:00`); // local-time anchor — avoids the
+                                              // UTC-midnight day-shift bug that
+                                              // plain `new Date(dateStr)` has
+  if (isToday) {
+    return `Today's Focus List — ${d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`;
+  }
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (dateStr === yesterday.toISOString().split('T')[0]) return 'Yesterday';
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 export default function TasksScreen() {
   const { tasks, tags, pillars, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox } = useTaskStore();
   const { summits } = useSummitStore();
@@ -117,9 +131,37 @@ export default function TasksScreen() {
   // Modals state
   const [editTask, setEditTask] = useState<Task | null>(null);
 
-  const incompleteTasks = tasks.filter(t => !t.isIcebox && !t.completed);
-  const completedTasks = tasks.filter(t => !t.isIcebox && t.completed);
   const iceboxTasks = tasks.filter(t => t.isIcebox);
+
+  // Bundle non-icebox tasks by the day they were created — today's group is
+  // expanded by default, every other day collapses, and only the 5 most
+  // recent distinct days are shown at all (older tasks simply don't render).
+  const todayStr = new Date().toISOString().split('T')[0]; // matches dateCreated's own format exactly
+
+  const tasksByDate: Record<string, Task[]> = {};
+  tasks.filter(t => !t.isIcebox).forEach(t => {
+    // dateCreated is now a full timestamp (for the time-of-day pill below);
+    // grouping only cares about the calendar date. Backward-compatible with
+    // pre-existing tasks whose dateCreated was already date-only (no 'T').
+    const dateKey = t.dateCreated.split('T')[0];
+    (tasksByDate[dateKey] ||= []).push(t);
+  });
+  // Active tasks first, completed ones after (faded) within each day's group.
+  Object.values(tasksByDate).forEach(list =>
+    list.sort((a, b) => Number(a.completed) - Number(b.completed))
+  );
+
+  const distinctDates = Object.keys(tasksByDate).sort((a, b) => b.localeCompare(a)); // desc; lexicographic = chronological for YYYY-MM-DD
+  const datesToShow = [todayStr, ...distinctDates.filter(d => d !== todayStr)].slice(0, 5);
+
+  const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
+  const isDateExpanded = (date: string) =>
+    date === todayStr ? (expandedDates[date] ?? true) : !!expandedDates[date];
+  const toggleDate = (date: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    feedback('expand');
+    setExpandedDates(prev => ({ ...prev, [date]: !isDateExpanded(date) }));
+  };
 
   const toggleQuickAddExpanded = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -246,73 +288,61 @@ export default function TasksScreen() {
 
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }} className="flex-1">
           
-          {/* Active Tasks Section */}
-          <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3">
-            Today's Focus List
-          </Text>
-          
-          {incompleteTasks.length === 0 ? (
-            <View style={CARD_STYLE} className="rounded-2xl p-6 items-center justify-center mb-6">
-              <Ionicons name="checkmark-done-circle-outline" size={28} color="#3A3A3C" style={{ marginBottom: 8 }} />
-              <Text className="text-white font-semibold text-center">Your focus list is clear.</Text>
-              <Text className="text-[#8E8E93] text-xs text-center mt-1">Type above and press Enter to schedule a focus session.</Text>
-            </View>
-          ) : (
-            <View style={CARD_STYLE} className="rounded-2xl overflow-hidden mb-5">
-              {incompleteTasks.map((task, index) => {
-                const tag = tags.find(t => t.id === task.tagId);
-                const isLast = index === incompleteTasks.length - 1;
-                return (
-                  <AnimatedTaskRow
-                    key={task.id}
-                    task={task}
-                    tagName={tag?.name}
-                    tagType={tag?.type}
-                    tags={tags}
-                    onUpdate={updateTask}
-                    isLast={isLast}
-                    onToggle={handleToggle}
-                    onMoveToIcebox={handleMoveToIcebox}
-                    onEdit={setEditTask}
-                    onDelete={deleteTask}
-                    onStartTimer={handleStartTimer}
-                    showStartButton
-                  />
-                );
-              })}
-            </View>
-          )}
+          {/* Tasks bundled by day — today expanded, older days collapsed,
+              capped to the 5 most recent distinct days */}
+          {datesToShow.map(date => {
+            const dateTasks = tasksByDate[date] || [];
+            const isToday = date === todayStr;
+            const expanded = isDateExpanded(date);
+            return (
+              <View key={date} className="mb-5">
+                <Pressable
+                  onPress={() => toggleDate(date)}
+                  className="flex-row items-center mb-3"
+                >
+                  <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px]" style={{ flex: 1 }}>
+                    {formatDateLabel(date, isToday)}{dateTasks.length > 0 ? ` (${dateTasks.length})` : ''}
+                  </Text>
+                  <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color="#8E8E93" />
+                </Pressable>
 
-          {/* Completed Tasks Section */}
-          {completedTasks.length > 0 && (
-            <View className="mb-5">
-              <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3">
-                Completed Today
-              </Text>
-              <View style={CARD_STYLE} className="rounded-2xl overflow-hidden">
-                {completedTasks.map((task, index) => {
-                  const tag = tags.find(t => t.id === task.tagId);
-                  const isLast = index === completedTasks.length - 1;
-                  return (
-                    <AnimatedTaskRow
-                      key={task.id}
-                      task={task}
-                      tagName={tag?.name}
-                      tagType={tag?.type}
-                      tags={tags}
-                      onUpdate={updateTask}
-                      isLast={isLast}
-                      onToggle={handleToggle}
-                      onMoveToIcebox={handleMoveToIcebox}
-                      onEdit={setEditTask}
-                      onDelete={deleteTask}
-                      showIceboxButton={false}
-                    />
-                  );
-                })}
+                {expanded && (
+                  dateTasks.length === 0 ? (
+                    <View style={CARD_STYLE} className="rounded-2xl p-6 items-center justify-center">
+                      <Ionicons name="checkmark-done-circle-outline" size={28} color="#3A3A3C" style={{ marginBottom: 8 }} />
+                      <Text className="text-white font-semibold text-center">Your focus list is clear.</Text>
+                      <Text className="text-[#8E8E93] text-xs text-center mt-1">Type above and press Enter to schedule a focus session.</Text>
+                    </View>
+                  ) : (
+                    <View style={CARD_STYLE} className="rounded-2xl overflow-hidden">
+                      {dateTasks.map((task, index) => {
+                        const tag = tags.find(t => t.id === task.tagId);
+                        const isLast = index === dateTasks.length - 1;
+                        return (
+                          <AnimatedTaskRow
+                            key={task.id}
+                            task={task}
+                            tagName={tag?.name}
+                            tagType={tag?.type}
+                            tags={tags}
+                            onUpdate={updateTask}
+                            isLast={isLast}
+                            onToggle={handleToggle}
+                            onMoveToIcebox={handleMoveToIcebox}
+                            onEdit={setEditTask}
+                            onDelete={deleteTask}
+                            onStartTimer={task.completed ? undefined : handleStartTimer}
+                            showStartButton={!task.completed}
+                            showIceboxButton={!task.completed}
+                          />
+                        );
+                      })}
+                    </View>
+                  )
+                )}
               </View>
-            </View>
-          )}
+            );
+          })}
 
           {/* Icebox Tasks Section */}
           <View className="mt-5">

@@ -107,7 +107,7 @@ export default function EditSummitModal({
                 placeholderTextColor="#52525B"
                 spellCheck={true}
                 autoCorrect={true}
-                style={{
+                style={[{
                   backgroundColor: '#18181B',
                   color: '#FFFFFF',
                   padding: 16,
@@ -115,7 +115,7 @@ export default function EditSummitModal({
                   fontSize: 16,
                   borderWidth: 1,
                   borderColor: '#27272A'
-                }}
+                }, { outlineStyle: 'none' } as any]}
               />
             </View>
 
@@ -252,7 +252,7 @@ export default function EditSummitModal({
                   placeholder="e.g. 12"
                   placeholderTextColor="#52525B"
                   keyboardType="numeric"
-                  style={{ backgroundColor: '#18181B', color: '#FFFFFF', padding: 16, borderRadius: 12, fontSize: 16, borderWidth: 1, borderColor: '#27272A' }}
+                  style={[{ backgroundColor: '#18181B', color: '#FFFFFF', padding: 16, borderRadius: 12, fontSize: 16, borderWidth: 1, borderColor: '#27272A' }, { outlineStyle: 'none' } as any]}
                 />
               ) : (
                 <Pressable

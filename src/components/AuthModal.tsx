@@ -176,7 +176,7 @@ export default function AuthModal() {
                 placeholderTextColor="#8E8E93"
                 keyboardType="email-address"
                 autoCapitalize="none"
-                style={styles.input}
+                style={[styles.input, { outlineStyle: 'none' } as any]}
               />
 
               {/* Password Input */}
@@ -187,7 +187,7 @@ export default function AuthModal() {
                 placeholder="••••••••"
                 placeholderTextColor="#8E8E93"
                 secureTextEntry
-                style={styles.input}
+                style={[styles.input, { outlineStyle: 'none' } as any]}
               />
 
               {/* Submit Button */}

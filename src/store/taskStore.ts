@@ -100,7 +100,10 @@ export const useTaskStore = create<TaskState>()(
             collectionId: task.collectionId,
             id,
             completed: false,
-            dateCreated: new Date().toISOString().split('T')[0]
+            // Full timestamp (not just the date) so the row can show the
+            // creation time — day-grouping (TasksScreen) extracts the date
+            // portion itself.
+            dateCreated: new Date().toISOString()
           }],
           lastUsedTagId: tagId || state.lastUsedTagId
         }));
@@ -169,7 +172,7 @@ export const useTaskStore = create<TaskState>()(
         tasks: state.tasks.map(t => t.id === id ? { ...t, isIcebox: true } : t)
       })),
       activateFromIcebox: (id) => set((state) => ({
-        tasks: state.tasks.map(t => t.id === id ? { ...t, isIcebox: false, dateCreated: new Date().toISOString().split('T')[0] } : t)
+        tasks: state.tasks.map(t => t.id === id ? { ...t, isIcebox: false, dateCreated: new Date().toISOString() } : t)
       })),
       
       // Pillar Actions

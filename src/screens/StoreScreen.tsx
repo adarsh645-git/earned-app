@@ -411,7 +411,7 @@ export default function StoreScreen() {
               placeholderTextColor="#52525B"
               spellCheck={true}
               autoCorrect={true}
-              style={{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }}
+              style={[{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }, { outlineStyle: 'none' } as any]}
               className="text-white rounded-lg p-3 text-sm"
             />
           </View>
@@ -435,7 +435,7 @@ export default function StoreScreen() {
                 placeholder="e.g. 150.00"
                 placeholderTextColor="#52525B"
                 keyboardType="numeric"
-                style={{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }}
+                style={[{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }, { outlineStyle: 'none' } as any]}
                 className="text-white rounded-lg p-3 text-sm"
               />
             ) : projectMetricType === 'units' ? (
@@ -445,7 +445,7 @@ export default function StoreScreen() {
                 placeholder="e.g. 10 (games, seasons, runs...)"
                 placeholderTextColor="#52525B"
                 keyboardType="numeric"
-                style={{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }}
+                style={[{ backgroundColor: '#09090B', borderColor: '#27272A', borderWidth: 1 }, { outlineStyle: 'none' } as any]}
                 className="text-white rounded-lg p-3 text-sm"
               />
             ) : (

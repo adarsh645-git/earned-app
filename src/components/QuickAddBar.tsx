@@ -73,7 +73,7 @@ export default function QuickAddBar({
           onChangeText={onChangeText}
           placeholder={placeholder}
           placeholderTextColor="#5C5C5E"
-          style={{ flex: 1, color: '#FFF', fontSize: 15, paddingVertical: 6 }}
+          style={[{ flex: 1, color: '#FFF', fontSize: 15, paddingVertical: 6 }, { outlineStyle: 'none' } as any]}
           onSubmitEditing={handleSubmit}
           blurOnSubmit={false}
           returnKeyType="done"

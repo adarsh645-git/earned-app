@@ -22,7 +22,9 @@ const TONE_ACCENTS: Record<ToastTone, { color: string; icon: React.ComponentProp
 
 export default function RewardToast({ visible, message, subtext, chainTrail, onDismiss, tone = 'neutral' }: RewardToastProps) {
   const [mounted, setMounted] = useState(visible);
-  const translateY = useRef(new Animated.Value(visible ? 0 : -16)).current;
+  // Bottom-right anchored, so it slides up into place (and back down on
+  // dismiss) rather than the old top-anchored slide-down.
+  const translateY = useRef(new Animated.Value(visible ? 0 : 16)).current;
   const opacity = useRef(new Animated.Value(visible ? 1 : 0)).current;
 
   // Keep the timeout/tap handler calling the latest onDismiss without making it
@@ -47,7 +49,7 @@ export default function RewardToast({ visible, message, subtext, chainTrail, onD
 
     // Play the exit animation, then unmount.
     Animated.parallel([
-      Animated.timing(translateY, { toValue: -16, duration: 200, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 16, duration: 200, useNativeDriver: true }),
       Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }),
     ]).start(() => setMounted(false));
   }, [visible]);
@@ -59,14 +61,15 @@ export default function RewardToast({ visible, message, subtext, chainTrail, onD
   const hasChainTrail = !!chainTrail && chainTrail.length > 1;
 
   return (
-    // Non-interactive full-width wrapper (box-none) so touches pass through
-    // everywhere except the card itself — the card floats centered, content-width.
-    <View pointerEvents="box-none" style={{ position: 'absolute', top: 50, left: 0, right: 0, alignItems: 'center', paddingHorizontal: 20, zIndex: 9999 }}>
-      <Animated.View style={{ maxWidth: 440, width: '100%', opacity, transform: [{ translateY }] }}>
+    // Non-interactive wrapper (box-none) so touches pass through everywhere
+    // except the card itself — the card floats bottom-right, content-width,
+    // like a desktop notification.
+    <View pointerEvents="box-none" style={{ position: 'absolute', bottom: 24, left: 20, right: 20, alignItems: 'flex-end', zIndex: 9999 }}>
+      <Animated.View style={{ maxWidth: 400, opacity, transform: [{ translateY }] }}>
         <Pressable
           onPress={onDismiss}
           style={{
-            backgroundColor: '#18181B',
+            backgroundColor: 'rgba(24,24,27,0.88)',
             borderWidth: 1,
             borderColor: 'rgba(255,255,255,0.10)',
             borderRadius: 20,
@@ -75,10 +78,10 @@ export default function RewardToast({ visible, message, subtext, chainTrail, onD
             flexDirection: 'row',
             alignItems: 'center',
             shadowColor: accent,
-            shadowOffset: { width: 0, height: 10 },
-            shadowOpacity: 0.35,
-            shadowRadius: 20,
-            elevation: 14,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.12,
+            shadowRadius: 10,
+            elevation: 6,
           }}
         >
           {/* Nested concentric icon badge — the app's depth idiom for accent tints */}

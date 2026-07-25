@@ -133,7 +133,7 @@ export default function TimeSelectorModal({
                   keyboardType="number-pad"
                   placeholder="0"
                   placeholderTextColor="#52525B"
-                  style={{
+                  style={[{
                     backgroundColor: '#18181B',
                     color: '#FFFFFF',
                     padding: 16,
@@ -142,7 +142,7 @@ export default function TimeSelectorModal({
                     borderWidth: 1,
                     borderColor: '#27272A',
                     textAlign: 'center'
-                  }}
+                  }, { outlineStyle: 'none' } as any]}
                 />
               </View>
               <View style={{ flex: 1 }}>
@@ -153,7 +153,7 @@ export default function TimeSelectorModal({
                   keyboardType="number-pad"
                   placeholder="0"
                   placeholderTextColor="#52525B"
-                  style={{
+                  style={[{
                     backgroundColor: '#18181B',
                     color: '#FFFFFF',
                     padding: 16,
@@ -162,7 +162,7 @@ export default function TimeSelectorModal({
                     borderWidth: 1,
                     borderColor: '#27272A',
                     textAlign: 'center'
-                  }}
+                  }, { outlineStyle: 'none' } as any]}
                 />
               </View>
             </View>

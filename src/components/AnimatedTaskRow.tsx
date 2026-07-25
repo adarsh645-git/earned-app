@@ -22,6 +22,15 @@ import { feedback } from '../utils/feedback';
 // fully hidden, so the Completed Today group still reads at a glance.
 const COMPLETED_OPACITY = 0.5;
 
+// "9:41 AM" — null for legacy tasks whose dateCreated predates the switch
+// from a date-only string to a full timestamp (nothing to show for those).
+function formatCreatedTime(dateCreated: string): string | null {
+  if (!dateCreated.includes('T')) return null;
+  const d = new Date(dateCreated);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
 type OpenPill = 'tag' | 'journey' | null;
 
 interface AnimatedTaskRowProps {
@@ -64,6 +73,7 @@ export default function AnimatedTaskRow({
   const { summits } = useSummitStore();
   const eligibleJourneys = onUpdate ? getEligibleJourneys(collections, summits, tagType === 'burner' ? 'burner' : 'earner') : [];
   const linkedJourney = task.collectionId ? collections.find(c => c.id === task.collectionId) : undefined;
+  const createdTime = formatCreatedTime(task.dateCreated);
 
   const [openPill, setOpenPill] = useState<OpenPill>(null);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
@@ -265,6 +275,13 @@ export default function AnimatedTaskRow({
                     accentColor={accent}
                   />
                 )}
+
+                {createdTime && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#3A3A3C' }}>
+                    <Ionicons name="time-outline" size={11} color="#8E8E93" style={{ marginRight: 4 }} />
+                    <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600' }}>{createdTime}</Text>
+                  </View>
+                )}
               </View>
             ) : (
               <View className="flex-row items-center mt-1 gap-1.5">
@@ -276,6 +293,11 @@ export default function AnimatedTaskRow({
                 <Text className="text-[#8E8E93] text-xs font-medium">
                   {task.estimatedMinutes} mins
                 </Text>
+                {createdTime && (
+                  <Text className="text-[#8E8E93] text-xs font-medium">
+                    · {createdTime}
+                  </Text>
+                )}
               </View>
             )}
           </View>

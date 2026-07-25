@@ -224,7 +224,7 @@ function InlineEditableText({
         onBlur={handleSave}
         onSubmitEditing={handleSave}
         autoFocus
-        style={[textStyle, { padding: 0, margin: 0, minWidth: 100, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, paddingHorizontal: 4 }]}
+        style={[textStyle, { padding: 0, margin: 0, minWidth: 100, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, paddingHorizontal: 4 }, { outlineStyle: 'none' } as any]}
         returnKeyType="done"
       />
     );

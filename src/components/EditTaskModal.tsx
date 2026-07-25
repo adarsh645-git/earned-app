@@ -99,7 +99,7 @@ export default function EditTaskModal({
                 placeholderTextColor="#52525B"
                 spellCheck={true}
                 autoCorrect={true}
-                style={{
+                style={[{
                   backgroundColor: '#18181B',
                   color: '#FFFFFF',
                   padding: 16,
@@ -107,7 +107,7 @@ export default function EditTaskModal({
                   fontSize: 16,
                   borderWidth: 1,
                   borderColor: '#27272A'
-                }}
+                }, { outlineStyle: 'none' } as any]}
               />
             </View>
 

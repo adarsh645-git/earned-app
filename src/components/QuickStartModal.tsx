@@ -76,7 +76,7 @@ export default function QuickStartModal({
             onChangeText={setTitle}
             placeholder={isEntertainment ? "e.g. Boss Fight" : "e.g. Read Chapter 1"}
             placeholderTextColor="#5C5C5E"
-            style={{ backgroundColor: '#151517', color: '#FFF', padding: 16, borderRadius: 12, fontSize: 16, marginBottom: 16, borderWidth: 1, borderColor: '#2C2C2E' }}
+            style={[{ backgroundColor: '#151517', color: '#FFF', padding: 16, borderRadius: 12, fontSize: 16, marginBottom: 16, borderWidth: 1, borderColor: '#2C2C2E' }, { outlineStyle: 'none' } as any]}
           />
 
           {/* Target Project / Sub-Project */}
