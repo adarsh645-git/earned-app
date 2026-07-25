@@ -10,6 +10,9 @@ import { useConfettiStore } from '../store/confettiStore';
 import { PrimaryButton } from '../components/PrimaryButton';
 import AnimatedProgressBar from '../components/AnimatedProgressBar';
 import RewardToast from '../components/RewardToast';
+import PillPicker from '../components/PillPicker';
+import QuickAddBar from '../components/QuickAddBar';
+import EditableText from '../components/EditableText';
 import { feedback } from '../utils/feedback';
 import { CategoryVectorIcon } from '../utils/categoryIcons';
 
@@ -100,6 +103,7 @@ export default function CollectionsScreen() {
     updateWaypoint,
     deleteWaypoint,
     addItem,
+    updateItem,
     toggleItemCompletion,
     deleteItem,
   } = useCollectionStore();
@@ -138,10 +142,18 @@ export default function CollectionsScreen() {
   const [newSummitHorizon, setNewSummitHorizon] = useState<'monthly' | 'yearly'>('monthly');
   const [newSummitParentId, setNewSummitParentId] = useState('');
 
+  // New Journey — collapsible inline form (no modal). Shares all the state
+  // above (journeyTitle, journeyCategory, journeyLinkMode, newSummit*) and
+  // handleSaveJourney with the Edit modal below; only the container + open
+  // state differ.
+  const [isNewJourneyExpanded, setIsNewJourneyExpanded] = useState(false);
+  const [newJourneyOpenPill, setNewJourneyOpenPill] = useState<'category' | 'goal' | null>(null);
+
   // Delete Journey Confirmation Modal
   const [deletingJourneyId, setDeletingJourneyId] = useState<string | null>(null);
 
-  // Create/Edit Waypoint Modal
+  // Edit Waypoint Modal (creation now happens via the quick-add bar below —
+  // this only ever opens from the "..." edit affordance now)
   const [isWaypointModalOpen, setIsWaypointModalOpen] = useState(false);
   const [editingWaypointId, setEditingWaypointId] = useState<string | null>(null);
   const [activeWaypointCollectionId, setActiveWaypointCollectionId] = useState('');
@@ -150,12 +162,18 @@ export default function CollectionsScreen() {
   const [waypointYear, setWaypointYear] = useState<string>(currentYear.toString());
   const [waypointMonth, setWaypointMonth] = useState<string>(currentMonth.toString());
 
-  // Create Item Modal
-  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
-  const [activeCollectionId, setActiveCollectionId] = useState('');
-  const [selectedWaypointId, setSelectedWaypointId] = useState<string>('');
-  const [itemTitle, setItemTitle] = useState('');
-  const [itemEstimatedMinutes, setItemEstimatedMinutes] = useState('');
+  // Waypoint quick-add bar — bare title only; Target/Year/Month default
+  // unset and become row pills afterward. Keyed by collection id (one bar
+  // per journey's waypoints footer).
+  const [waypointQuickAddTitle, setWaypointQuickAddTitle] = useState<Record<string, string>>({});
+  // Row-level Target/Year/Month pills for an existing waypoint (post-creation
+  // correction), keyed by waypoint id.
+  const [waypointRowOpenField, setWaypointRowOpenField] = useState<Record<string, 'target' | 'year' | 'month' | null>>({});
+
+  // Item quick-add bars — bare title only; keyed by waypoint id (per-waypoint
+  // "Add Task" bar) or by collection id (journey-footer "+ Task" bar, root items).
+  const [itemQuickAddTitleByWaypoint, setItemQuickAddTitleByWaypoint] = useState<Record<string, string>>({});
+  const [itemQuickAddTitleByJourney, setItemQuickAddTitleByJourney] = useState<Record<string, string>>({});
 
   // Accordion State
   const [expandedWaypoints, setExpandedWaypoints] = useState<Record<string, boolean>>({});
@@ -173,13 +191,22 @@ export default function CollectionsScreen() {
     setExpandedJourneys(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  // Per-journey-row Category/Goal pills (post-creation correction, in the
+  // expanded accordion area) — keyed by journey id since these rows aren't
+  // their own component.
+  const [journeyRowOpenPill, setJourneyRowOpenPill] = useState<Record<string, 'category' | 'goal' | null>>({});
+  const toggleJourneyRowPill = (collectionId: string, pill: 'category' | 'goal') => {
+    setJourneyRowOpenPill(prev => ({ ...prev, [collectionId]: prev[collectionId] === pill ? null : pill }));
+  };
+
   const categories: CollectionCategory[] = ['books', 'games', 'stocks', 'fitness', 'courses', 'travel', 'general'];
 
   // Journey CRUD
   const handleOpenNewJourney = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setEditingJourneyId(null);
     setJourneyTitle('');
-    setJourneyCategory('books');
+    setJourneyCategory('general'); // matches collectionStore's addCollection default
     setJourneyValidationError('');
     setJourneyLinkMode('none');
     setSelectedMacroId('');
@@ -189,7 +216,14 @@ export default function CollectionsScreen() {
     setNewSummitTargetCount('');
     setNewSummitHorizon('monthly');
     setNewSummitParentId('');
-    setIsJourneyModalOpen(true);
+    setNewJourneyOpenPill(null);
+    setIsNewJourneyExpanded(true);
+  };
+
+  const handleCancelNewJourney = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsNewJourneyExpanded(false);
+    setNewJourneyOpenPill(null);
   };
 
   const handleOpenEditJourney = (cId: string) => {
@@ -259,7 +293,9 @@ export default function CollectionsScreen() {
         category: journeyCategory,
         summitId: linkedSummitId,
       });
-      setIsJourneyModalOpen(false);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setIsNewJourneyExpanded(false);
+      setNewJourneyOpenPill(null);
 
       // Trigger celebration feedback
       triggerConfetti();
@@ -289,17 +325,8 @@ export default function CollectionsScreen() {
     setDeletingJourneyId(null);
   };
 
-  // Waypoint CRUD
-  const handleOpenNewWaypoint = (collectionId: string) => {
-    setActiveWaypointCollectionId(collectionId);
-    setEditingWaypointId(null);
-    setWaypointTitle('');
-    setWaypointTargetMetric('');
-    setWaypointYear(currentYear.toString());
-    setWaypointMonth(currentMonth.toString());
-    setIsWaypointModalOpen(true);
-  };
-
+  // Waypoint CRUD — creation is now the quick-add bar (handleQuickAddWaypoint
+  // below); this modal only ever opens for editing.
   const handleOpenEditWaypoint = (waypoint: Waypoint) => {
     setActiveWaypointCollectionId(waypoint.collectionId);
     setEditingWaypointId(waypoint.id);
@@ -311,65 +338,52 @@ export default function CollectionsScreen() {
   };
 
   const handleSaveWaypoint = () => {
-    if (!waypointTitle.trim() || !activeWaypointCollectionId) return;
+    if (!editingWaypointId || !waypointTitle.trim()) return;
     const targetVal = parseInt(waypointTargetMetric, 10);
     const yrVal = parseInt(waypointYear, 10);
     const moVal = parseInt(waypointMonth, 10);
 
-    if (editingWaypointId) {
-      updateWaypoint(editingWaypointId, {
-        title: waypointTitle.trim(),
-        targetMetric: isNaN(targetVal) ? undefined : targetVal,
-        year: isNaN(yrVal) ? undefined : yrVal,
-        month: isNaN(moVal) ? undefined : moVal,
-      });
-      setIsWaypointModalOpen(false);
-    } else {
-      addWaypoint({
-        collectionId: activeWaypointCollectionId,
-        title: waypointTitle.trim(),
-        targetMetric: isNaN(targetVal) ? undefined : targetVal,
-        year: isNaN(yrVal) ? undefined : yrVal,
-        month: isNaN(moVal) ? undefined : moVal,
-      });
-      setIsWaypointModalOpen(false);
-
-      // Trigger celebration feedback for Waypoint creation
-      triggerConfetti();
-      feedback('select');
-      setCelebrationInfo({
-        title: 'Waypoint added',
-        subtitle: `"${waypointTitle.trim()}" added to your journey targets.`,
-        iconType: 'target',
-        payoutText: `Target: ${isNaN(targetVal) ? 'Custom' : targetVal} units · ${waypointMonth ? MONTH_NAMES[parseInt(waypointMonth, 10) - 1] : ''} ${waypointYear || 'Ongoing'}`,
-        badgeLabel: 'WAYPOINT ADDED',
-      });
-    }
+    updateWaypoint(editingWaypointId, {
+      title: waypointTitle.trim(),
+      targetMetric: isNaN(targetVal) ? undefined : targetVal,
+      year: isNaN(yrVal) ? undefined : yrVal,
+      month: isNaN(moVal) ? undefined : moVal,
+    });
+    setIsWaypointModalOpen(false);
   };
 
-  // Item CRUD
-  const handleOpenNewItem = (collectionId: string) => {
-    setActiveCollectionId(collectionId);
-    setSelectedWaypointId('');
-    setItemTitle('');
-    setItemEstimatedMinutes('');
-    setIsItemModalOpen(true);
+  // Bare quick-add — title only; Target/Year/Month default unset and become
+  // row pills on the created Waypoint afterward.
+  const handleQuickAddWaypoint = (collectionId: string) => {
+    const title = (waypointQuickAddTitle[collectionId] || '').trim();
+    if (!title) return;
+
+    addWaypoint({ collectionId, title });
+    setWaypointQuickAddTitle(prev => ({ ...prev, [collectionId]: '' }));
+
+    triggerConfetti();
+    feedback('select');
+    setCelebrationInfo({
+      title: 'Waypoint added',
+      subtitle: `"${title}" added to your journey targets.`,
+      iconType: 'target',
+      payoutText: 'Set a target, year, or month anytime by tapping its pills.',
+      badgeLabel: 'WAYPOINT ADDED',
+    });
   };
 
-  const handleCreateItem = () => {
-    if (!itemTitle.trim() || !activeCollectionId) return;
-    const est = parseInt(itemEstimatedMinutes, 10);
+  // Item quick-add — title only; waypointId is preset when launched from
+  // inside an expanded waypoint, otherwise it's a root (General) item.
+  const handleQuickAddItem = (collectionId: string, waypointId: string | undefined, title: string) => {
+    const trimmed = title.trim();
+    if (!trimmed) return;
     addItem({
-      collectionId: activeCollectionId,
-      waypointId: selectedWaypointId || undefined,
-      title: itemTitle.trim(),
-      estimatedMinutes: isNaN(est) ? undefined : est,
+      collectionId,
+      waypointId: waypointId || undefined,
+      title: trimmed,
       isAddedLater: true,
     });
-    setItemTitle('');
-    setItemEstimatedMinutes('');
-    setSelectedWaypointId('');
-    setIsItemModalOpen(false);
+    feedback('select');
   };
 
   const handleToggleItem = (itemId: string, collectionId: string, waypointId?: string) => {
@@ -463,15 +477,7 @@ export default function CollectionsScreen() {
 
       {/* Executive Summary Header Stats Bar (Shadcn-inspired) */}
       <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <Text style={{ fontSize: 32, fontWeight: '800', color: '#FFFFFF' }}>Journeys</Text>
-          <PrimaryButton
-            onPress={handleOpenNewJourney}
-            title="New Journey"
-            icon={<Ionicons name="add" size={16} color="white" />}
-            size="sm"
-          />
-        </View>
+        <Text style={{ fontSize: 32, fontWeight: '800', color: '#FFFFFF', marginBottom: 16 }}>Journeys</Text>
 
         {/* Shadcn Stats Grid */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -520,6 +526,215 @@ export default function CollectionsScreen() {
         </View>
       </View>
 
+      {/* New Journey — collapsible inline form, no modal */}
+      <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+        <Pressable
+          onPress={isNewJourneyExpanded ? handleCancelNewJourney : handleOpenNewJourney}
+          style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1C1E', borderWidth: 1, borderColor: '#2C2C2E', borderRadius: 16, padding: 14 }}
+        >
+          <Ionicons name="add-circle" size={18} color="#BF5AF2" style={{ marginRight: 8 }} />
+          <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '700', flex: 1 }}>New Journey</Text>
+          <Ionicons name={isNewJourneyExpanded ? 'chevron-up' : 'chevron-down'} size={18} color="#8E8E93" />
+        </Pressable>
+
+        {isNewJourneyExpanded && (
+          <View style={{ marginTop: 8, backgroundColor: '#1C1C1E', borderWidth: 1, borderColor: '#2C2C2E', borderRadius: 16, padding: 16 }}>
+            {journeyValidationError ? (
+              <View style={{ backgroundColor: 'rgba(255,69,58,0.15)', borderColor: 'rgba(255,69,58,0.4)', borderWidth: 1, padding: 12, borderRadius: 12, marginBottom: 14 }}>
+                <Text style={{ color: '#FF453A', fontSize: 12, fontWeight: '600', textAlign: 'center' }}>{journeyValidationError}</Text>
+              </View>
+            ) : null}
+
+            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Journey Title</Text>
+            <PremiumInput
+              style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, fontSize: 15, marginBottom: 14, borderWidth: 1, borderColor: '#2C2C2E' }}
+              placeholder="e.g., Reading List 2026, Marathon Training"
+              placeholderTextColor="#5C5C5E"
+              value={journeyTitle}
+              onChangeText={setJourneyTitle}
+              autoFocus
+            />
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+              <PillPicker
+                label={`Category: ${journeyCategory.charAt(0).toUpperCase()}${journeyCategory.slice(1)}`}
+                options={categories.map(c => ({ id: c, label: `${c.charAt(0).toUpperCase()}${c.slice(1)}` }))}
+                selectedId={journeyCategory}
+                onSelect={(id) => { setJourneyCategory(id as CollectionCategory); setNewJourneyOpenPill(null); }}
+                open={newJourneyOpenPill === 'category'}
+                onToggle={() => setNewJourneyOpenPill(p => (p === 'category' ? null : 'category'))}
+              />
+
+              <PillPicker
+                label={`Goal: ${
+                  journeyLinkMode === 'existing'
+                    ? (summits.find(s => s.id === selectedMacroId)?.title || 'Select...')
+                    : journeyLinkMode === 'new'
+                    ? (newSummitTitle.trim() ? `New — ${newSummitTitle.trim()}` : 'New Goal...')
+                    : 'None'
+                }`}
+                options={[{ id: '', label: 'None' }, ...summits.map(s => ({ id: s.id, label: s.title }))]}
+                selectedId={journeyLinkMode === 'existing' ? selectedMacroId : ''}
+                onSelect={(id) => {
+                  feedback('select');
+                  setNewJourneyOpenPill(null);
+                  if (id === '') {
+                    setJourneyLinkMode('none');
+                    setSelectedMacroId('');
+                  } else {
+                    setJourneyLinkMode('existing');
+                    setSelectedMacroId(id);
+                  }
+                }}
+                open={newJourneyOpenPill === 'goal'}
+                onToggle={() => setNewJourneyOpenPill(p => (p === 'goal' ? null : 'goal'))}
+                footerAction={{
+                  label: '+ Create New Goal...',
+                  onPress: () => { setJourneyLinkMode('new'); setNewJourneyOpenPill(null); },
+                }}
+              />
+            </View>
+
+            {journeyLinkMode === 'new' && (
+              <View style={{ marginTop: 12 }}>
+                <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Summit Title</Text>
+                <PremiumInput
+                  style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, fontSize: 15, marginBottom: 14, borderWidth: 1, borderColor: '#2C2C2E' }}
+                  placeholder="e.g. Hike 100 miles, Write a Novel, Learn French"
+                  placeholderTextColor="#5C5C5E"
+                  value={newSummitTitle}
+                  onChangeText={setNewSummitTitle}
+                />
+
+                <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Track By</Text>
+                <View style={{ backgroundColor: '#151517', borderColor: '#2C2C2E', borderWidth: 1 }} className="flex-row p-1 rounded-xl mb-4">
+                  {([
+                    { key: 'minutes' as const, label: 'Time' },
+                    { key: 'units' as const, label: 'Count' },
+                  ]).map(({ key, label }) => {
+                    const isActive = newSummitMetricType === key;
+                    return (
+                      <Pressable
+                        key={key}
+                        onPress={() => setNewSummitMetricType(key)}
+                        style={{
+                          flex: 1,
+                          paddingVertical: 8,
+                          borderRadius: 8,
+                          alignItems: 'center',
+                          backgroundColor: isActive ? 'rgba(191,90,242,0.15)' : 'transparent',
+                        }}
+                      >
+                        <Text style={{ color: isActive ? '#FFFFFF' : '#8E8E93', fontWeight: isActive ? '700' : '500', fontSize: 13 }}>{label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>
+                  {newSummitMetricType === 'units' ? 'Target Count' : 'Target Hours'}
+                </Text>
+                {newSummitMetricType === 'units' ? (
+                  <PremiumInput
+                    style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, fontSize: 15, marginBottom: 14, borderWidth: 1, borderColor: '#2C2C2E' }}
+                    placeholder="e.g. 20 (books, games, workouts...)"
+                    placeholderTextColor="#5C5C5E"
+                    keyboardType="numeric"
+                    value={newSummitTargetCount}
+                    onChangeText={setNewSummitTargetCount}
+                  />
+                ) : (
+                  <PremiumInput
+                    style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, fontSize: 15, marginBottom: 14, borderWidth: 1, borderColor: '#2C2C2E' }}
+                    placeholder="e.g. 50"
+                    placeholderTextColor="#5C5C5E"
+                    keyboardType="numeric"
+                    value={newSummitTargetHours}
+                    onChangeText={setNewSummitTargetHours}
+                  />
+                )}
+
+                <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Time Horizon</Text>
+                <View style={{ backgroundColor: '#151517', borderColor: '#2C2C2E', borderWidth: 1 }} className="flex-row p-1 rounded-xl mb-4">
+                  {(['monthly', 'yearly'] as const).map((h) => {
+                    const isActive = newSummitHorizon === h;
+                    return (
+                      <Pressable
+                        key={h}
+                        onPress={() => setNewSummitHorizon(h)}
+                        style={{
+                          flex: 1,
+                          paddingVertical: 8,
+                          borderRadius: 8,
+                          alignItems: 'center',
+                          backgroundColor: isActive ? 'rgba(191,90,242,0.15)' : 'transparent',
+                        }}
+                      >
+                        <Text style={{ color: isActive ? '#FFFFFF' : '#8E8E93', fontWeight: isActive ? '700' : '500', fontSize: 13, textTransform: 'capitalize' }}>{h}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                {eligibleParents.length > 0 && (
+                  <View style={{ marginBottom: 8 }}>
+                    <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Contributes To (Optional)</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      <Pressable
+                        onPress={() => setNewSummitParentId('')}
+                        style={{
+                          paddingHorizontal: 16,
+                          paddingVertical: 10,
+                          borderRadius: 9999,
+                          borderWidth: 1,
+                          marginRight: 8,
+                          backgroundColor: !newSummitParentId ? 'rgba(191,90,242,0.15)' : '#151517',
+                          borderColor: !newSummitParentId ? 'rgba(191,90,242,0.3)' : '#2C2C2E',
+                        }}
+                      >
+                        <Text style={{ color: !newSummitParentId ? '#FFFFFF' : '#8E8E93', fontSize: 13, fontWeight: !newSummitParentId ? '700' : '500' }}>None</Text>
+                      </Pressable>
+                      {eligibleParents.map((p) => {
+                        const isSelected = newSummitParentId === p.id;
+                        return (
+                          <Pressable
+                            key={p.id}
+                            onPress={() => setNewSummitParentId(p.id)}
+                            style={{
+                              paddingHorizontal: 16,
+                              paddingVertical: 10,
+                              borderRadius: 9999,
+                              borderWidth: 1,
+                              marginRight: 8,
+                              backgroundColor: isSelected ? 'rgba(191,90,242,0.15)' : '#151517',
+                              borderColor: isSelected ? 'rgba(191,90,242,0.3)' : '#2C2C2E',
+                            }}
+                          >
+                            <Text style={{ color: isSelected ? '#FFFFFF' : '#8E8E93', fontSize: 13, fontWeight: isSelected ? '700' : '500' }}>{p.title}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            )}
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+              <Pressable
+                onPress={handleCancelNewJourney}
+                style={{ flex: 1, backgroundColor: '#2C2C2E', borderRadius: 14, paddingVertical: 10, alignItems: 'center' }}
+              >
+                <Text style={{ color: '#FFF', fontSize: 14, fontWeight: '700' }}>Cancel</Text>
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <PrimaryButton onPress={handleSaveJourney} title="Create Journey" size="sm" style={{ width: '100%' }} />
+              </View>
+            </View>
+          </View>
+        )}
+      </View>
+
       {/* Journeys List */}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
         {collections.length === 0 ? (
@@ -560,7 +775,11 @@ export default function CollectionsScreen() {
                   </View>
 
                   <View style={{ flex: 1, marginRight: 8 }}>
-                    <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }} numberOfLines={1}>{collection.title}</Text>
+                    <EditableText
+                      value={collection.title}
+                      onSave={(title) => updateCollection(collection.id, { title })}
+                      textStyle={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}
+                    />
                     <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 3 }}>
                       <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginRight: 6 }}>
                         <Text style={{ color: '#BF5AF2', fontSize: 10, textTransform: 'uppercase', fontWeight: '700' }}>
@@ -602,6 +821,27 @@ export default function CollectionsScreen() {
                     />
                   </View>
 
+                  {/* Category/Goal — fast post-creation correction pills */}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 12, paddingTop: 10 }}>
+                    <PillPicker
+                      label={`${collection.category.charAt(0).toUpperCase()}${collection.category.slice(1)}`}
+                      options={categories.map(c => ({ id: c, label: `${c.charAt(0).toUpperCase()}${c.slice(1)}` }))}
+                      selectedId={collection.category}
+                      onSelect={(id) => { feedback('select'); updateCollection(collection.id, { category: id as CollectionCategory }); setJourneyRowOpenPill(prev => ({ ...prev, [collection.id]: null })); }}
+                      open={journeyRowOpenPill[collection.id] === 'category'}
+                      onToggle={() => toggleJourneyRowPill(collection.id, 'category')}
+                    />
+                    <PillPicker
+                      label={linkedSummit ? linkedSummit.title : 'No Goal'}
+                      options={[{ id: '', label: 'No Goal' }, ...summits.map(s => ({ id: s.id, label: s.title }))]}
+                      selectedId={collection.summitId || ''}
+                      onSelect={(id) => { feedback('select'); updateCollection(collection.id, { summitId: id || undefined }); setJourneyRowOpenPill(prev => ({ ...prev, [collection.id]: null })); }}
+                      open={journeyRowOpenPill[collection.id] === 'goal'}
+                      onToggle={() => toggleJourneyRowPill(collection.id, 'goal')}
+                      accentColor="#5AC8FA"
+                    />
+                  </View>
+
                 {/* Waypoints Area */}
                 <View style={{ padding: 10, backgroundColor: '#1C1C1E' }}>
                   {collectionWaypoints.map(wp => {
@@ -631,7 +871,11 @@ export default function CollectionsScreen() {
                               ) : (
                                 <Ionicons name="flag" size={16} color="#5AC8FA" style={{ marginRight: 7 }} />
                               )}
-                              <Text style={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}>{wp.title}</Text>
+                              <EditableText
+                                value={wp.title}
+                                onSave={(title) => updateWaypoint(wp.id, { title })}
+                                textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
+                              />
                             </View>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                               <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '500', marginRight: 10 }}>
@@ -653,6 +897,37 @@ export default function CollectionsScreen() {
                         {/* Accordion Content */}
                         {isExpanded && (
                           <View style={{ paddingHorizontal: 11, paddingBottom: 11, borderTopWidth: 1, borderTopColor: '#3A3A3C' }}>
+                            {/* Target/Year/Month — fast post-creation correction pills */}
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10, marginBottom: 4 }}>
+                              <PillPicker
+                                label={wp.targetMetric ? `Target: ${wp.targetMetric}` : 'No Target'}
+                                options={[{ id: '', label: 'No Target' }, ...[5, 10, 15, 20, 25, 30, 50, 100].map(n => ({ id: String(n), label: String(n) }))]}
+                                selectedId={wp.targetMetric ? String(wp.targetMetric) : ''}
+                                onSelect={(id) => { updateWaypoint(wp.id, { targetMetric: id ? parseInt(id, 10) : undefined }); setWaypointRowOpenField(prev => ({ ...prev, [wp.id]: null })); }}
+                                open={waypointRowOpenField[wp.id] === 'target'}
+                                onToggle={() => setWaypointRowOpenField(prev => ({ ...prev, [wp.id]: prev[wp.id] === 'target' ? null : 'target' }))}
+                                accentColor="#5AC8FA"
+                              />
+                              <PillPicker
+                                label={wp.year ? String(wp.year) : 'Ongoing'}
+                                options={[{ id: '', label: 'Ongoing' }, ...[currentYear, currentYear + 1, currentYear + 2].map(y => ({ id: String(y), label: String(y) }))]}
+                                selectedId={wp.year ? String(wp.year) : ''}
+                                onSelect={(id) => { updateWaypoint(wp.id, { year: id ? parseInt(id, 10) : undefined }); setWaypointRowOpenField(prev => ({ ...prev, [wp.id]: null })); }}
+                                open={waypointRowOpenField[wp.id] === 'year'}
+                                onToggle={() => setWaypointRowOpenField(prev => ({ ...prev, [wp.id]: prev[wp.id] === 'year' ? null : 'year' }))}
+                                accentColor="#5AC8FA"
+                              />
+                              <PillPicker
+                                label={wp.month ? MONTH_NAMES[wp.month - 1].slice(0, 3) : 'All Year'}
+                                options={[{ id: '', label: 'All Year' }, ...MONTH_NAMES.map((m, i) => ({ id: String(i + 1), label: m }))]}
+                                selectedId={wp.month ? String(wp.month) : ''}
+                                onSelect={(id) => { updateWaypoint(wp.id, { month: id ? parseInt(id, 10) : undefined }); setWaypointRowOpenField(prev => ({ ...prev, [wp.id]: null })); }}
+                                open={waypointRowOpenField[wp.id] === 'month'}
+                                onToggle={() => setWaypointRowOpenField(prev => ({ ...prev, [wp.id]: prev[wp.id] === 'month' ? null : 'month' }))}
+                                accentColor="#5AC8FA"
+                              />
+                            </View>
+
                             {wpItems.length > 0 ? (
                               wpItems.map(item => (
                                 <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
@@ -661,9 +936,12 @@ export default function CollectionsScreen() {
                                       {item.completed && <Ionicons name="checkmark" size={14} color="#FFF" />}
                                     </View>
                                   </Pressable>
-                                  <Text style={{ flex: 1, color: item.completed ? '#8E8E93' : '#FFF', fontSize: 14, textDecorationLine: item.completed ? 'line-through' : 'none' }}>
-                                    {item.title}
-                                  </Text>
+                                  <EditableText
+                                    value={item.title}
+                                    onSave={(title) => updateItem(item.id, { title })}
+                                    containerStyle={{ flex: 1 }}
+                                    textStyle={{ color: item.completed ? '#8E8E93' : '#FFF', fontSize: 14, textDecorationLine: item.completed ? 'line-through' : 'none' }}
+                                  />
                                   <Pressable onPress={() => deleteItem(item.id)} style={{ padding: 4 }}>
                                     <Ionicons name="trash-outline" size={15} color="#FF453A" />
                                   </Pressable>
@@ -673,17 +951,17 @@ export default function CollectionsScreen() {
                               <Text style={{ color: '#8E8E93', fontSize: 12, marginTop: 10, fontStyle: 'italic' }}>No tasks added yet.</Text>
                             )}
 
-                            {/* Shadcn Quick-Add Task Chip */}
-                            <Pressable
-                              onPress={() => {
-                                handleOpenNewItem(collection.id);
-                                setSelectedWaypointId(wp.id);
-                              }}
-                              style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, alignSelf: 'flex-start', backgroundColor: '#1C1C1E', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: '#2C2C2E' }}
-                            >
-                              <Ionicons name="add" size={14} color="#BF5AF2" style={{ marginRight: 5 }} />
-                              <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>Add Task</Text>
-                            </Pressable>
+                            <View style={{ marginTop: 10 }}>
+                              <QuickAddBar
+                                placeholder="Add a task..."
+                                value={itemQuickAddTitleByWaypoint[wp.id] || ''}
+                                onChangeText={(t) => setItemQuickAddTitleByWaypoint(prev => ({ ...prev, [wp.id]: t }))}
+                                onSubmit={() => {
+                                  handleQuickAddItem(collection.id, wp.id, itemQuickAddTitleByWaypoint[wp.id] || '');
+                                  setItemQuickAddTitleByWaypoint(prev => ({ ...prev, [wp.id]: '' }));
+                                }}
+                              />
+                            </View>
                           </View>
                         )}
                       </View>
@@ -698,32 +976,36 @@ export default function CollectionsScreen() {
                           {item.completed && <Ionicons name="checkmark" size={14} color="#FFF" />}
                         </View>
                       </Pressable>
-                      <Text style={{ flex: 1, color: item.completed ? '#8E8E93' : '#FFF', fontSize: 14, textDecorationLine: item.completed ? 'line-through' : 'none' }}>
-                        {item.title}
-                      </Text>
+                      <EditableText
+                        value={item.title}
+                        onSave={(title) => updateItem(item.id, { title })}
+                        containerStyle={{ flex: 1 }}
+                        textStyle={{ color: item.completed ? '#8E8E93' : '#FFF', fontSize: 14, textDecorationLine: item.completed ? 'line-through' : 'none' }}
+                      />
                       <Pressable onPress={() => deleteItem(item.id)} style={{ padding: 4 }}>
                         <Ionicons name="trash-outline" size={15} color="#FF453A" />
                       </Pressable>
                     </View>
                   ))}
 
-                  {/* Quick Action Chips Footer */}
-                  <View style={{ flexDirection: 'row', marginTop: 10 }}>
-                    <Pressable
-                      onPress={() => handleOpenNewWaypoint(collection.id)}
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#252528', paddingVertical: 9, borderRadius: 10, marginRight: 6, borderWidth: 1, borderColor: '#3A3A3C' }}
-                    >
-                      <Ionicons name="folder-open" size={14} color="#5AC8FA" style={{ marginRight: 7 }} />
-                      <Text style={{ color: '#5AC8FA', fontSize: 12, fontWeight: '700' }}>+ Waypoint</Text>
-                    </Pressable>
-
-                    <Pressable
-                      onPress={() => handleOpenNewItem(collection.id)}
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#BF5AF215', paddingVertical: 9, borderRadius: 10, marginLeft: 6, borderWidth: 1, borderColor: '#BF5AF233' }}
-                    >
-                      <Ionicons name="list" size={14} color="#BF5AF2" style={{ marginRight: 7 }} />
-                      <Text style={{ color: '#BF5AF2', fontSize: 12, fontWeight: '700' }}>+ Task</Text>
-                    </Pressable>
+                  {/* Quick-add bars — bare title only, replacing the old +Waypoint/+Task chips */}
+                  <View style={{ marginTop: 10, gap: 8 }}>
+                    <QuickAddBar
+                      placeholder="Add a waypoint..."
+                      value={waypointQuickAddTitle[collection.id] || ''}
+                      onChangeText={(t) => setWaypointQuickAddTitle(prev => ({ ...prev, [collection.id]: t }))}
+                      onSubmit={() => handleQuickAddWaypoint(collection.id)}
+                      accentColor="#5AC8FA"
+                    />
+                    <QuickAddBar
+                      placeholder="Add a task..."
+                      value={itemQuickAddTitleByJourney[collection.id] || ''}
+                      onChangeText={(t) => setItemQuickAddTitleByJourney(prev => ({ ...prev, [collection.id]: t }))}
+                      onSubmit={() => {
+                        handleQuickAddItem(collection.id, undefined, itemQuickAddTitleByJourney[collection.id] || '');
+                        setItemQuickAddTitleByJourney(prev => ({ ...prev, [collection.id]: '' }));
+                      }}
+                    />
                   </View>
 
                 </View>
@@ -1275,91 +1557,6 @@ export default function CollectionsScreen() {
         </View>
       </Modal>
 
-      {/* Item Create Modal */}
-      <Modal visible={isItemModalOpen} animationType="fade" transparent={true}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-          <View style={{ backgroundColor: '#1C1C1E', borderRadius: 24, padding: 24, maxWidth: 480, width: '100%', borderWidth: 1, borderColor: '#3A3A3C' }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '800' }}>Add Item</Text>
-              <Pressable onPress={() => setIsItemModalOpen(false)}>
-                <Ionicons name="close" size={24} color="#8E8E93" />
-              </Pressable>
-            </View>
-
-            <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Item Name</Text>
-            <PremiumInput
-              style={{ backgroundColor: '#252528', color: '#FFF', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, fontSize: 15, marginBottom: 14, borderWidth: 1, borderColor: '#3A3A3C' }}
-              placeholder="e.g., The Great Gatsby, 5km Morning Run"
-              placeholderTextColor="#8E8E93"
-              value={itemTitle}
-              onChangeText={setItemTitle}
-              autoFocus
-            />
-
-            {/* Waypoint Assignment Selector */}
-            {(() => {
-              const availableWaypoints = (waypoints || []).filter(w => w.collectionId === activeCollectionId);
-              if (availableWaypoints.length > 0) {
-                return (
-                  <View style={{ marginBottom: 14 }}>
-                    <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Waypoint Assignment</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      <Pressable
-                        onPress={() => setSelectedWaypointId('')}
-                        style={{
-                          backgroundColor: selectedWaypointId === '' ? '#BF5AF2' : '#252528',
-                          paddingHorizontal: 12,
-                          paddingVertical: 7,
-                          borderRadius: 10,
-                          marginRight: 6,
-                          borderWidth: 1,
-                          borderColor: selectedWaypointId === '' ? '#BF5AF2' : '#3A3A3C'
-                        }}
-                      >
-                        <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>General (None)</Text>
-                      </Pressable>
-                      {availableWaypoints.map((wp) => (
-                        <Pressable
-                          key={wp.id}
-                          onPress={() => setSelectedWaypointId(wp.id)}
-                          style={{
-                            backgroundColor: selectedWaypointId === wp.id ? '#BF5AF2' : '#252528',
-                            paddingHorizontal: 12,
-                            paddingVertical: 7,
-                            borderRadius: 10,
-                            marginRight: 6,
-                            borderWidth: 1,
-                            borderColor: selectedWaypointId === wp.id ? '#BF5AF2' : '#3A3A3C'
-                          }}
-                        >
-                          <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>{wp.title}</Text>
-                        </Pressable>
-                      ))}
-                    </ScrollView>
-                  </View>
-                );
-              }
-              return null;
-            })()}
-
-            <Text style={{ color: '#8E8E93', marginBottom: 6, fontSize: 12, fontWeight: '600' }}>Estimated Time (Minutes) (Optional)</Text>
-            <PremiumInput
-              style={{ backgroundColor: '#252528', color: '#FFF', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, fontSize: 15, marginBottom: 20, borderWidth: 1, borderColor: '#3A3A3C' }}
-              placeholder="e.g., 480"
-              placeholderTextColor="#8E8E93"
-              value={itemEstimatedMinutes}
-              onChangeText={setItemEstimatedMinutes}
-              keyboardType="numeric"
-            />
-
-            <PrimaryButton
-              onPress={handleCreateItem}
-              title="Add Item"
-              style={{ width: '100%' }}
-            />
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }

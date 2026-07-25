@@ -34,9 +34,15 @@ interface TaskState {
   tasks: Task[];
   tags: Tag[];
   pillars: Pillar[];
-  
+  // Remembers the last tag used on a quick-added task, so the next quick-add
+  // defaults to it instead of forcing a choice every time.
+  lastUsedTagId: string;
+
   // Task Actions
-  addTask: (task: Omit<Task, 'id' | 'completed' | 'dateCreated'>) => string;
+  // title is the only required field — quick-add can create a task from just
+  // a title; tagId/estimatedMinutes/isIcebox get safe defaults filled in below.
+  addTask: (task: { title: string; tagId?: string; estimatedMinutes?: number; isIcebox?: boolean; summitId?: string; collectionId?: string }) => string;
+  setLastUsedTagId: (id: string) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
   toggleTask: (id: string, isManual?: boolean) => void;
@@ -56,7 +62,7 @@ interface TaskState {
 
 export const useTaskStore = create<TaskState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       tasks: [],
       pillars: [
         { id: 'office', name: 'Office' },
@@ -68,19 +74,39 @@ export const useTaskStore = create<TaskState>()(
         { id: uuidv4(), pillarId: 'health', name: 'Fitness', type: 'earner' },
         { id: uuidv4(), pillarId: 'personal', name: 'Gaming', type: 'burner' }
       ],
-      
+      lastUsedTagId: '',
+
       addTask: (task) => {
         const id = uuidv4();
+        const state = get();
+
+        // Safe default-fill so any caller (quick-add included) can create a
+        // task from just a title — last-used tag, then first non-archived
+        // tag, then '' as a last resort.
+        const tagId = task.tagId
+          || (state.tags.find(t => t.id === state.lastUsedTagId && !t.isArchived)?.id)
+          || state.tags.find(t => !t.isArchived)?.id
+          || '';
+        const estimatedMinutes = task.estimatedMinutes && task.estimatedMinutes > 0 ? task.estimatedMinutes : 25;
+        const isIcebox = task.isIcebox ?? false;
+
         set((state) => ({
-          tasks: [...state.tasks, { 
-            ...task, 
+          tasks: [...state.tasks, {
+            title: task.title,
+            tagId,
+            estimatedMinutes,
+            isIcebox,
+            summitId: task.summitId,
+            collectionId: task.collectionId,
             id,
             completed: false,
             dateCreated: new Date().toISOString().split('T')[0]
-          }]
+          }],
+          lastUsedTagId: tagId || state.lastUsedTagId
         }));
         return id;
       },
+      setLastUsedTagId: (id) => set({ lastUsedTagId: id }),
       updateTask: (id, updates) => set((state) => ({
         tasks: state.tasks.map(t => t.id === id ? { ...t, ...updates } : t)
       })),

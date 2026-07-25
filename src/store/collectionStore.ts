@@ -41,7 +41,9 @@ interface CollectionState {
   waypoints: Waypoint[];
   items: CollectionItem[];
   journeyBackfillApplied: boolean;
-  addCollection: (collection: Omit<Collection, 'id' | 'dateCreated'>) => string;
+  // category is required on the stored record, but optional here — quick-add
+  // can create a Journey from just a title, defaulting category to 'general'.
+  addCollection: (collection: { title: string; category?: CollectionCategory; summitId?: string }) => string;
   updateCollection: (id: string, updates: Partial<Collection>) => void;
   deleteCollection: (id: string) => void;
   addWaypoint: (waypoint: Omit<Waypoint, 'id' | 'dateCreated'>) => string;
@@ -71,7 +73,13 @@ export const useCollectionStore = create<CollectionState>()(
         set((state) => ({
           collections: [
             ...state.collections,
-            { ...collectionData, id, dateCreated: new Date().toISOString() },
+            {
+              title: collectionData.title,
+              category: collectionData.category ?? 'general',
+              summitId: collectionData.summitId,
+              id,
+              dateCreated: new Date().toISOString(),
+            },
           ],
         }));
         return id;

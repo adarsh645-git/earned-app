@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, Modal, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, ScrollView, Pressable, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTaskStore, Task } from '../store/taskStore';
@@ -22,31 +22,46 @@ const CARD_STYLE = {
   elevation: 3,
 } as const;
 import { useSummitStore, getChainTrail } from '../store/summitStore';
+import { useCollectionStore } from '../store/collectionStore';
 import { useEconomyStore } from '../store/economyStore';
 import { useTimerStore } from '../store/timerStore';
-import { PrimaryButton } from '../components/PrimaryButton';
 import RewardToast from '../components/RewardToast';
 import AnimatedTaskRow from '../components/AnimatedTaskRow';
-import DialPicker from '../components/DialPicker';
 import EditTaskModal from '../components/EditTaskModal';
 import TimeSelectorModal from '../components/TimeSelectorModal';
 import ConfirmModal from '../components/ConfirmModal';
-import LinkProgressPicker from '../components/LinkProgressPicker';
+import QuickAddBar from '../components/QuickAddBar';
+import PillPicker from '../components/PillPicker';
+import { getEligibleJourneys } from '../components/LinkProgressPicker';
 
 export default function TasksScreen() {
   const { tasks, tags, pillars, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox } = useTaskStore();
   const { summits } = useSummitStore();
+  const { collections } = useCollectionStore();
   const { startTimer } = useTimerStore();
-  
-  const [modalVisible, setModalVisible] = useState(false);
+
+  // Quick-add bar state — title + the one economy-critical field (Duration)
+  // that stays visible in the bar itself; everything else (Tag, Journey)
+  // defaults silently (see taskStore.addTask) and becomes a row pill after —
+  // unless the chevron is expanded, in which case they can be set here too.
   const [title, setTitle] = useState('');
-  const [selectedTagId, setSelectedTagId] = useState(tags[0]?.id || '');
   const [estimatedMinutes, setEstimatedMinutes] = useState<number>(25);
-  const [selectedMacroId, setSelectedMacroId] = useState('');
-  const [selectedCollectionId, setSelectedCollectionId] = useState('');
-  const [sendDirectlyToIcebox, setSendDirectlyToIcebox] = useState(false);
-  const [validationError, setValidationError] = useState('');
+  const [showAddTimeSelector, setShowAddTimeSelector] = useState(false);
   const [blockedModal, setBlockedModal] = useState<{ title: string; message: string } | null>(null);
+
+  // Chevron-expand draft state for the quick-add bar. Empty/false means "let
+  // the store apply its normal default" — only an explicit pick overrides it.
+  const [quickAddExpanded, setQuickAddExpanded] = useState(false);
+  const [quickAddOpenPill, setQuickAddOpenPill] = useState<'tag' | 'journey' | null>(null);
+  const [quickAddTagId, setQuickAddTagId] = useState('');
+  const [quickAddCollectionId, setQuickAddCollectionId] = useState('');
+  const [quickAddSummitId, setQuickAddSummitId] = useState('');
+  const [quickAddIsIcebox, setQuickAddIsIcebox] = useState(false);
+
+  const quickAddTagType: 'earner' | 'burner' = quickAddTagId
+    ? (tags.find(t => t.id === quickAddTagId)?.type ?? 'earner')
+    : 'earner';
+  const quickAddEligibleJourneys = getEligibleJourneys(collections, summits, quickAddTagType);
 
   const handleStartTimer = (taskId: string, mins: number) => {
     const res = startTimer(taskId, mins);
@@ -64,12 +79,14 @@ export default function TasksScreen() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastSubtext, setToastSubtext] = useState('');
   const [toastChainTrail, setToastChainTrail] = useState<string[]>([]);
+  const [toastTone, setToastTone] = useState<'earner' | 'burner'>('earner');
 
   // Show a reward toast when completing a task (was previously silent)
   const handleToggle = (id: string) => {
     const task = tasks.find(t => t.id === id);
     const tag = task ? tags.find(t => t.id === task.tagId) : null;
     if (task && !task.completed && tag) {
+      setToastTone(tag.type);
       if (tag.type === 'earner') {
         const conversion = useEconomyStore.getState().getConversionRate();
         const hoursEarned = Math.round(task.estimatedMinutes * conversion.multiplier);
@@ -99,194 +116,42 @@ export default function TasksScreen() {
 
   // Modals state
   const [editTask, setEditTask] = useState<Task | null>(null);
-  const [showAddTimeSelector, setShowAddTimeSelector] = useState(false);
 
   const incompleteTasks = tasks.filter(t => !t.isIcebox && !t.completed);
   const completedTasks = tasks.filter(t => !t.isIcebox && t.completed);
   const iceboxTasks = tasks.filter(t => t.isIcebox);
 
-  const selectedTag = tags.find(t => t.id === selectedTagId);
-  const isBurner = selectedTag?.type === 'burner';
+  const toggleQuickAddExpanded = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setQuickAddExpanded(prev => !prev);
+    setQuickAddOpenPill(null);
+  };
 
-  const handleAddTask = () => {
-    setValidationError('');
-    
-    if (!title.trim()) {
-      setValidationError(isBurner ? 'Activity title is required' : 'Task title is required');
-      return;
-    }
-    
-    if (estimatedMinutes <= 0) {
-      setValidationError('Estimated focus time must be greater than 0 minutes');
-      return;
-    }
+  // Quick-add: title + Duration always; Tag/Journey/Icebox default silently
+  // unless the chevron was expanded and one was explicitly picked — either
+  // way, anything left unset can still be fixed via the row pills afterward.
+  const handleQuickAdd = () => {
+    if (!title.trim()) return;
 
     addTask({
       title: title.trim(),
-      tagId: selectedTagId,
-      estimatedMinutes: estimatedMinutes,
-      summitId: selectedMacroId || undefined,
-      collectionId: selectedCollectionId || undefined,
-      isIcebox: sendDirectlyToIcebox,
+      estimatedMinutes,
+      tagId: quickAddTagId || undefined,
+      collectionId: quickAddCollectionId || undefined,
+      summitId: quickAddSummitId || undefined,
+      isIcebox: quickAddIsIcebox,
     });
 
     feedback('taskComplete');
     setTitle('');
-    setEstimatedMinutes(25);
-    setSelectedMacroId('');
-    setSelectedCollectionId('');
-    setSendDirectlyToIcebox(false);
-    setModalVisible(false);
+    setQuickAddTagId('');
+    setQuickAddCollectionId('');
+    setQuickAddSummitId('');
+    setQuickAddIsIcebox(false);
+    setQuickAddOpenPill(null);
+    // Duration is intentionally NOT reset — the next quick-add inherits it,
+    // matching the "remember" spirit of the Tag default.
   };
-
-  const addTaskModal = (
-    <Modal visible={modalVisible} transparent animationType="fade">
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', padding: 20 }}>
-        <View style={{ width: '100%', maxWidth: 440, alignSelf: 'center', maxHeight: '88%' }}>
-          <ScrollView
-            style={{ backgroundColor: '#1C1C1E', borderRadius: 24, borderWidth: 1, borderColor: '#2C2C2E' }}
-            contentContainerStyle={{ padding: 24 }}
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Header */}
-            <View className="flex-row justify-between items-center mb-5">
-              <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '700' }}>
-                {isBurner ? 'New Leisure Activity' : 'New Focus Block'}
-              </Text>
-              <Pressable onPress={() => setModalVisible(false)} style={{ padding: 4 }}>
-                <Ionicons name="close" size={22} color="#8E8E93" />
-              </Pressable>
-            </View>
-
-            {validationError ? (
-              <View style={{ backgroundColor: 'rgba(255,69,58,0.15)', borderColor: 'rgba(255,69,58,0.4)', borderWidth: 1 }} className="p-3.5 rounded-2xl mb-4">
-                <Text className="text-[#FF453A] text-xs font-semibold text-center">{validationError}</Text>
-              </View>
-            ) : null}
-
-            {/* Title Input */}
-            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>
-              {isBurner ? 'Activity Title' : 'Focus Item Title'}
-            </Text>
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder={isBurner ? "e.g. Play PS5, Watch Netflix" : "e.g. Code Review, Bike Ride, Read Book"}
-              placeholderTextColor="#5C5C5E"
-              autoFocus
-              spellCheck={true}
-              autoCorrect={true}
-              style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 16, borderRadius: 16, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2C2C2E' }}
-            />
-
-            {/* Duration */}
-            <View style={{ marginBottom: 20 }}>
-              <Text style={{ color: '#8E8E93', fontSize: 13, fontWeight: '600', marginBottom: 8 }}>Estimated Duration</Text>
-              <Pressable
-                onPress={() => setShowAddTimeSelector(true)}
-                style={{
-                  backgroundColor: '#18181B',
-                  padding: 16,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: '#27272A',
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '500' }}>
-                  {Math.floor(estimatedMinutes / 60)}h {estimatedMinutes % 60}m
-                </Text>
-                <Ionicons name="time-outline" size={20} color="#A1A1AA" />
-              </Pressable>
-            </View>
-
-            {/* Tag Selection */}
-            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Category Tag</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
-              {tags.filter(t => !t.isArchived).map((tag) => {
-                const isSelected = selectedTagId === tag.id;
-                const pillar = pillars.find(p => p.id === tag.pillarId);
-                return (
-                  <Pressable
-                    key={tag.id}
-                    onPress={() => { feedback('select'); setSelectedTagId(tag.id); }}
-                    style={({ hovered }: any) => ({
-                      backgroundColor: isSelected ? (hovered ? '#3A2053' : '#2C183E') : (hovered ? '#2C2C2E' : '#1C1C1E'),
-                      borderColor: isSelected ? (hovered ? '#5A3382' : '#4D2A6B') : '#2C2C2E',
-                      borderWidth: 1,
-                      paddingHorizontal: 16,
-                      paddingVertical: 10,
-                      borderRadius: 12,
-                      marginRight: 8,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.15s ease-in-out',
-                    })}
-                  >
-                    <Text style={{ color: isSelected ? '#FFF' : '#8E8E93', fontWeight: isSelected ? '700' : '600', fontSize: 13 }}>
-                      {tag.name} {pillar ? `(${pillar.name})` : ''}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            <LinkProgressPicker
-              tagType={isBurner ? 'burner' : 'earner'}
-              collectionId={selectedCollectionId}
-              summitId={selectedMacroId}
-              onChange={(collectionId, summitId) => {
-                feedback('select');
-                setSelectedCollectionId(collectionId);
-                setSelectedMacroId(summitId);
-              }}
-              accentColor={isBurner ? '#5AC8FA' : '#BF5AF2'}
-            />
-
-            {/* Send Directly to Icebox Toggle */}
-            <Pressable
-              onPress={() => setSendDirectlyToIcebox(!sendDirectlyToIcebox)}
-              style={{ backgroundColor: '#151517', borderColor: '#2C2C2E', borderWidth: 1 }}
-              className="flex-row items-center p-4 rounded-2xl justify-between mb-6"
-            >
-              <View className="flex-row items-center gap-2.5">
-                <Ionicons name="snow-outline" size={18} color="#8E8E93" />
-                <View>
-                  <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '600' }}>Defer directly to Icebox</Text>
-                  <Text style={{ color: '#8E8E93', fontSize: 12, marginTop: 2 }}>Locks item out of today's focus list</Text>
-                </View>
-              </View>
-              <Ionicons
-                name={sendDirectlyToIcebox ? 'checkbox' : 'square-outline'}
-                size={20}
-                color={sendDirectlyToIcebox ? '#BF5AF2' : '#8E8E93'}
-              />
-            </Pressable>
-
-            {/* Submit Button */}
-            <PrimaryButton
-              onPress={handleAddTask}
-              title={isBurner ? `Add Leisure Activity (${estimatedMinutes}m)` : 'Add Focus Block'}
-              style={{ width: '100%', backgroundColor: isBurner ? '#5AC8FA' : '#BF5AF2' }}
-            />
-          </ScrollView>
-        </View>
-      </View>
-
-      <TimeSelectorModal
-        visible={showAddTimeSelector}
-        initialMinutes={estimatedMinutes}
-        title="Estimate Duration"
-        onClose={() => setShowAddTimeSelector(false)}
-        onConfirm={(mins) => {
-          setEstimatedMinutes(mins);
-          setShowAddTimeSelector(false);
-        }}
-      />
-    </Modal>
-  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }}>
@@ -295,21 +160,88 @@ export default function TasksScreen() {
         message={toastMessage}
         subtext={toastSubtext}
         chainTrail={toastChainTrail}
+        tone={toastTone}
         onDismiss={() => setToastVisible(false)}
       />
 
       <View style={{ maxWidth: 900, width: '100%', alignSelf: 'center' }} className="flex-1 px-5">
         
         {/* Header */}
-        <View className="flex-row justify-between items-center mt-3 mb-4">
-          <Text className="text-white text-3xl font-extrabold tracking-tight">Manage Focus</Text>
-          <Pressable
-            onPress={() => setModalVisible(true)}
-            style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14, flexDirection: 'row', alignItems: 'center' }}
-          >
-            <Ionicons name="add" size={16} color="#BF5AF2" style={{ marginRight: 6 }} />
-            <Text style={{ color: '#BF5AF2', fontSize: 14, fontWeight: '700' }}>Add Task</Text>
-          </Pressable>
+        <Text className="text-white text-3xl font-extrabold tracking-tight mt-3 mb-4">Manage Focus</Text>
+
+        {/* Quick-add — title + Enter to save; Duration is the one field that
+            stays visible here (it scales the Hours payout). Tag/Journey
+            default silently and become row pills below. */}
+        <View className="mb-5">
+          <QuickAddBar
+            placeholder="Add a task..."
+            value={title}
+            onChangeText={setTitle}
+            onSubmit={handleQuickAdd}
+            trailingAccessory={
+              <Pressable
+                onPress={() => setShowAddTimeSelector(true)}
+                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginLeft: 8 }}
+              >
+                <Ionicons name="time-outline" size={14} color="#A1A1AA" style={{ marginRight: 4 }} />
+                <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>
+                  {estimatedMinutes}m
+                </Text>
+              </Pressable>
+            }
+            expandable={{
+              open: quickAddExpanded,
+              onToggle: toggleQuickAddExpanded,
+              content: (
+                <View className="flex-row items-center" style={{ flexWrap: 'wrap', gap: 6 }}>
+                  <PillPicker
+                    label={quickAddTagId ? (tags.find(t => t.id === quickAddTagId)?.name || 'Tag') : 'Tag (last used)'}
+                    options={tags.filter(t => !t.isArchived).map(t => ({ id: t.id, label: t.name }))}
+                    selectedId={quickAddTagId}
+                    onSelect={(id) => { feedback('select'); setQuickAddTagId(id); setQuickAddOpenPill(null); }}
+                    open={quickAddOpenPill === 'tag'}
+                    onToggle={() => setQuickAddOpenPill(p => (p === 'tag' ? null : 'tag'))}
+                  />
+
+                  {quickAddEligibleJourneys.length > 0 && (
+                    <PillPicker
+                      label={quickAddCollectionId ? (quickAddEligibleJourneys.find(c => c.id === quickAddCollectionId)?.title || 'Journey') : 'No Journey'}
+                      options={[{ id: '', label: 'No Journey' }, ...quickAddEligibleJourneys.map(c => ({ id: c.id, label: c.title }))]}
+                      selectedId={quickAddCollectionId}
+                      onSelect={(id) => {
+                        feedback('select');
+                        const linked = quickAddEligibleJourneys.find(c => c.id === id);
+                        setQuickAddCollectionId(id);
+                        setQuickAddSummitId(linked?.summitId || '');
+                        setQuickAddOpenPill(null);
+                      }}
+                      open={quickAddOpenPill === 'journey'}
+                      onToggle={() => setQuickAddOpenPill(p => (p === 'journey' ? null : 'journey'))}
+                    />
+                  )}
+
+                  <Pressable
+                    onPress={() => setQuickAddIsIcebox(v => !v)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: quickAddIsIcebox ? 'rgba(191,90,242,0.2)' : '#2C2C2E',
+                      borderWidth: 1,
+                      borderColor: quickAddIsIcebox ? 'rgba(191,90,242,0.4)' : '#3A3A3C',
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Ionicons name="snow-outline" size={13} color={quickAddIsIcebox ? '#BF5AF2' : '#8E8E93'} style={{ marginRight: 4 }} />
+                    <Text style={{ color: quickAddIsIcebox ? '#BF5AF2' : '#FFF', fontSize: 12, fontWeight: '600' }}>
+                      Icebox
+                    </Text>
+                  </Pressable>
+                </View>
+              ),
+            }}
+          />
         </View>
 
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }} className="flex-1">
@@ -323,7 +255,7 @@ export default function TasksScreen() {
             <View style={CARD_STYLE} className="rounded-2xl p-6 items-center justify-center mb-6">
               <Ionicons name="checkmark-done-circle-outline" size={28} color="#3A3A3C" style={{ marginBottom: 8 }} />
               <Text className="text-white font-semibold text-center">Your focus list is clear.</Text>
-              <Text className="text-[#8E8E93] text-xs text-center mt-1">Tap Add Task to schedule focus sessions for today.</Text>
+              <Text className="text-[#8E8E93] text-xs text-center mt-1">Type above and press Enter to schedule a focus session.</Text>
             </View>
           ) : (
             <View style={CARD_STYLE} className="rounded-2xl overflow-hidden mb-5">
@@ -336,6 +268,8 @@ export default function TasksScreen() {
                     task={task}
                     tagName={tag?.name}
                     tagType={tag?.type}
+                    tags={tags}
+                    onUpdate={updateTask}
                     isLast={isLast}
                     onToggle={handleToggle}
                     onMoveToIcebox={handleMoveToIcebox}
@@ -365,6 +299,8 @@ export default function TasksScreen() {
                       task={task}
                       tagName={tag?.name}
                       tagType={tag?.type}
+                      tags={tags}
+                      onUpdate={updateTask}
                       isLast={isLast}
                       onToggle={handleToggle}
                       onMoveToIcebox={handleMoveToIcebox}
@@ -467,7 +403,16 @@ export default function TasksScreen() {
         />
       )}
 
-      {addTaskModal}
+      <TimeSelectorModal
+        visible={showAddTimeSelector}
+        initialMinutes={estimatedMinutes}
+        title="Estimate Duration"
+        onClose={() => setShowAddTimeSelector(false)}
+        onConfirm={(mins) => {
+          setEstimatedMinutes(mins);
+          setShowAddTimeSelector(false);
+        }}
+      />
     </SafeAreaView>
   );
 }

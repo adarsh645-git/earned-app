@@ -1,8 +1,14 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { View, Text, Animated, Pressable, LayoutAnimation, Platform, UIManager } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Task } from '../store/taskStore';
+import { Task, Tag } from '../store/taskStore';
 import CheckboxBurst, { CheckboxBurstHandle } from './CheckboxBurst';
+import PillPicker from './PillPicker';
+import EditableText from './EditableText';
+import TimeSelectorModal from './TimeSelectorModal';
+import { useCollectionStore } from '../store/collectionStore';
+import { useSummitStore } from '../store/summitStore';
+import { getEligibleJourneys } from './LinkProgressPicker';
 
 if (
   Platform.OS === 'android' &&
@@ -16,11 +22,17 @@ import { feedback } from '../utils/feedback';
 // fully hidden, so the Completed Today group still reads at a glance.
 const COMPLETED_OPACITY = 0.5;
 
+type OpenPill = 'tag' | 'journey' | null;
+
 interface AnimatedTaskRowProps {
   task: Task;
   tagName: string | undefined;
   /** Earner tasks accent green, burner tasks accent blue — mirrors the tag's economic type. */
   tagType?: 'earner' | 'burner';
+  /** All non-archived tags — powers the row's Tag pill. */
+  tags?: Tag[];
+  /** Fixes a single field in place (Tag/Duration/Journey pills) without opening the full edit modal. */
+  onUpdate?: (id: string, updates: Partial<Task>) => void;
   isLast: boolean;
   onToggle: (id: string) => void;
   onMoveToIcebox?: (id: string) => void;
@@ -35,6 +47,8 @@ export default function AnimatedTaskRow({
   task,
   tagName,
   tagType,
+  tags = [],
+  onUpdate,
   isLast,
   onToggle,
   onMoveToIcebox,
@@ -45,6 +59,14 @@ export default function AnimatedTaskRow({
   showIceboxButton = true,
 }: AnimatedTaskRowProps) {
   const accent = tagType === 'burner' ? '#5AC8FA' : '#30D158';
+
+  const { collections } = useCollectionStore();
+  const { summits } = useSummitStore();
+  const eligibleJourneys = onUpdate ? getEligibleJourneys(collections, summits, tagType === 'burner' ? 'burner' : 'earner') : [];
+  const linkedJourney = task.collectionId ? collections.find(c => c.id === task.collectionId) : undefined;
+
+  const [openPill, setOpenPill] = useState<OpenPill>(null);
+  const [showDurationPicker, setShowDurationPicker] = useState(false);
 
   const checkScale = useRef(new Animated.Value(1)).current;
   const checkmarkScale = useRef(new Animated.Value(task.completed ? 1 : 0)).current;
@@ -127,6 +149,7 @@ export default function AnimatedTaskRow({
   const isStrikethrough = localCompleted;
 
   return (
+    <>
     <Animated.View
       style={{
         borderBottomWidth: isLast ? 0 : 0.5,
@@ -182,30 +205,80 @@ export default function AnimatedTaskRow({
             </Animated.View>
           </Pressable>
 
-          {/* Task Text */}
-          <Pressable 
-            onPress={handleToggle}
-            className="flex-1"
-            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-          >
-            <Text
-              className={`text-base font-semibold ${
-                isStrikethrough ? 'line-through text-[#8E8E93]' : 'text-white'
-              }`}
-            >
-              {task.title}
-            </Text>
-            <View className="flex-row items-center mt-1 gap-1.5">
-              <View style={{ backgroundColor: '#2C2C2E' }} className="px-2 py-0.5 rounded-full">
-                <Text className="text-[#8E8E93] text-[9px] font-bold uppercase tracking-wider">
-                  {tagName}
+          {/* Task Text + row pills */}
+          <View className="flex-1">
+            {onUpdate ? (
+              <EditableText
+                value={task.title}
+                onSave={(title) => onUpdate(task.id, { title })}
+                textStyle={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: isStrikethrough ? '#8E8E93' : '#FFFFFF',
+                  textDecorationLine: isStrikethrough ? 'line-through' : 'none',
+                }}
+              />
+            ) : (
+              <Text
+                className={`text-base font-semibold ${
+                  isStrikethrough ? 'line-through text-[#8E8E93]' : 'text-white'
+                }`}
+              >
+                {task.title}
+              </Text>
+            )}
+
+            {onUpdate ? (
+              <View className="flex-row items-center mt-1.5" style={{ flexWrap: 'wrap', gap: 6 }}>
+                <PillPicker
+                  label={tagName || 'Tag'}
+                  options={tags.filter(t => !t.isArchived).map(t => ({ id: t.id, label: t.name }))}
+                  selectedId={task.tagId}
+                  onSelect={(id) => { feedback('select'); onUpdate(task.id, { tagId: id }); setOpenPill(null); }}
+                  open={openPill === 'tag'}
+                  onToggle={() => setOpenPill(p => (p === 'tag' ? null : 'tag'))}
+                  accentColor={accent}
+                />
+
+                <Pressable
+                  onPress={() => setShowDurationPicker(true)}
+                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#3A3A3C' }}
+                >
+                  <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>
+                    {task.estimatedMinutes}m
+                  </Text>
+                </Pressable>
+
+                {eligibleJourneys.length > 0 && (
+                  <PillPicker
+                    label={linkedJourney ? linkedJourney.title : 'No Journey'}
+                    options={[{ id: '', label: 'No Journey' }, ...eligibleJourneys.map(c => ({ id: c.id, label: c.title }))]}
+                    selectedId={task.collectionId || ''}
+                    onSelect={(id) => {
+                      feedback('select');
+                      const linked = eligibleJourneys.find(c => c.id === id);
+                      onUpdate(task.id, { collectionId: id || undefined, summitId: linked?.summitId || undefined });
+                      setOpenPill(null);
+                    }}
+                    open={openPill === 'journey'}
+                    onToggle={() => setOpenPill(p => (p === 'journey' ? null : 'journey'))}
+                    accentColor={accent}
+                  />
+                )}
+              </View>
+            ) : (
+              <View className="flex-row items-center mt-1 gap-1.5">
+                <View style={{ backgroundColor: '#2C2C2E' }} className="px-2 py-0.5 rounded-full">
+                  <Text className="text-[#8E8E93] text-[9px] font-bold uppercase tracking-wider">
+                    {tagName}
+                  </Text>
+                </View>
+                <Text className="text-[#8E8E93] text-xs font-medium">
+                  {task.estimatedMinutes} mins
                 </Text>
               </View>
-              <Text className="text-[#8E8E93] text-xs font-medium">
-                {task.estimatedMinutes} mins
-              </Text>
-            </View>
-          </Pressable>
+            )}
+          </View>
         </View>
 
         {/* Actions - Shadcn-style ghost buttons */}
@@ -261,5 +334,18 @@ export default function AnimatedTaskRow({
         </View>
       </Pressable>
     </Animated.View>
+    {onUpdate && (
+      <TimeSelectorModal
+        visible={showDurationPicker}
+        initialMinutes={task.estimatedMinutes}
+        title="Estimate Duration"
+        onClose={() => setShowDurationPicker(false)}
+        onConfirm={(mins) => {
+          onUpdate(task.id, { estimatedMinutes: mins });
+          setShowDurationPicker(false);
+        }}
+      />
+    )}
+    </>
   );
 }

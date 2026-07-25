@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
-import { useCollectionStore } from '../store/collectionStore';
-import { useSummitStore } from '../store/summitStore';
+import { useCollectionStore, Collection } from '../store/collectionStore';
+import { useSummitStore, Summit } from '../store/summitStore';
 import { CategoryVectorIcon } from '../utils/categoryIcons';
 
 interface LinkProgressPickerProps {
@@ -10,6 +10,20 @@ interface LinkProgressPickerProps {
   summitId: string; // '' = none
   onChange: (collectionId: string, summitId: string) => void;
   accentColor?: string;
+}
+
+/**
+ * Journeys whose linked Summit matches the given economic type, or that have
+ * no linked Summit at all (goalless Journeys are type-neutral). Shared between
+ * `LinkProgressPicker` and the Task-row Journey pill (`AnimatedTaskRow`).
+ */
+export function getEligibleJourneys(collections: Collection[], summits: Summit[], tagType: 'earner' | 'burner'): Collection[] {
+  const type = tagType === 'burner' ? 'entertainment' : 'productive';
+  return collections.filter(c => {
+    if (!c.summitId) return true;
+    const summit = summits.find(g => g.id === c.summitId);
+    return !summit || (summit.type || 'productive') === type;
+  });
 }
 
 /**
@@ -27,15 +41,7 @@ export default function LinkProgressPicker({
   const { collections } = useCollectionStore();
   const { summits } = useSummitStore();
 
-  const type = tagType === 'burner' ? 'entertainment' : 'productive';
-
-  // Journeys whose linked Summit matches this task's economic type, or that
-  // have no linked Summit at all (goalless Journeys are type-neutral).
-  const eligibleJourneys = collections.filter(c => {
-    if (!c.summitId) return true;
-    const summit = summits.find(g => g.id === c.summitId);
-    return !summit || (summit.type || 'productive') === type;
-  });
+  const eligibleJourneys = getEligibleJourneys(collections, summits, tagType);
 
   if (eligibleJourneys.length === 0) return null;
 

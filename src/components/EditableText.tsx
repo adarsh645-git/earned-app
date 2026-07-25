@@ -20,7 +20,6 @@ interface EditableTextProps {
 export default function EditableText({ value, onSave, textStyle, containerStyle, numberOfLines = 1 }: EditableTextProps) {
   const [draft, setDraft] = useState(value);
   const [textWidth, setTextWidth] = useState<number | null>(null);
-  const [isFocused, setIsFocused] = useState(false);
 
   // Sync local draft if the value changes externally (e.g. another surface edited it).
   useEffect(() => {
@@ -28,7 +27,6 @@ export default function EditableText({ value, onSave, textStyle, containerStyle,
   }, [value]);
 
   const commit = () => {
-    setIsFocused(false);
     const trimmed = draft.trim();
     if (trimmed && trimmed !== value) {
       onSave(trimmed);
@@ -44,7 +42,6 @@ export default function EditableText({ value, onSave, textStyle, containerStyle,
       <TextInput
         value={draft}
         onChangeText={setDraft}
-        onFocus={() => setIsFocused(true)}
         onBlur={commit}
         onSubmitEditing={commit}
         style={[
@@ -57,8 +54,7 @@ export default function EditableText({ value, onSave, textStyle, containerStyle,
             width: inputWidth,
             padding: 0,
             margin: 0,
-            backgroundColor: isFocused ? 'rgba(255,255,255,0.06)' : 'transparent',
-            borderRadius: 4,
+            backgroundColor: 'transparent',
           },
         ]}
         returnKeyType="done"
