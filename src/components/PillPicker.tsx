@@ -19,6 +19,12 @@ interface PillPickerProps {
   onToggle: () => void;
   accentColor?: string;
   footerAction?: { label: string; onPress: () => void }; // e.g. "+ Create New Goal..."
+  /** 'chip' (default) is the bordered pill face used everywhere today.
+   * 'plain' renders the trigger as bare text — no background/border, just a
+   * hit-slop for touch target — for contexts (subtask rows) that want the
+   * same tap-to-edit popover without the visual weight of a chip. The
+   * popover itself is identical either way. */
+  variant?: 'chip' | 'plain';
 }
 
 const DROPDOWN_MAX_HEIGHT = 280;
@@ -47,6 +53,7 @@ export default function PillPicker({
   onToggle,
   accentColor = '#BF5AF2',
   footerAction,
+  variant = 'chip',
 }: PillPickerProps) {
   const anchorRef = useRef<View>(null);
   const [anchorRect, setAnchorRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -90,22 +97,34 @@ export default function PillPicker({
     <View ref={anchorRef} collapsable={false}>
       <Pressable
         onPress={handleTogglePress}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: '#2C2C2E',
-          paddingHorizontal: 10,
-          paddingVertical: 6,
-          borderRadius: 8,
-          borderWidth: 1,
-          borderColor: open ? accentColor : '#3A3A3C',
-        }}
+        hitSlop={variant === 'plain' ? 6 : undefined}
+        style={
+          variant === 'plain'
+            ? { flexDirection: 'row', alignItems: 'center' }
+            : {
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#2C2C2E',
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: open ? accentColor : '#3A3A3C',
+              }
+        }
       >
-        {icon && <View style={{ marginRight: 5 }}>{icon}</View>}
-        <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600', marginRight: 4 }} numberOfLines={1}>
+        {icon && variant === 'chip' && <View style={{ marginRight: 5 }}>{icon}</View>}
+        <Text
+          style={
+            variant === 'plain'
+              ? { color: open ? accentColor : '#8E8E93', fontSize: 12, fontWeight: '600' }
+              : { color: '#FFF', fontSize: 12, fontWeight: '600', marginRight: 4 }
+          }
+          numberOfLines={1}
+        >
           {label}
         </Text>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={12} color="#8E8E93" />
+        {variant === 'chip' && <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={12} color="#8E8E93" />}
       </Pressable>
 
       {open && anchorRect && (

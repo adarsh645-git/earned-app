@@ -44,12 +44,23 @@ interface AnimatedTaskRowProps {
   onUpdate?: (id: string, updates: Partial<Task>) => void;
   isLast: boolean;
   onToggle: (id: string) => void;
-  onMoveToIcebox?: (id: string) => void;
   onEdit?: (task: Task) => void;
-  onDelete?: (id: string) => void;
   onStartTimer?: (id: string, mins: number) => void;
   showStartButton?: boolean;
-  showIceboxButton?: boolean;
+  subtaskCount?: number;
+  completedSubtaskCount?: number;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
+  onAddSubtask?: () => void;
+  /** Rendered at the start of the left cluster, before the checkbox — used
+   * for the drag-reorder grip so its gesture claims the touch before the
+   * row's own onPress (toggle-expand) or any other tap target reacts. */
+  leadingAccessory?: React.ReactNode;
+  /** 'subtask' renders a quieter, more compact row — smaller checkbox/title/
+   * icons, plain-text metadata instead of pill-chips, no confetti/glow on
+   * completion — so a parent's children don't compete visually with
+   * top-level tasks. Purely cosmetic; behavior/props are unchanged. */
+  variant?: 'default' | 'subtask';
 }
 
 export default function AnimatedTaskRow({
@@ -60,14 +71,38 @@ export default function AnimatedTaskRow({
   onUpdate,
   isLast,
   onToggle,
-  onMoveToIcebox,
   onEdit,
-  onDelete,
   onStartTimer,
   showStartButton = false,
-  showIceboxButton = true,
+  subtaskCount = 0,
+  completedSubtaskCount = 0,
+  isExpanded = false,
+  onToggleExpand,
+  onAddSubtask,
+  leadingAccessory,
+  variant = 'default',
 }: AnimatedTaskRowProps) {
   const accent = tagType === 'burner' ? '#5AC8FA' : '#30D158';
+  const isSubtask = variant === 'subtask';
+
+  // Derived sizes — a subtask row is the same component, just quieter and
+  // more compact, so top-level tasks (the default) are pixel-identical to
+  // before.
+  const CHECKBOX_SIZE = isSubtask ? 18 : 24;
+  const CHECKBOX_RADIUS = isSubtask ? 6 : 7;
+  const TITLE_FONT_SIZE = isSubtask ? 13 : 16;
+  const TITLE_FONT_WEIGHT = isSubtask ? ('500' as const) : ('600' as const);
+  const ROW_PADDING_V = isSubtask ? 8 : 16;
+  const ACTION_ICON_SIZE = isSubtask ? 15 : 20;
+  // A *static* Tailwind class, not a computed style prop — `paddingHorizontal`
+  // passed through Pressable's function-style prop silently doesn't apply in
+  // this codebase's NativeWind/RNW setup (confirmed via computed style: it
+  // measured 0px regardless of value), which is what actually caused the
+  // cramped look, for top-level rows too, not just subtasks. The original
+  // `px-3` className (before this row grew a `variant` prop) is restored
+  // here; subtasks get slightly more to offset their smaller icon glyph.
+  const ACTION_PADDING_CLASS = isSubtask ? 'px-[15px]' : 'px-3';
+  const ACTION_DIVIDER_HEIGHT = isSubtask ? 14 : 16;
 
   const { collections } = useCollectionStore();
   const { summits } = useSummitStore();
@@ -113,9 +148,13 @@ export default function AnimatedTaskRow({
       return;
     }
 
-    // Completing: trigger multi-layered animation
+    // Completing: trigger multi-layered animation. Subtask rows keep the
+    // satisfying checkbox bounce + checkmark pop + strikethrough, but skip
+    // the confetti burst and glow-ring pulse — that celebration is reserved
+    // for the parent's own auto-complete, so checking off several subtasks
+    // in a row doesn't fire off a burst of fireworks.
     feedback('taskComplete');
-    burstRef.current?.fire(); // confetti burst radiating from the checkbox
+    if (!isSubtask) burstRef.current?.fire(); // confetti burst radiating from the checkbox
     setLocalCompleted(true); // instantly show checkmark
 
     // 1. Checkbox spring bounce + glow ring pulse + checkmark pop + strikethrough
@@ -124,12 +163,14 @@ export default function AnimatedTaskRow({
         Animated.spring(checkScale, { toValue: 1.5, useNativeDriver: true, speed: 80, bounciness: 16 }),
         Animated.spring(checkScale, { toValue: 1, useNativeDriver: true, speed: 40, bounciness: 8 }),
       ]),
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(glowOpacity, { toValue: 0.7, duration: 150, useNativeDriver: true }),
-          Animated.timing(glowScale, { toValue: 2.0, duration: 300, useNativeDriver: true }),
+      ...(isSubtask ? [] : [
+        Animated.sequence([
+          Animated.parallel([
+            Animated.timing(glowOpacity, { toValue: 0.7, duration: 150, useNativeDriver: true }),
+            Animated.timing(glowScale, { toValue: 2.0, duration: 300, useNativeDriver: true }),
+          ]),
+          Animated.timing(glowOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
         ]),
-        Animated.timing(glowOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
       ]),
       Animated.sequence([
         Animated.spring(checkmarkScale, { toValue: 1.3, useNativeDriver: true, speed: 90, bounciness: 14 }),
@@ -168,17 +209,22 @@ export default function AnimatedTaskRow({
         transform: [{ translateX: rowTranslateX }],
       }}
     >
-      <Pressable className="flex-row items-stretch justify-between min-h-[72px] hover:bg-[#1F1F22]">
-        <View className="flex-row items-center flex-1 py-4 pl-4 pr-2">
+      <Pressable
+        onPress={onToggleExpand}
+        className="flex-row items-stretch justify-between hover:bg-[#1F1F22]"
+        style={{ minHeight: isSubtask ? 44 : 72 }}
+      >
+        <View className="flex-row items-center flex-1" style={{ paddingVertical: ROW_PADDING_V, paddingLeft: 16, paddingRight: 8 }}>
+          {leadingAccessory}
           {/* Checkbox with glow ring + confetti burst */}
-          <Pressable onPress={handleToggle} style={{ position: 'relative' }}>
-            {/* Accent glow ring (behind checkbox) */}
+          <Pressable onPress={subtaskCount > 0 ? undefined : handleToggle} style={{ position: 'relative' }}>
+            {/* Accent glow ring (behind checkbox) — subtask rows never fire it (see handleToggle) */}
             <Animated.View
               style={{
                 position: 'absolute',
-                width: 24,
-                height: 24,
-                borderRadius: 7,
+                width: CHECKBOX_SIZE,
+                height: CHECKBOX_SIZE,
+                borderRadius: CHECKBOX_RADIUS,
                 backgroundColor: accent,
                 opacity: glowOpacity,
                 transform: [{ scale: glowScale }],
@@ -187,19 +233,19 @@ export default function AnimatedTaskRow({
               }}
               pointerEvents="none"
             />
-            {/* Confetti burst, centered on the checkbox */}
-            <CheckboxBurst ref={burstRef} color={accent} size={24} />
+            {/* Confetti burst, centered on the checkbox — subtask rows never fire it */}
+            <CheckboxBurst ref={burstRef} color={accent} size={CHECKBOX_SIZE} />
             {/* Checkbox — rounded square, TickTick-style */}
             <Animated.View
               style={[
                 {
-                  width: 24,
-                  height: 24,
-                  borderRadius: 7,
+                  width: CHECKBOX_SIZE,
+                  height: CHECKBOX_SIZE,
+                  borderRadius: CHECKBOX_RADIUS,
                   borderWidth: 2,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginRight: 12,
+                  marginRight: isSubtask ? 8 : 12,
                   transform: [{ scale: checkScale }],
                 },
                 localCompleted
@@ -209,7 +255,7 @@ export default function AnimatedTaskRow({
             >
               {localCompleted && (
                 <Animated.View style={{ transform: [{ scale: checkmarkScale }] }}>
-                  <Ionicons name="checkmark" size={14} color="white" />
+                  <Ionicons name="checkmark" size={isSubtask ? 11 : 14} color="white" />
                 </Animated.View>
               )}
             </Animated.View>
@@ -222,8 +268,8 @@ export default function AnimatedTaskRow({
                 value={task.title}
                 onSave={(title) => onUpdate(task.id, { title })}
                 textStyle={{
-                  fontSize: 16,
-                  fontWeight: '600',
+                  fontSize: TITLE_FONT_SIZE,
+                  fontWeight: TITLE_FONT_WEIGHT,
                   color: isStrikethrough ? '#8E8E93' : '#FFFFFF',
                   textDecorationLine: isStrikethrough ? 'line-through' : 'none',
                 }}
@@ -238,7 +284,29 @@ export default function AnimatedTaskRow({
               </Text>
             )}
 
-            {onUpdate ? (
+            {onUpdate && isSubtask ? (
+              // Quiet, chrome-free metadata line — just "Tag · Xm", still
+              // tappable to edit (same pickers), no Journey/created-time
+              // pills. The single biggest de-cluttering move for subtasks.
+              <View className="flex-row items-center mt-1" style={{ flexWrap: 'wrap', gap: 4 }}>
+                <PillPicker
+                  variant="plain"
+                  label={tagName || 'Tag'}
+                  options={tags.filter(t => !t.isArchived).map(t => ({ id: t.id, label: t.name }))}
+                  selectedId={task.tagId}
+                  onSelect={(id) => { feedback('select'); onUpdate(task.id, { tagId: id }); setOpenPill(null); }}
+                  open={openPill === 'tag'}
+                  onToggle={() => setOpenPill(p => (p === 'tag' ? null : 'tag'))}
+                  accentColor={accent}
+                />
+                <Text style={{ color: '#5C5C5E', fontSize: 12 }}>·</Text>
+                <Pressable onPress={() => setShowDurationPicker(true)} hitSlop={6}>
+                  <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600' }}>
+                    {task.estimatedMinutes}m
+                  </Text>
+                </Pressable>
+              </View>
+            ) : onUpdate ? (
               <View className="flex-row items-center mt-1.5" style={{ flexWrap: 'wrap', gap: 6 }}>
                 <PillPicker
                   label={tagName || 'Tag'}
@@ -298,61 +366,69 @@ export default function AnimatedTaskRow({
                     · {createdTime}
                   </Text>
                 )}
+                {subtaskCount > 0 && (
+                  <View style={{ backgroundColor: 'transparent', borderWidth: 1, borderColor: '#3A3A3C' }} className="px-2 py-0.5 rounded-full ml-1">
+                    <Text className="text-[#8E8E93] text-[9px] font-bold uppercase tracking-wider">
+                      {completedSubtaskCount}/{subtaskCount} Subtasks
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
           </View>
         </View>
 
-        {/* Actions - Shadcn-style ghost buttons */}
+        {/* Actions - Shadcn-style ghost buttons. Built as an array + map (rather
+            than each button conditionally rendering the *next* button's
+            divider) so the separators are always correct regardless of which
+            combination of actions is present. Icebox and Delete live in
+            SwipeableRow now (swipe-reveal + right-click), not here. */}
         <View className="flex-row items-stretch">
-          {showStartButton && !localCompleted && onStartTimer && (
-            <>
-              <Pressable
-                onPress={() => onStartTimer(task.id, task.estimatedMinutes)}
-                className="px-3 justify-center items-center bg-transparent hover:bg-[#2C2C2E]"
-                style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
-              >
-                <Ionicons name="play" size={20} color="#BF5AF2" />
-              </Pressable>
-              {onEdit && <View className="self-center" style={{ width: 1, height: 16, backgroundColor: '#3A3A3C' }} />}
-            </>
-          )}
-
-          {onEdit && (
-            <>
-              <Pressable
-                onPress={() => onEdit(task)}
-                className="px-3 justify-center items-center bg-transparent hover:bg-[#2C2C2E]"
-                style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
-              >
-                <Ionicons name="pencil" size={20} color="#8E8E93" />
-              </Pressable>
-              {showIceboxButton && onMoveToIcebox && <View className="self-center" style={{ width: 1, height: 16, backgroundColor: '#3A3A3C' }} />}
-            </>
-          )}
-
-          {showIceboxButton && onMoveToIcebox && (
-            <>
-              <Pressable
-                onPress={() => onMoveToIcebox(task.id)}
-                className="px-3 justify-center items-center bg-transparent hover:bg-[#2C2C2E]"
-                style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
-              >
-                <Ionicons name="snow-outline" size={20} color="#8E8E93" />
-              </Pressable>
-              {onDelete && <View className="self-center" style={{ width: 1, height: 16, backgroundColor: '#3A3A3C' }} />}
-            </>
-          )}
-
-          {onDelete && (
-            <Pressable
-              onPress={() => onDelete(task.id)}
-              className="px-3 justify-center items-center bg-transparent hover:bg-[rgba(255,69,58,0.1)]"
-              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
-            >
-              <Ionicons name="trash-outline" size={20} color="#FF453A" />
-            </Pressable>
-          )}
+          {([
+            showStartButton && !localCompleted && onStartTimer ? {
+              key: 'start',
+              icon: 'play',
+              color: '#BF5AF2',
+              hoverClass: 'hover:bg-[#2C2C2E]',
+              onPress: () => onStartTimer(task.id, task.estimatedMinutes),
+            } : null,
+            onEdit ? {
+              key: 'edit',
+              icon: 'pencil',
+              color: '#8E8E93',
+              hoverClass: 'hover:bg-[#2C2C2E]',
+              onPress: () => onEdit(task),
+            } : null,
+            // Icebox and Delete moved to SwipeableRow (swipe-reveal + right-click) —
+            // see the wrapping component at the call sites in TasksScreen.tsx.
+            onAddSubtask ? {
+              key: 'add',
+              icon: 'add',
+              color: '#8E8E93',
+              hoverClass: 'hover:bg-[#2C2C2E]',
+              onPress: onAddSubtask,
+            } : null,
+            subtaskCount > 0 && onToggleExpand ? {
+              key: 'expand',
+              icon: isExpanded ? 'chevron-up' : 'chevron-down',
+              color: '#8E8E93',
+              hoverClass: 'hover:bg-[#2C2C2E]',
+              onPress: onToggleExpand,
+            } : null,
+          ] as Array<{ key: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string; hoverClass: string; onPress: () => void } | null>)
+            .filter((btn): btn is NonNullable<typeof btn> => btn !== null)
+            .map((btn, i) => (
+              <React.Fragment key={btn.key}>
+                {i > 0 && <View className="self-center" style={{ width: 1, height: ACTION_DIVIDER_HEIGHT, backgroundColor: '#3A3A3C' }} />}
+                <Pressable
+                  onPress={btn.onPress}
+                  className={`${ACTION_PADDING_CLASS} justify-center items-center bg-transparent ${btn.hoverClass}`}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                >
+                  <Ionicons name={btn.icon} size={ACTION_ICON_SIZE} color={btn.color} />
+                </Pressable>
+              </React.Fragment>
+            ))}
         </View>
       </Pressable>
     </Animated.View>

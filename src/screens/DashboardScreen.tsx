@@ -10,6 +10,7 @@ import { feedback } from '../utils/feedback';
 import { useConfettiStore } from '../store/confettiStore';
 import ConfirmModal from '../components/ConfirmModal';
 import AnimatedTaskRow from '../components/AnimatedTaskRow';
+import SwipeableRow from '../components/SwipeableRow';
 import AnimatedSummitCard from '../components/AnimatedSummitCard';
 import AnimatedProgressRing from '../components/AnimatedProgressRing';
 import CurrencyPill from '../components/CurrencyPill';
@@ -236,19 +237,17 @@ export default function DashboardScreen() {
               const tag = tags.find(tag => tag.id === task.tagId);
               const isLast = index === incompleteTasks.length - 1;
               return (
-                <AnimatedTaskRow
-                  key={task.id}
-                  task={task}
-                  tagName={tag?.name}
-                  isLast={isLast}
-                  onToggle={toggleTask}
-                  onStartTimer={handleStartTimer}
-                  onMoveToIcebox={moveToIcebox}
-                  onEdit={setEditTask}
-                  onDelete={deleteTask}
-                  showStartButton
-                  showIceboxButton
-                />
+                <SwipeableRow key={task.id} taskId={task.id} onMoveToIcebox={moveToIcebox} onDelete={deleteTask} showIceboxButton>
+                  <AnimatedTaskRow
+                    task={task}
+                    tagName={tag?.name}
+                    isLast={isLast}
+                    onToggle={toggleTask}
+                    onStartTimer={handleStartTimer}
+                    onEdit={setEditTask}
+                    showStartButton
+                  />
+                </SwipeableRow>
               );
             })}
           </View>
@@ -265,17 +264,16 @@ export default function DashboardScreen() {
                 const tag = tags.find(tag => tag.id === task.tagId);
                 const isLast = index === completedTasks.length - 1;
                 return (
-                  <AnimatedTaskRow
-                    key={task.id}
-                    task={task}
-                    tagName={tag?.name}
-                    isLast={isLast}
-                    onToggle={toggleTask}
-                    onEdit={setEditTask}
-                    onDelete={deleteTask}
-                    showStartButton={false}
-                    showIceboxButton={false}
-                  />
+                  <SwipeableRow key={task.id} taskId={task.id} onDelete={deleteTask} showIceboxButton={false}>
+                    <AnimatedTaskRow
+                      task={task}
+                      tagName={tag?.name}
+                      isLast={isLast}
+                      onToggle={toggleTask}
+                      onEdit={setEditTask}
+                      showStartButton={false}
+                    />
+                  </SwipeableRow>
                 );
               })}
             </View>

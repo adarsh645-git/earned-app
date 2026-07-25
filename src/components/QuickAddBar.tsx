@@ -23,6 +23,10 @@ interface QuickAddBarProps {
     onToggle: () => void;
     content: React.ReactNode;
   };
+  /** Smaller everything (icon/font/padding/send-button) — for nested contexts
+   * like a subtask's own add-bar, which shouldn't read as large as the
+   * top-level "Add a task..." bar it sits underneath. */
+  compact?: boolean;
 }
 
 /**
@@ -40,6 +44,7 @@ export default function QuickAddBar({
   disabled,
   trailingAccessory,
   expandable,
+  compact = false,
 }: QuickAddBarProps) {
   const canSubmit = !disabled && value.trim().length > 0;
 
@@ -48,13 +53,15 @@ export default function QuickAddBar({
     onSubmit();
   };
 
+  const sendSize = compact ? 24 : 32;
+
   return (
     <View
       style={{
         backgroundColor: '#1C1C1E',
         borderWidth: 1,
         borderColor: '#2C2C2E',
-        borderRadius: 16,
+        borderRadius: compact ? 10 : 16,
         overflow: 'hidden',
       }}
     >
@@ -62,18 +69,18 @@ export default function QuickAddBar({
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          paddingLeft: 16,
-          paddingRight: 8,
-          paddingVertical: 8,
+          paddingLeft: compact ? 10 : 16,
+          paddingRight: compact ? 6 : 8,
+          paddingVertical: compact ? 4 : 8,
         }}
       >
-        <Ionicons name="add" size={18} color="#8E8E93" style={{ marginRight: 8 }} />
+        <Ionicons name="add" size={compact ? 14 : 18} color="#8E8E93" style={{ marginRight: compact ? 6 : 8 }} />
         <TextInput
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
           placeholderTextColor="#5C5C5E"
-          style={[{ flex: 1, color: '#FFF', fontSize: 15, paddingVertical: 6 }, { outlineStyle: 'none' } as any]}
+          style={[{ flex: 1, color: '#FFF', fontSize: compact ? 13 : 15, paddingVertical: compact ? 3 : 6 }, { outlineStyle: 'none' } as any]}
           onSubmitEditing={handleSubmit}
           blurOnSubmit={false}
           returnKeyType="done"
@@ -91,16 +98,16 @@ export default function QuickAddBar({
           onPress={handleSubmit}
           disabled={!canSubmit}
           style={{
-            marginLeft: 8,
-            width: 32,
-            height: 32,
-            borderRadius: 16,
+            marginLeft: compact ? 6 : 8,
+            width: sendSize,
+            height: sendSize,
+            borderRadius: sendSize / 2,
             justifyContent: 'center',
             alignItems: 'center',
             backgroundColor: canSubmit ? accentColor : '#2C2C2E',
           }}
         >
-          <Ionicons name="arrow-up" size={16} color={canSubmit ? '#FFF' : '#5C5C5E'} />
+          <Ionicons name="arrow-up" size={compact ? 13 : 16} color={canSubmit ? '#FFF' : '#5C5C5E'} />
         </Pressable>
       </View>
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useTaskStore, Task } from '../store/taskStore';
+import { useTaskStore, Task, sortKey } from '../store/taskStore';
 import { feedback } from '../utils/feedback';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -27,6 +27,8 @@ import { useEconomyStore } from '../store/economyStore';
 import { useTimerStore } from '../store/timerStore';
 import RewardToast from '../components/RewardToast';
 import AnimatedTaskRow from '../components/AnimatedTaskRow';
+import SwipeableRow from '../components/SwipeableRow';
+import ReorderableTaskGroup from '../components/ReorderableTaskGroup';
 import EditTaskModal from '../components/EditTaskModal';
 import TimeSelectorModal from '../components/TimeSelectorModal';
 import ConfirmModal from '../components/ConfirmModal';
@@ -49,7 +51,7 @@ function formatDateLabel(dateStr: string, isToday: boolean): string {
 }
 
 export default function TasksScreen() {
-  const { tasks, tags, pillars, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox } = useTaskStore();
+  const { tasks, tags, pillars, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox, reorderTasks } = useTaskStore();
   const { summits } = useSummitStore();
   const { collections } = useCollectionStore();
   const { startTimer } = useTimerStore();
@@ -139,17 +141,22 @@ export default function TasksScreen() {
   const todayStr = new Date().toISOString().split('T')[0]; // matches dateCreated's own format exactly
 
   const tasksByDate: Record<string, Task[]> = {};
-  tasks.filter(t => !t.isIcebox).forEach(t => {
+  tasks.filter(t => !t.isIcebox && !t.parentId).forEach(t => {
     // dateCreated is now a full timestamp (for the time-of-day pill below);
     // grouping only cares about the calendar date. Backward-compatible with
     // pre-existing tasks whose dateCreated was already date-only (no 'T').
     const dateKey = t.dateCreated.split('T')[0];
     (tasksByDate[dateKey] ||= []).push(t);
   });
-  // Active tasks first, completed ones after (faded) within each day's group.
-  Object.values(tasksByDate).forEach(list =>
-    list.sort((a, b) => Number(a.completed) - Number(b.completed))
-  );
+  // Active tasks sort by the manual reorder key (default = creation time,
+  // via sortKey's fallback); completed tasks stay in their existing natural
+  // order, pinned below — they're never draggable, so nothing re-sorts them.
+  Object.keys(tasksByDate).forEach(date => {
+    const list = tasksByDate[date];
+    const active = list.filter(t => !t.completed).sort((a, b) => sortKey(a) - sortKey(b));
+    const completed = list.filter(t => t.completed);
+    tasksByDate[date] = [...active, ...completed];
+  });
 
   const distinctDates = Object.keys(tasksByDate).sort((a, b) => b.localeCompare(a)); // desc; lexicographic = chronological for YYYY-MM-DD
   const datesToShow = [todayStr, ...distinctDates.filter(d => d !== todayStr)].slice(0, 5);
@@ -162,6 +169,24 @@ export default function TasksScreen() {
     feedback('expand');
     setExpandedDates(prev => ({ ...prev, [date]: !isDateExpanded(date) }));
   };
+
+  const [expandedParents, setExpandedParents] = useState<Record<string, boolean>>({});
+  const toggleParentExpanded = (id: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    feedback('expand');
+    setExpandedParents(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  // The add-subtask bar is always present under an expanded parent (not
+  // gated behind a separate "start adding" tap), so its draft text is keyed
+  // per-parent — several could be expanded at once, and a single shared
+  // string would leak one parent's draft into another's input.
+  const [subtaskTitleByParent, setSubtaskTitleByParent] = useState<Record<string, string>>({});
+
+  // Which day's card currently has a live drag — disables outer scroll for
+  // the duration and lets that card's overflow go visible so the lifted
+  // row's shadow isn't clipped by the card's rounded-corner clipping.
+  const [draggingDate, setDraggingDate] = useState<string | null>(null);
 
   const toggleQuickAddExpanded = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -286,8 +311,8 @@ export default function TasksScreen() {
           />
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} className="flex-1">
-          
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} className="flex-1" scrollEnabled={!draggingDate}>
+
           {/* Tasks bundled by day — today expanded, older days collapsed,
               capped to the 5 most recent distinct days */}
           {datesToShow.map(date => {
@@ -314,29 +339,109 @@ export default function TasksScreen() {
                       <Text className="text-[#8E8E93] text-xs text-center mt-1">Type above and press Enter to schedule a focus session.</Text>
                     </View>
                   ) : (
-                    <View style={CARD_STYLE} className="rounded-2xl overflow-hidden">
-                      {dateTasks.map((task, index) => {
-                        const tag = tags.find(t => t.id === task.tagId);
-                        const isLast = index === dateTasks.length - 1;
-                        return (
-                          <AnimatedTaskRow
-                            key={task.id}
-                            task={task}
-                            tagName={tag?.name}
-                            tagType={tag?.type}
-                            tags={tags}
-                            onUpdate={updateTask}
-                            isLast={isLast}
-                            onToggle={handleToggle}
-                            onMoveToIcebox={handleMoveToIcebox}
-                            onEdit={setEditTask}
-                            onDelete={deleteTask}
-                            onStartTimer={task.completed ? undefined : handleStartTimer}
-                            showStartButton={!task.completed}
-                            showIceboxButton={!task.completed}
-                          />
-                        );
-                      })}
+                    <View
+                      style={{ ...CARD_STYLE, overflow: draggingDate === date ? 'visible' : 'hidden' } as any}
+                      className="rounded-2xl"
+                    >
+                      <ReorderableTaskGroup
+                        tasks={dateTasks}
+                        activeCount={dateTasks.filter(t => !t.completed).length}
+                        onReorder={reorderTasks}
+                        onDragActiveChange={(dragging) => setDraggingDate(dragging ? date : null)}
+                        renderRow={(task, { leadingAccessory }) => {
+                          const tag = tags.find(t => t.id === task.tagId);
+                          const isLast = task.id === dateTasks[dateTasks.length - 1]?.id;
+
+                          // Exclude iceboxed subtasks — they're deferred and render
+                          // flat in the Icebox section instead, avoiding a double-render.
+                          const rawSubtasks = tasks.filter(t => t.parentId === task.id && !t.isIcebox);
+                          // Same split-sort convention as the day groups: active
+                          // subtasks order by the manual reorder key, completed
+                          // ones stay pinned below in natural order.
+                          const activeSubtasks = rawSubtasks.filter(t => !t.completed).sort((a, b) => sortKey(a) - sortKey(b));
+                          const completedSubtasks = rawSubtasks.filter(t => t.completed);
+                          const subtasks = [...activeSubtasks, ...completedSubtasks];
+                          const isExpanded = expandedParents[task.id];
+
+                          return (
+                            <View key={task.id} style={{ borderBottomWidth: (isLast && !isExpanded) ? 0 : 0.5, borderBottomColor: 'rgba(255,255,255,0.05)' }}>
+                              <SwipeableRow
+                                taskId={task.id}
+                                onMoveToIcebox={handleMoveToIcebox}
+                                onDelete={deleteTask}
+                                showIceboxButton={!task.completed}
+                              >
+                                <AnimatedTaskRow
+                                  task={task}
+                                  tagName={tag?.name}
+                                  tagType={tag?.type}
+                                  tags={tags}
+                                  onUpdate={updateTask}
+                                  isLast={true} // Handle bottom border in the wrapper View
+                                  onToggle={handleToggle}
+                                  onEdit={setEditTask}
+                                  onStartTimer={task.completed ? undefined : handleStartTimer}
+                                  showStartButton={!task.completed}
+                                  subtaskCount={subtasks.length}
+                                  completedSubtaskCount={completedSubtasks.length}
+                                  isExpanded={isExpanded}
+                                  onToggleExpand={() => toggleParentExpanded(task.id)}
+                                  onAddSubtask={() => {
+                                    if (!isExpanded) toggleParentExpanded(task.id);
+                                  }}
+                                  leadingAccessory={leadingAccessory}
+                                />
+                              </SwipeableRow>
+                              {isExpanded && (
+                                <View style={{ marginLeft: 32, paddingLeft: 16, paddingBottom: 16, paddingRight: 8 }}>
+                                  {subtasks.map((subtask) => {
+                                    const subTag = tags.find(t => t.id === subtask.tagId);
+                                    return (
+                                      <SwipeableRow
+                                        key={subtask.id}
+                                        taskId={subtask.id}
+                                        onMoveToIcebox={handleMoveToIcebox}
+                                        onDelete={deleteTask}
+                                        showIceboxButton={false}
+                                      >
+                                        <AnimatedTaskRow
+                                          task={subtask}
+                                          tagName={subTag?.name}
+                                          tagType={subTag?.type}
+                                          tags={tags}
+                                          onUpdate={updateTask}
+                                          isLast={true} // no divider line between subtasks — spacing alone separates them
+                                          onToggle={handleToggle}
+                                          onEdit={setEditTask}
+                                          onStartTimer={subtask.completed ? undefined : handleStartTimer}
+                                          showStartButton={!subtask.completed}
+                                          variant="subtask"
+                                        />
+                                      </SwipeableRow>
+                                    );
+                                  })}
+                                  <View style={{ marginTop: 8 }}>
+                                    <QuickAddBar
+                                      compact
+                                      placeholder="Add subtask..."
+                                      value={subtaskTitleByParent[task.id] || ''}
+                                      onChangeText={(t) => setSubtaskTitleByParent(prev => ({ ...prev, [task.id]: t }))}
+                                      onSubmit={() => {
+                                        const title = (subtaskTitleByParent[task.id] || '').trim();
+                                        if (title) {
+                                          addTask({ title, parentId: task.id });
+                                          setSubtaskTitleByParent(prev => ({ ...prev, [task.id]: '' }));
+                                          feedback('taskComplete');
+                                        }
+                                      }}
+                                    />
+                                  </View>
+                                </View>
+                              )}
+                            </View>
+                          );
+                        }}
+                      />
                     </View>
                   )
                 )}
