@@ -151,6 +151,7 @@ export default function TimerOverlay() {
           visible={showChainToast}
           message={recentCompletionResult?.tagType === 'earner' ? 'Session logged' : 'Leisure session logged'}
           chainTrail={chainTrail}
+          tone={recentCompletionResult?.tagType === 'earner' ? 'earner' : 'burner'}
           onDismiss={() => setChainToastDismissed(true)}
         />
       </>
