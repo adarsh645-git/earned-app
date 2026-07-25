@@ -475,6 +475,12 @@ export default function CollectionsScreen() {
         onDismiss={() => setChainToastVisible(false)}
       />
 
+      {/* Whole screen scrolls as one unit — the collapsible New Journey form
+          below can grow tall enough on its own (once its "new goal"
+          sub-fields appear) to exceed the viewport, so it can't live in a
+          static, non-scrolling header the way it did before. */}
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }}>
+
       {/* Executive Summary Header Stats Bar (Shadcn-inspired) */}
       <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 }}>
         <Text style={{ fontSize: 32, fontWeight: '800', color: '#FFFFFF', marginBottom: 16 }}>Journeys</Text>
@@ -736,7 +742,7 @@ export default function CollectionsScreen() {
       </View>
 
       {/* Journeys List */}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
+      <View style={{ paddingHorizontal: 16 }}>
         {collections.length === 0 ? (
           <View style={{ alignItems: 'center', marginTop: 40, backgroundColor: '#1C1C1E', borderRadius: 20, padding: 32, borderWidth: 1, borderColor: '#2C2C2E' }}>
             <View style={{ backgroundColor: '#BF5AF222', width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
@@ -1015,6 +1021,7 @@ export default function CollectionsScreen() {
             );
           })
         )}
+      </View>
       </ScrollView>
 
       {/* Celebration feedback modal */}
