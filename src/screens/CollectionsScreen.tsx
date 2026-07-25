@@ -20,27 +20,12 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const PremiumInput = (props: React.ComponentProps<typeof TextInput>) => {
-  const [isFocused, setIsFocused] = useState(false);
-  return (
-    <TextInput
-      {...props}
-      onFocus={(e) => {
-        setIsFocused(true);
-        props.onFocus?.(e);
-      }}
-      onBlur={(e) => {
-        setIsFocused(false);
-        props.onBlur?.(e);
-      }}
-      style={[
-        props.style,
-        { outlineStyle: 'none' } as any,
-        isFocused && { borderColor: '#BF5AF2', borderWidth: 2 }
-      ]}
-    />
-  );
-};
+const PremiumInput = (props: React.ComponentProps<typeof TextInput>) => (
+  <TextInput
+    {...props}
+    style={[props.style, { outlineStyle: 'none' } as any]}
+  />
+);
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',

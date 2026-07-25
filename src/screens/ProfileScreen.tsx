@@ -10,27 +10,12 @@ import { useSummitStore, Summit, getMilestoneDollars } from '../store/summitStor
 import { useAuthStore } from '../store/authStore';
 import EditSummitModal from '../components/EditSummitModal';
 
-const PremiumInput = (props: React.ComponentProps<typeof TextInput>) => {
-  const [isFocused, setIsFocused] = useState(false);
-  return (
-    <TextInput
-      {...props}
-      onFocus={(e) => {
-        setIsFocused(true);
-        props.onFocus?.(e);
-      }}
-      onBlur={(e) => {
-        setIsFocused(false);
-        props.onBlur?.(e);
-      }}
-      style={[
-        props.style,
-        { outlineStyle: 'none' } as any,
-        isFocused && { borderColor: '#BF5AF2', borderWidth: 2 }
-      ]}
-    />
-  );
-};
+const PremiumInput = (props: React.ComponentProps<typeof TextInput>) => (
+  <TextInput
+    {...props}
+    style={[props.style, { outlineStyle: 'none' } as any]}
+  />
+);
 
 export default function ProfileScreen() {
   const { user, openModal } = useAuthStore();
