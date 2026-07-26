@@ -124,6 +124,7 @@ export default function CollectionsScreen() {
   const [newSummitMetricType, setNewSummitMetricType] = useState<'minutes' | 'units'>('minutes');
   const [newSummitTargetHours, setNewSummitTargetHours] = useState('');
   const [newSummitTargetCount, setNewSummitTargetCount] = useState('');
+  const [newSummitUnitLabel, setNewSummitUnitLabel] = useState('');
   const [newSummitHorizon, setNewSummitHorizon] = useState<'monthly' | 'yearly'>('monthly');
   const [newSummitParentId, setNewSummitParentId] = useState('');
 
@@ -199,6 +200,7 @@ export default function CollectionsScreen() {
     setNewSummitMetricType('minutes');
     setNewSummitTargetHours('');
     setNewSummitTargetCount('');
+    setNewSummitUnitLabel('');
     setNewSummitHorizon('monthly');
     setNewSummitParentId('');
     setNewJourneyOpenPill(null);
@@ -248,6 +250,7 @@ export default function CollectionsScreen() {
           targetMinutes: 0,
           metricType: 'units',
           targetMetric: count,
+          unitLabel: newSummitUnitLabel.trim() || undefined,
           parentId: newSummitParentId || undefined,
         });
       } else {
@@ -446,7 +449,7 @@ export default function CollectionsScreen() {
   // Eligible chain-parents for a Summit being created inline (root goals only,
   // same type/metricType, no cycles) — mirrors the old Profile creation form.
   const eligibleParents = journeyLinkMode === 'new'
-    ? getEligibleParents(summits, null, 'productive', newSummitMetricType)
+    ? getEligibleParents(summits, null, 'productive', newSummitMetricType, newSummitUnitLabel)
     : [];
 
   const celebrationAccent = celebrationInfo ? getCelebrationAccent(celebrationInfo.iconType) : '#BF5AF2';
@@ -626,14 +629,23 @@ export default function CollectionsScreen() {
                   {newSummitMetricType === 'units' ? 'Target Count' : 'Target Hours'}
                 </Text>
                 {newSummitMetricType === 'units' ? (
-                  <PremiumInput
-                    style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, fontSize: 15, marginBottom: 14, borderWidth: 1, borderColor: '#2C2C2E' }}
-                    placeholder="e.g. 20 (books, games, workouts...)"
-                    placeholderTextColor="#5C5C5E"
-                    keyboardType="numeric"
-                    value={newSummitTargetCount}
-                    onChangeText={setNewSummitTargetCount}
-                  />
+                  <>
+                    <PremiumInput
+                      style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, fontSize: 15, marginBottom: 8, borderWidth: 1, borderColor: '#2C2C2E' }}
+                      placeholder="e.g. 20 (books, games, workouts...)"
+                      placeholderTextColor="#5C5C5E"
+                      keyboardType="numeric"
+                      value={newSummitTargetCount}
+                      onChangeText={setNewSummitTargetCount}
+                    />
+                    <PremiumInput
+                      style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, fontSize: 15, marginBottom: 14, borderWidth: 1, borderColor: '#2C2C2E' }}
+                      placeholder="Unit label (e.g. pages, reps, km)"
+                      placeholderTextColor="#5C5C5E"
+                      value={newSummitUnitLabel}
+                      onChangeText={setNewSummitUnitLabel}
+                    />
+                  </>
                 ) : (
                   <PremiumInput
                     style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, fontSize: 15, marginBottom: 14, borderWidth: 1, borderColor: '#2C2C2E' }}
@@ -752,6 +764,18 @@ export default function CollectionsScreen() {
             const linkedSummit = summits.find(g => g.id === collection.summitId);
             const isFullyComplete = progress === 100 && collectionItems.length > 0;
 
+            // Mirrors the linked Summit's own progress (from Tasks/subtasks
+            // cascading up via summitId) — a Journey has no progress of its
+            // own, so this surfaces the Goal it actually feeds right where
+            // tasks get created, without a tap to the Profile/Dashboard.
+            const isSummitUnits = linkedSummit?.metricType === 'units';
+            const summitCompleted = linkedSummit ? (isSummitUnits ? (linkedSummit.completedMetric || 0) : linkedSummit.completedMinutes) : 0;
+            const summitTarget = linkedSummit ? (isSummitUnits ? (linkedSummit.targetMetric || 0) : linkedSummit.targetMinutes) : 0;
+            const summitPct = summitTarget > 0 ? Math.min(100, Math.round((summitCompleted / summitTarget) * 100)) : 0;
+            const summitProgressLabel = isSummitUnits
+              ? `${summitCompleted}/${summitTarget}${linkedSummit?.unitLabel ? ` ${linkedSummit.unitLabel}` : ''}`
+              : `${(summitCompleted / 60).toFixed(1)}/${(summitTarget / 60).toFixed(1)}h`;
+
             const isJourneyExpanded = !!expandedJourneys[collection.id];
 
             return (
@@ -784,6 +808,12 @@ export default function CollectionsScreen() {
                         </View>
                       )}
                     </View>
+                    {linkedSummit && (
+                      <View style={{ marginTop: 6 }}>
+                        <AnimatedProgressBar progress={summitPct} color="#5AC8FA" height={4} />
+                        <Text style={{ color: '#8E8E93', fontSize: 10, marginTop: 3 }}>{summitProgressLabel} toward goal · {summitPct}%</Text>
+                      </View>
+                    )}
                   </View>
 
                   <Text style={{ color: isFullyComplete ? '#30D158' : '#FFF', fontSize: 13, fontWeight: '700', marginRight: 10 }}>
@@ -1266,14 +1296,23 @@ export default function CollectionsScreen() {
                     {newSummitMetricType === 'units' ? 'Target Count' : 'Target Hours'}
                   </Text>
                   {newSummitMetricType === 'units' ? (
-                    <PremiumInput
-                      style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 16, borderRadius: 16, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2C2C2E' }}
-                      placeholder="e.g. 20 (books, games, workouts...)"
-                      placeholderTextColor="#5C5C5E"
-                      keyboardType="numeric"
-                      value={newSummitTargetCount}
-                      onChangeText={setNewSummitTargetCount}
-                    />
+                    <>
+                      <PremiumInput
+                        style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 16, borderRadius: 16, fontSize: 16, marginBottom: 10, borderWidth: 1, borderColor: '#2C2C2E' }}
+                        placeholder="e.g. 20 (books, games, workouts...)"
+                        placeholderTextColor="#5C5C5E"
+                        keyboardType="numeric"
+                        value={newSummitTargetCount}
+                        onChangeText={setNewSummitTargetCount}
+                      />
+                      <PremiumInput
+                        style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 16, borderRadius: 16, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2C2C2E' }}
+                        placeholder="Unit label (e.g. pages, reps, km)"
+                        placeholderTextColor="#5C5C5E"
+                        value={newSummitUnitLabel}
+                        onChangeText={setNewSummitUnitLabel}
+                      />
+                    </>
                   ) : (
                     <PremiumInput
                       style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 16, borderRadius: 16, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2C2C2E' }}

@@ -58,9 +58,11 @@ export default function TaskDetailModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [subtaskTitle, setSubtaskTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [metricProgressInput, setMetricProgressInput] = useState('');
 
   useEffect(() => {
     setDescription(task?.description || '');
+    setMetricProgressInput(task?.metricProgress != null ? String(task.metricProgress) : '');
   }, [task?.id]);
 
   if (!task) return null;
@@ -70,6 +72,11 @@ export default function TaskDetailModal({
   const accent = tagType === 'burner' ? '#5AC8FA' : '#30D158';
   const eligibleJourneys = getEligibleJourneys(collections, summits, tagType);
   const linkedJourney = task.collectionId ? collections.find(c => c.id === task.collectionId) : undefined;
+  // Progress quantity (e.g. "10 pages") only matters when the linked Summit
+  // is a units-mode goal — hidden entirely for time-based/unlinked tasks.
+  const linkedSummit = task.summitId ? summits.find(s => s.id === task.summitId) : undefined;
+  const isUnitsGoal = linkedSummit?.metricType === 'units';
+  const unitLabel = linkedSummit?.unitLabel || 'units';
 
   const subtasks = tasks.filter(t => t.parentId === task.id);
   const completedSubtasks = subtasks.filter(t => t.completed);
@@ -77,6 +84,14 @@ export default function TaskDetailModal({
   const commitDescription = () => {
     if (description !== (task.description || '')) {
       onUpdate(task.id, { description: description.trim() || undefined });
+    }
+  };
+
+  const commitMetricProgress = () => {
+    const parsed = parseFloat(metricProgressInput);
+    const next = isNaN(parsed) ? undefined : parsed;
+    if (next !== task.metricProgress) {
+      onUpdate(task.id, { metricProgress: next });
     }
   };
 
@@ -166,6 +181,30 @@ export default function TaskDetailModal({
                 />
               )}
             </View>
+
+            {/* Progress toward goal — only for a units-mode linked Summit */}
+            {isUnitsGoal && (
+              <View style={{ marginBottom: 24 }}>
+                <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                  Progress ({unitLabel})
+                </Text>
+                <TextInput
+                  value={metricProgressInput}
+                  onChangeText={setMetricProgressInput}
+                  onBlur={commitMetricProgress}
+                  placeholder={`e.g. 10 ${unitLabel}`}
+                  placeholderTextColor="#5C5C5E"
+                  keyboardType="numeric"
+                  style={[
+                    { backgroundColor: '#18181B', color: '#FFFFFF', padding: 16, borderRadius: 12, fontSize: 15, borderWidth: 1, borderColor: '#2C2C2E' },
+                    { outlineStyle: 'none' } as any,
+                  ]}
+                />
+                <Text style={{ color: '#5C5C5E', fontSize: 11, marginTop: 6 }}>
+                  How much of the goal this task completes — separate from its time estimate above, which still drives what you earn.
+                </Text>
+              </View>
+            )}
 
             {/* Description */}
             <View style={{ marginBottom: 28 }}>

@@ -306,7 +306,7 @@ export default function AnimatedSummitCard({
   if (isOpenEnded) {
     completedLabel = `${(completed / 60).toFixed(1)}h Logged`;
   } else if (isUnits) {
-    completedLabel = `${completed}/${target}`;
+    completedLabel = `${completed}/${target}${goal.unitLabel ? ` ${goal.unitLabel}` : ''}`;
   } else if (isEntertainment) {
     completedLabel = `${(completed / 60).toFixed(1)}/${(target / 60).toFixed(0)}h`;
   } else {

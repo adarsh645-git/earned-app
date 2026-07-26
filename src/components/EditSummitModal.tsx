@@ -27,6 +27,7 @@ export default function EditSummitModal({
   const [horizon, setHorizon] = useState<'monthly' | 'yearly'>('monthly');
   const [targetMinutes, setTargetMinutes] = useState(0);
   const [targetMetric, setTargetMetric] = useState('');
+  const [unitLabel, setUnitLabel] = useState('');
   const [isOpenEnded, setIsOpenEnded] = useState(false);
   const [showTimeSelector, setShowTimeSelector] = useState(false);
   const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
@@ -41,6 +42,7 @@ export default function EditSummitModal({
       setHorizon(goal.horizon);
       setTargetMinutes(goal.targetMinutes);
       setTargetMetric(String(goal.targetMetric || ''));
+      setUnitLabel(goal.unitLabel || '');
       setIsOpenEnded((goal.targetMetric ?? goal.targetMinutes) === 0);
       setParentId(goal.parentId || '');
       setPaysCurrency(goal.paysCurrency !== false);
@@ -49,7 +51,7 @@ export default function EditSummitModal({
 
   if (!goal) return null;
 
-  const eligibleParents = getEligibleParents(allGoals, goal, goal.type || 'productive', goal.metricType || 'minutes');
+  const eligibleParents = getEligibleParents(allGoals, goal, goal.type || 'productive', goal.metricType || 'minutes', unitLabel);
 
   const handleSave = () => {
     if (!title.trim()) return;
@@ -58,6 +60,7 @@ export default function EditSummitModal({
 
     if (isUnits) {
       updates.targetMetric = isOpenEnded ? 0 : parseInt(targetMetric, 10) || 0;
+      updates.unitLabel = unitLabel.trim() || undefined;
     } else {
       updates.targetMinutes = isOpenEnded ? 0 : targetMinutes;
     }
@@ -246,14 +249,23 @@ export default function EditSummitModal({
                   <Text style={{ color: '#8E8E93', fontSize: 13, fontStyle: 'italic' }}>Will count up progress without a fixed target.</Text>
                 </View>
               ) : isUnits ? (
-                <TextInput
-                  value={targetMetric}
-                  onChangeText={setTargetMetric}
-                  placeholder="e.g. 12"
-                  placeholderTextColor="#52525B"
-                  keyboardType="numeric"
-                  style={[{ backgroundColor: '#18181B', color: '#FFFFFF', padding: 16, borderRadius: 12, fontSize: 16, borderWidth: 1, borderColor: '#27272A' }, { outlineStyle: 'none' } as any]}
-                />
+                <>
+                  <TextInput
+                    value={targetMetric}
+                    onChangeText={setTargetMetric}
+                    placeholder="e.g. 12"
+                    placeholderTextColor="#52525B"
+                    keyboardType="numeric"
+                    style={[{ backgroundColor: '#18181B', color: '#FFFFFF', padding: 16, borderRadius: 12, fontSize: 16, borderWidth: 1, borderColor: '#27272A' }, { outlineStyle: 'none' } as any]}
+                  />
+                  <TextInput
+                    value={unitLabel}
+                    onChangeText={setUnitLabel}
+                    placeholder="Unit label (e.g. pages, reps, km)"
+                    placeholderTextColor="#52525B"
+                    style={[{ backgroundColor: '#18181B', color: '#FFFFFF', padding: 16, borderRadius: 12, fontSize: 16, borderWidth: 1, borderColor: '#27272A', marginTop: 8 }, { outlineStyle: 'none' } as any]}
+                  />
+                </>
               ) : (
                 <Pressable
                   onPress={() => setShowTimeSelector(true)}
