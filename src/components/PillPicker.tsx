@@ -110,6 +110,7 @@ export default function PillPicker({
                 borderRadius: 8,
                 borderWidth: 1,
                 borderColor: open ? accentColor : '#3A3A3C',
+                flexShrink: 1,
               }
         }
       >
@@ -117,8 +118,8 @@ export default function PillPicker({
         <Text
           style={
             variant === 'plain'
-              ? { color: open ? accentColor : '#8E8E93', fontSize: 12, fontWeight: '600' }
-              : { color: '#FFF', fontSize: 12, fontWeight: '600', marginRight: 4 }
+              ? { color: open ? accentColor : '#8E8E93', fontSize: 12, fontWeight: '600', maxWidth: 130, flexShrink: 1 }
+              : { color: '#FFF', fontSize: 12, fontWeight: '600', marginRight: 4, maxWidth: 130, flexShrink: 1 }
           }
           numberOfLines={1}
         >

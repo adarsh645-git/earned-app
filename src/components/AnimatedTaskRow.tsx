@@ -9,6 +9,7 @@ import TimeSelectorModal from './TimeSelectorModal';
 import { useCollectionStore } from '../store/collectionStore';
 import { useSummitStore } from '../store/summitStore';
 import { getEligibleJourneys } from './LinkProgressPicker';
+import useIsMobile from '../hooks/useIsMobile';
 
 if (
   Platform.OS === 'android' &&
@@ -84,6 +85,7 @@ export default function AnimatedTaskRow({
 }: AnimatedTaskRowProps) {
   const accent = tagType === 'burner' ? '#5AC8FA' : '#30D158';
   const isSubtask = variant === 'subtask';
+  const isMobile = useIsMobile();
 
   // Derived sizes — a subtask row is the same component, just quieter and
   // more compact, so top-level tasks (the default) are pixel-identical to
@@ -214,7 +216,7 @@ export default function AnimatedTaskRow({
         className="flex-row items-stretch justify-between hover:bg-[#1F1F22]"
         style={{ minHeight: isSubtask ? 44 : 72 }}
       >
-        <View className="flex-row items-center flex-1" style={{ paddingVertical: ROW_PADDING_V, paddingLeft: 16, paddingRight: 8 }}>
+        <View className="flex-row items-center flex-1" style={{ paddingVertical: ROW_PADDING_V, paddingLeft: isMobile ? 10 : 16, paddingRight: isMobile ? 4 : 8 }}>
           {leadingAccessory}
           {/* Checkbox with glow ring + confetti burst */}
           <Pressable onPress={subtaskCount > 0 ? undefined : handleToggle} style={{ position: 'relative' }}>
@@ -245,7 +247,7 @@ export default function AnimatedTaskRow({
                   borderWidth: 2,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginRight: isSubtask ? 8 : 12,
+                  marginRight: isSubtask ? 8 : (isMobile ? 8 : 12),
                   transform: [{ scale: checkScale }],
                 },
                 localCompleted
@@ -307,7 +309,7 @@ export default function AnimatedTaskRow({
                 </Pressable>
               </View>
             ) : onUpdate ? (
-              <View className="flex-row items-center mt-1.5" style={{ flexWrap: 'wrap', gap: 6 }}>
+              <View className="flex-row items-center mt-1.5" style={{ flexWrap: 'wrap', gap: isMobile ? 4 : 6 }}>
                 <PillPicker
                   label={tagName || 'Tag'}
                   options={tags.filter(t => !t.isArchived).map(t => ({ id: t.id, label: t.name }))}

@@ -35,6 +35,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import QuickAddBar from '../components/QuickAddBar';
 import PillPicker from '../components/PillPicker';
 import { getEligibleJourneys } from '../components/LinkProgressPicker';
+import useIsMobile from '../hooks/useIsMobile';
 
 // "Today's Focus List — Friday, July 25" / "Yesterday" / "Wed, Jul 23"
 function formatDateLabel(dateStr: string, isToday: boolean): string {
@@ -55,6 +56,7 @@ export default function TasksScreen() {
   const { summits } = useSummitStore();
   const { collections } = useCollectionStore();
   const { startTimer } = useTimerStore();
+  const isMobile = useIsMobile();
 
   // Quick-add bar state — title + the one economy-critical field (Duration)
   // that stays visible in the bar itself; everything else (Tag, Journey)
@@ -248,10 +250,10 @@ export default function TasksScreen() {
             trailingAccessory={
               <Pressable
                 onPress={() => setShowAddTimeSelector(true)}
-                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginLeft: 8 }}
+                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', paddingHorizontal: isMobile ? 8 : 10, paddingVertical: isMobile ? 4 : 6, borderRadius: 8, marginLeft: isMobile ? 4 : 8 }}
               >
-                <Ionicons name="time-outline" size={14} color="#A1A1AA" style={{ marginRight: 4 }} />
-                <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>
+                <Ionicons name="time-outline" size={isMobile ? 12 : 14} color="#A1A1AA" style={{ marginRight: isMobile ? 2 : 4 }} />
+                <Text style={{ color: '#FFF', fontSize: isMobile ? 11 : 12, fontWeight: '600' }}>
                   {estimatedMinutes}m
                 </Text>
               </Pressable>

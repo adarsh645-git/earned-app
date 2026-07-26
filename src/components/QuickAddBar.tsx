@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, TextInput, Pressable } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import useIsMobile from '../hooks/useIsMobile';
 
 interface QuickAddBarProps {
   placeholder: string;
@@ -47,13 +48,18 @@ export default function QuickAddBar({
   compact = false,
 }: QuickAddBarProps) {
   const canSubmit = !disabled && value.trim().length > 0;
+  const isMobile = useIsMobile();
+  // Top-level bars always pass compact=false; folding isMobile in here means
+  // they self-tighten on narrow viewports without every call site having to
+  // pass viewport state, and subtask bars (already compact) are unaffected.
+  const tight = compact || isMobile;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
     onSubmit();
   };
 
-  const sendSize = compact ? 24 : 32;
+  const sendSize = tight ? 24 : 32;
 
   return (
     <View
@@ -61,7 +67,7 @@ export default function QuickAddBar({
         backgroundColor: '#1C1C1E',
         borderWidth: 1,
         borderColor: '#2C2C2E',
-        borderRadius: compact ? 10 : 16,
+        borderRadius: tight ? 10 : 16,
         overflow: 'hidden',
       }}
     >
@@ -69,18 +75,19 @@ export default function QuickAddBar({
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          paddingLeft: compact ? 10 : 16,
-          paddingRight: compact ? 6 : 8,
-          paddingVertical: compact ? 4 : 8,
+          flexWrap: 'wrap',
+          paddingLeft: tight ? 10 : 16,
+          paddingRight: tight ? 6 : 8,
+          paddingVertical: tight ? 4 : 8,
         }}
       >
-        <Ionicons name="add" size={compact ? 14 : 18} color="#8E8E93" style={{ marginRight: compact ? 6 : 8 }} />
+        <Ionicons name="add" size={tight ? 14 : 18} color="#8E8E93" style={{ marginRight: tight ? 6 : 8 }} />
         <TextInput
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
           placeholderTextColor="#5C5C5E"
-          style={[{ flex: 1, color: '#FFF', fontSize: compact ? 13 : 15, paddingVertical: compact ? 3 : 6 }, { outlineStyle: 'none' } as any]}
+          style={[{ flex: 1, color: '#FFF', fontSize: tight ? 13 : 15, paddingVertical: tight ? 3 : 6 }, { outlineStyle: 'none' } as any]}
           onSubmitEditing={handleSubmit}
           blurOnSubmit={false}
           returnKeyType="done"
@@ -89,7 +96,7 @@ export default function QuickAddBar({
         {expandable && (
           <Pressable
             onPress={expandable.onToggle}
-            style={{ marginLeft: 6, padding: 6 }}
+            style={{ marginLeft: tight ? 4 : 6, padding: tight ? 4 : 6 }}
           >
             <Ionicons name={expandable.open ? 'chevron-up' : 'chevron-down'} size={16} color="#8E8E93" />
           </Pressable>
@@ -98,7 +105,7 @@ export default function QuickAddBar({
           onPress={handleSubmit}
           disabled={!canSubmit}
           style={{
-            marginLeft: compact ? 6 : 8,
+            marginLeft: tight ? 6 : 8,
             width: sendSize,
             height: sendSize,
             borderRadius: sendSize / 2,
