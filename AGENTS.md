@@ -99,6 +99,30 @@ For trivial edits (documentation, typos, comments, minor formatting/typing fixes
 
 ---
 
+## Deployment Philosophy (Early-Stage / Personal-Use App)
+
+This app is in its early, personal-use stage — the primary (and currently only)
+user is its own owner, using it for personal discipline tracking. Given that,
+the bar for shipping is deliberately low-friction:
+
+- It's fine to deploy straight to production (push to `main`) to actually test
+  a change working end-to-end, rather than insisting on a staging environment
+  that doesn't exist yet — **provided a revert path is confirmed before
+  deploying**, not improvised after something breaks.
+- **Frontend revert is cheap and always available**: either use Vercel's
+  dashboard "Instant Rollback" to the previous deployment, or `git revert` the
+  merge commit on `main` and push again. Confirm one of these paths exists
+  before pushing, not as an afterthought.
+- **Database/migration changes are NOT symmetrically revertible.** There are
+  no down-migrations in this project — once a migration is pasted into the
+  Supabase SQL Editor and run, undoing it means hand-writing and running the
+  inverse SQL yourself. Before deploying frontend code that depends on a new
+  migration, confirm the migration has actually been run against the live
+  project (see the migration-tracking rule above) — don't assume revertibility
+  extends to schema changes just because it's cheap for the frontend.
+
+---
+
 ## Git Commit Standards
 
 1. **Format**: Conventional Commits with a concise bulleted body:
