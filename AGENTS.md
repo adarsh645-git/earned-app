@@ -60,6 +60,20 @@ npx expo export -p web
    - Migrations & Patches: `supabase/migrations/*.sql`
    - CLI Config: `supabase/config.toml`
    - All tables MUST enforce Row Level Security (RLS) checked against `auth.uid()`.
+   - **These migration files are not auto-applied** — this project has no
+     `supabase db push`/CI step wired up, so a new `.sql` file sitting in
+     `supabase/migrations/` has done nothing until someone pastes it into
+     the Supabase SQL Editor. Whenever a task adds or changes a migration:
+     1. Tell the user exactly which file needs to be run against the live
+        project, and don't mark the feature done until they confirm it's
+        been run (or you've verified it yourself — e.g. a quick anon-key
+        REST query for the new column/table).
+     2. Never assume a column/table exists in production just because its
+        migration file exists in the repo. This exact gap caused a real
+        incident: `20260725000003_task_sort_order.sql` shipped but was
+        never run, so every task upsert silently failed with a Postgres
+        `42703` (column does not exist) error — see
+        `docs/sdd/018-sync-health-indicator.md`.
 4. **Browser Caching Strategy**:
    - Static web deployments use aggressive cache revalidation configured in `vercel.json` (`Cache-Control: public, max-age=0, must-revalidate`) to prevent stale PWA states.
 

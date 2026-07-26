@@ -2,9 +2,14 @@ import React, { useState } from 'react';
 import { View, Text, Modal, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useAuthStore } from '../store/authStore';
+import { useSyncStatusStore, isSyncUnhealthy, getFailingChannels } from '../store/syncStatusStore';
+import { retrySync } from '../store/syncEngine';
 
 export default function AuthModal() {
   const { isModalOpen, closeModal, user, signInWithEmail, signUpWithEmail, signInWithGoogle, signOut } = useAuthStore();
+  const syncChannels = useSyncStatusStore((s) => s.channels);
+  const syncUnhealthy = isSyncUnhealthy(syncChannels);
+  const failingChannels = getFailingChannels(syncChannels);
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
@@ -13,8 +18,16 @@ export default function AuthModal() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [retrying, setRetrying] = useState(false);
 
   if (!isModalOpen) return null;
+
+  const handleRetrySync = async () => {
+    if (!user) return;
+    setRetrying(true);
+    await retrySync(user.id);
+    setRetrying(false);
+  };
 
   const handleGoogleSignIn = async () => {
     setErrorMessage('');
@@ -92,13 +105,46 @@ export default function AuthModal() {
           {/* User Already Signed In View */}
           {user ? (
             <View style={styles.signedInContainer}>
-              <View style={styles.userInfoBox}>
-                <Ionicons name="person-circle-outline" size={32} color="#30D158" />
+              <View style={[styles.userInfoBox, syncUnhealthy ? styles.userInfoBoxUnhealthy : null]}>
+                <Ionicons
+                  name={syncUnhealthy ? 'cloud-offline-outline' : 'person-circle-outline'}
+                  size={32}
+                  color={syncUnhealthy ? '#FF9F0A' : '#30D158'}
+                />
                 <View style={{ marginLeft: 12, flex: 1 }}>
-                  <Text style={styles.statusLabel}>SYNC ACTIVE</Text>
+                  <Text style={[styles.statusLabel, syncUnhealthy ? styles.statusLabelUnhealthy : null]}>
+                    {syncUnhealthy ? 'SYNC PAUSED' : 'SYNC ACTIVE'}
+                  </Text>
                   <Text style={styles.userEmail}>{user.email}</Text>
                 </View>
               </View>
+
+              {syncUnhealthy && (
+                <View style={styles.syncIssueBox}>
+                  <Text style={styles.syncIssueTitle}>
+                    Having trouble reaching the cloud for: {failingChannels.map((c) => c.label).join(', ')}
+                  </Text>
+                  {failingChannels[0]?.error && (
+                    <Text style={styles.syncIssueDetail} numberOfLines={2}>
+                      {failingChannels[0].error}
+                    </Text>
+                  )}
+                  <Text style={styles.syncIssueNote}>
+                    Nothing is lost — changes stay saved on this device and will sync once this clears.
+                  </Text>
+                  <Pressable
+                    onPress={handleRetrySync}
+                    disabled={retrying}
+                    style={[styles.actionButton, styles.retryButton]}
+                  >
+                    {retrying ? (
+                      <ActivityIndicator color="#FF9F0A" />
+                    ) : (
+                      <Text style={styles.retryButtonText}>Retry Sync</Text>
+                    )}
+                  </Pressable>
+                </View>
+              )}
 
               <Pressable
                 onPress={handleSignOut}
@@ -329,6 +375,45 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     marginTop: 2,
+  },
+  userInfoBoxUnhealthy: {
+    borderColor: 'rgba(255,159,10,0.4)',
+  },
+  statusLabelUnhealthy: {
+    color: '#FF9F0A',
+  },
+  syncIssueBox: {
+    backgroundColor: 'rgba(255,159,10,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,159,10,0.3)',
+    borderRadius: 16,
+    padding: 16,
+    gap: 8,
+  },
+  syncIssueTitle: {
+    color: '#FF9F0A',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  syncIssueDetail: {
+    color: '#8E8E93',
+    fontSize: 11,
+    fontFamily: 'monospace' as any,
+  },
+  syncIssueNote: {
+    color: '#8E8E93',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  retryButton: {
+    backgroundColor: 'rgba(255,159,10,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,159,10,0.4)',
+  },
+  retryButtonText: {
+    color: '#FF9F0A',
+    fontSize: 14,
+    fontWeight: '700',
   },
   formContainer: {
     width: '100%',
