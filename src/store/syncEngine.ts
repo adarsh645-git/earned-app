@@ -8,6 +8,28 @@ import { useSummitStore, Summit } from './summitStore';
 import { useCollectionStore, Collection, CollectionItem } from './collectionStore';
 import { useSyncStatusStore } from './syncStatusStore';
 
+// Supabase/Postgrest errors are plain objects ({ message, code, details,
+// hint }), not `Error` instances, so `err instanceof Error` is false for
+// them and `String(err)` falls through to the useless "[object Object]" —
+// this pulls the actual message (plus the Postgres error code, when present,
+// since that's what actually identifies a schema-drift issue like the
+// sort_order incident) instead.
+function stringifyError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object') {
+    const anyErr = err as { message?: unknown; code?: unknown };
+    if (typeof anyErr.message === 'string') {
+      return anyErr.code ? `${anyErr.message} (${anyErr.code})` : anyErr.message;
+    }
+    try {
+      return JSON.stringify(err);
+    } catch {
+      // fall through to String(err) below
+    }
+  }
+  return String(err);
+}
+
 // Records a push/pull outcome against the shared sync-health signal (see
 // syncStatusStore.ts) — only called around an actual network attempt, never
 // on the early-return no-op guards each function below already has.
@@ -16,7 +38,7 @@ function reportResult(channel: string, ok: boolean, err?: unknown) {
   if (ok) {
     recordSuccess(channel);
   } else {
-    recordFailure(channel, err instanceof Error ? err.message : String(err));
+    recordFailure(channel, stringifyError(err));
   }
 }
 
@@ -65,8 +87,15 @@ export function useCloudSync() {
         deleteTasksFromCloud(user.id, removedTaskIds);
       }
       pushAllTasksToCloud(user.id, state.tasks);
-      pushAllPillarsToCloud(user.id, state.pillars);
-      pushAllTagsToCloud(user.id, state.tags);
+      // Tags FK-reference pillars (tags.pillar_id -> pillars.id), so pillars
+      // must land in the cloud first - firing both in parallel let a
+      // brand-new pillar's tags reach the tags upsert before that pillar's
+      // own row had committed, tripping the FK constraint. Both functions
+      // already catch their own errors internally, so this await never
+      // blocks tags from at least being attempted.
+      pushAllPillarsToCloud(user.id, state.pillars).then(() => {
+        pushAllTagsToCloud(user.id, state.tags);
+      });
     });
 
     const unsubRewards = useRewardStore.subscribe((state, prevState) => {
