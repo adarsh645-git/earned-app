@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   completed BOOLEAN DEFAULT FALSE,
   is_icebox BOOLEAN DEFAULT FALSE,
   date_created TIMESTAMPTZ DEFAULT NOW(),
-  sort_order DOUBLE PRECISION -- manual drag-reorder key; see 20260725000003
+  sort_order DOUBLE PRECISION, -- manual drag-reorder key; see 20260725000003
+  description TEXT -- free-text notes; see 20260726000001
 );
 
 -- 4. Indulgence Rewards Store Table

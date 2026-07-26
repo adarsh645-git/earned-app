@@ -177,6 +177,7 @@ export async function pullCloudData(userId: string) {
         isIcebox: t.is_icebox,
         dateCreated: t.date_created,
         sortOrder: t.sort_order ?? undefined,
+        description: t.description ?? undefined,
       }));
       useTaskStore.setState((s) => ({ ...s, tasks: mergeById(s.tasks, formattedTasks) }));
     }
@@ -373,6 +374,7 @@ export async function pushAllTasksToCloud(userId: string, tasks: Task[]) {
       // Push the resolved fallback (not just t.sortOrder) so even a legacy
       // local row that predates this field writes a usable value.
       sort_order: t.sortOrder ?? Date.parse(t.dateCreated),
+      description: t.description || null,
     }));
     const { error } = await supabase.from('tasks').upsert(payload, { onConflict: 'id' });
     if (error) throw error;

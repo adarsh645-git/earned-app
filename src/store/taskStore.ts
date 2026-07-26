@@ -29,6 +29,7 @@ export type Task = {
   completed: boolean;
   isIcebox: boolean;
   dateCreated: string;
+  description?: string;
   // Manual ordering key — larger sorts lower within its group (a day's active
   // tasks, or a parent's subtasks). Optional so persisted/cloud rows that
   // predate this field still typecheck; sortKey() below covers the gap by
