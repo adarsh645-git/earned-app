@@ -29,7 +29,7 @@ import RewardToast from '../components/RewardToast';
 import AnimatedTaskRow from '../components/AnimatedTaskRow';
 import SwipeableRow from '../components/SwipeableRow';
 import ReorderableTaskGroup from '../components/ReorderableTaskGroup';
-import EditTaskModal from '../components/EditTaskModal';
+import TaskDetailModal from '../components/TaskDetailModal';
 import TimeSelectorModal from '../components/TimeSelectorModal';
 import ConfirmModal from '../components/ConfirmModal';
 import QuickAddBar from '../components/QuickAddBar';
@@ -52,7 +52,7 @@ function formatDateLabel(dateStr: string, isToday: boolean): string {
 }
 
 export default function TasksScreen() {
-  const { tasks, tags, pillars, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox, reorderTasks } = useTaskStore();
+  const { tasks, tags, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox, reorderTasks } = useTaskStore();
   const { summits } = useSummitStore();
   const { collections } = useCollectionStore();
   const { startTimer } = useTimerStore();
@@ -132,8 +132,10 @@ export default function TasksScreen() {
     activateFromIcebox(id);
   };
 
-  // Modals state
-  const [editTask, setEditTask] = useState<Task | null>(null);
+  // Modals state — id-based (not a snapshot) so the detail screen reflects
+  // live edits (tag/duration/journey autosave) while it's still open.
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const detailTask = tasks.find(t => t.id === detailTaskId) || null;
 
   const iceboxTasks = tasks.filter(t => t.isIcebox);
 
@@ -381,7 +383,7 @@ export default function TasksScreen() {
                                   onUpdate={updateTask}
                                   isLast={true} // Handle bottom border in the wrapper View
                                   onToggle={handleToggle}
-                                  onEdit={setEditTask}
+                                  onEdit={(t) => setDetailTaskId(t.id)}
                                   onStartTimer={task.completed ? undefined : handleStartTimer}
                                   showStartButton={!task.completed}
                                   subtaskCount={subtasks.length}
@@ -414,7 +416,7 @@ export default function TasksScreen() {
                                           onUpdate={updateTask}
                                           isLast={true} // no divider line between subtasks — spacing alone separates them
                                           onToggle={handleToggle}
-                                          onEdit={setEditTask}
+                                          onEdit={(t) => setDetailTaskId(t.id)}
                                           onStartTimer={subtask.completed ? undefined : handleStartTimer}
                                           showStartButton={!subtask.completed}
                                           variant="subtask"
@@ -515,13 +517,19 @@ export default function TasksScreen() {
         </ScrollView>
       </View>
 
-      <EditTaskModal pillars={pillars} 
-        task={editTask}
-        visible={!!editTask}
+      <TaskDetailModal
+        task={detailTask}
+        visible={!!detailTaskId}
+        tasks={tasks}
         tags={tags}
-        onClose={() => setEditTask(null)}
-        onSave={(id, updates) => updateTask(id, updates)}
-        onDelete={(id) => deleteTask(id)}
+        onClose={() => setDetailTaskId(null)}
+        onUpdate={updateTask}
+        onToggle={handleToggle}
+        onDelete={(id) => { deleteTask(id); setDetailTaskId(null); }}
+        onStartTimer={handleStartTimer}
+        onMoveToIcebox={handleMoveToIcebox}
+        onActivateFromIcebox={handleActivate}
+        addTask={addTask}
       />
 
       {/* Blocked Timer Modal */}

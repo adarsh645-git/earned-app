@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Pressable, useWindowDimensions } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEconomyStore } from '../store/economyStore';
-import { useTaskStore, Task } from '../store/taskStore';
+import { useTaskStore } from '../store/taskStore';
 import { useSummitStore, Summit } from '../store/summitStore';
 import { useTimerStore } from '../store/timerStore';
 import { feedback } from '../utils/feedback';
@@ -14,7 +14,7 @@ import SwipeableRow from '../components/SwipeableRow';
 import AnimatedSummitCard from '../components/AnimatedSummitCard';
 import AnimatedProgressRing from '../components/AnimatedProgressRing';
 import CurrencyPill from '../components/CurrencyPill';
-import EditTaskModal from '../components/EditTaskModal';
+import TaskDetailModal from '../components/TaskDetailModal';
 import QuickStartModal from '../components/QuickStartModal';
 
 export default function DashboardScreen() {
@@ -25,11 +25,13 @@ export default function DashboardScreen() {
 
   const [activePillarId, setActivePillarId] = useState<string>('');
   const [blockedModal, setBlockedModal] = useState<{ title: string; message: string } | null>(null);
-  const [editTask, setEditTask] = useState<Task | null>(null);
+  // Id-based (not a snapshot) so the detail screen reflects live edits while open.
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [quickStartGoal, setQuickStartGoal] = useState<Summit | null>(null);
-  
+
   const { dollarBalance, hoursBalanceMinutes, debt, streak, lastCheckInDate } = useEconomyStore();
   const { tasks, tags, pillars, toggleTask, moveToIcebox, deleteTask, updateTask, addTask } = useTaskStore();
+  const detailTask = tasks.find(t => t.id === detailTaskId) || null;
   const activePillars = pillars.filter(p => !p.isArchived);
   const currentPillarId = activePillarId || activePillars[0]?.id;
   const { summits } = useSummitStore();
@@ -244,7 +246,7 @@ export default function DashboardScreen() {
                     isLast={isLast}
                     onToggle={toggleTask}
                     onStartTimer={handleStartTimer}
-                    onEdit={setEditTask}
+                    onEdit={(t) => setDetailTaskId(t.id)}
                     showStartButton
                   />
                 </SwipeableRow>
@@ -270,7 +272,7 @@ export default function DashboardScreen() {
                       tagName={tag?.name}
                       isLast={isLast}
                       onToggle={toggleTask}
-                      onEdit={setEditTask}
+                      onEdit={(t) => setDetailTaskId(t.id)}
                       showStartButton={false}
                     />
                   </SwipeableRow>
@@ -336,14 +338,18 @@ export default function DashboardScreen() {
         />
       )}
 
-      <EditTaskModal 
-        pillars={pillars} 
-        task={editTask}
-        visible={!!editTask}
+      <TaskDetailModal
+        task={detailTask}
+        visible={!!detailTaskId}
+        tasks={tasks}
         tags={tags}
-        onClose={() => setEditTask(null)}
-        onSave={(id, updates) => updateTask(id, updates)}
-        onDelete={(id) => deleteTask(id)}
+        onClose={() => setDetailTaskId(null)}
+        onUpdate={updateTask}
+        onToggle={toggleTask}
+        onDelete={(id) => { deleteTask(id); setDetailTaskId(null); }}
+        onStartTimer={handleStartTimer}
+        onMoveToIcebox={moveToIcebox}
+        addTask={addTask}
       />
 
       {quickStartGoal && (

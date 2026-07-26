@@ -212,7 +212,7 @@ export default function AnimatedTaskRow({
       }}
     >
       <Pressable
-        onPress={onToggleExpand}
+        onPress={() => onEdit?.(task)}
         className="flex-row items-stretch justify-between hover:bg-[#1F1F22]"
         style={{ minHeight: isSubtask ? 44 : 72 }}
       >
@@ -308,8 +308,8 @@ export default function AnimatedTaskRow({
                   </Text>
                 </Pressable>
               </View>
-            ) : onUpdate ? (
-              <View className="flex-row items-center mt-1.5" style={{ flexWrap: 'wrap', gap: isMobile ? 4 : 6 }}>
+            ) : onUpdate && !isMobile ? (
+              <View className="flex-row items-center mt-1.5" style={{ flexWrap: 'wrap', gap: 6 }}>
                 <PillPicker
                   label={tagName || 'Tag'}
                   options={tags.filter(t => !t.isArchived).map(t => ({ id: t.id, label: t.name }))}
@@ -352,6 +352,16 @@ export default function AnimatedTaskRow({
                     <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600' }}>{createdTime}</Text>
                   </View>
                 )}
+              </View>
+            ) : onUpdate ? (
+              // Mobile: no interactive pills — a quiet, non-interactive caption
+              // (same style as the subtask metadata line above) so the row stays
+              // scannable without chip clutter. Tag/Duration/Journey/time are one
+              // tap away in the Task Detail screen instead.
+              <View className="flex-row items-center mt-1" style={{ flexWrap: 'wrap', gap: 4 }}>
+                <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600' }}>{tagName || 'Tag'}</Text>
+                <Text style={{ color: '#5C5C5E', fontSize: 12 }}>·</Text>
+                <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600' }}>{task.estimatedMinutes}m</Text>
               </View>
             ) : (
               <View className="flex-row items-center mt-1 gap-1.5">
