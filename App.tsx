@@ -5,6 +5,7 @@ import ConfettiCanvas from './src/components/ConfettiCanvas';
 import { useEconomyStore } from './src/store/economyStore';
 import { useSummitStore } from './src/store/summitStore';
 import { useCollectionStore } from './src/store/collectionStore';
+import { useTaskStore } from './src/store/taskStore';
 import './global.css';
 
 function waitForHydration(store: { persist: { hasHydrated: () => boolean; onFinishHydration: (cb: () => void) => () => void } }): Promise<void> {
@@ -26,12 +27,14 @@ export default function App() {
       waitForHydration(useEconomyStore),
       waitForHydration(useSummitStore),
       waitForHydration(useCollectionStore),
+      waitForHydration(useTaskStore),
     ]).then(() => {
       useEconomyStore.getState().applyEntertainmentClawback();
       useSummitStore.getState().applyPaysCurrencyDefaults();
       // Must run after both Summits and Collections have hydrated — it reads
       // one store and writes the other.
       useCollectionStore.getState().backfillJourneysForOrphanSummits();
+      useTaskStore.getState().backfillTagPillarIds();
     });
   }, []);
 

@@ -56,6 +56,8 @@ interface TaskState {
   // Remembers the last tag used on a quick-added task, so the next quick-add
   // defaults to it instead of forcing a choice every time.
   lastUsedTagId: string;
+  // Guards the one-time repair below so it only ever runs once per device.
+  tagPillarIdBackfillApplied: boolean;
 
   // Task Actions
   // title is the only required field — quick-add can create a task from just
@@ -82,6 +84,12 @@ interface TaskState {
   addTag: (tag: Omit<Tag, 'id'>) => void;
   updateTag: (id: string, updates: Partial<Tag>) => void;
   archiveTag: (id: string) => void;
+  // Repairs tags persisted before the `bucket` -> `pillarId` rename (commit
+  // 79ffeb8) that never got migrated, so they still carry the old `bucket`
+  // field with `pillarId` left undefined. Pushing that straight to Supabase
+  // violates tags.pillar_id's NOT NULL constraint on every sync attempt —
+  // see docs/sdd/018-sync-health-indicator.md's "Journeys/Tags" failure.
+  backfillTagPillarIds: () => void;
 }
 
 export const useTaskStore = create<TaskState>()(
@@ -99,6 +107,7 @@ export const useTaskStore = create<TaskState>()(
         { id: uuidv4(), pillarId: 'personal', name: 'Gaming', type: 'burner' }
       ],
       lastUsedTagId: '',
+      tagPillarIdBackfillApplied: false,
 
       addTask: (task) => {
         const id = uuidv4();
@@ -303,7 +312,25 @@ export const useTaskStore = create<TaskState>()(
       })),
       archiveTag: (id) => set((state) => ({
         tags: state.tags.map(t => t.id === id ? { ...t, isArchived: true } : t)
-      }))
+      })),
+      backfillTagPillarIds: () => {
+        if (get().tagPillarIdBackfillApplied) return;
+
+        set((state) => {
+          const fallbackPillarId = state.pillars.find(p => !p.isArchived)?.id || state.pillars[0]?.id || 'office';
+          return {
+            tags: state.tags.map(t => {
+              if (t.pillarId) return t;
+              // Pre-rename rows persisted the pillar under `bucket` (see
+              // commit 79ffeb8); fall back to the first pillar if even that's gone.
+              const legacyBucket = (t as unknown as { bucket?: string }).bucket;
+              return { ...t, pillarId: legacyBucket || fallbackPillarId };
+            }),
+          };
+        });
+
+        set({ tagPillarIdBackfillApplied: true });
+      },
     }),
     {
       name: 'earned-task-storage',
