@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   is_icebox BOOLEAN DEFAULT FALSE,
   date_created TIMESTAMPTZ DEFAULT NOW(),
   sort_order DOUBLE PRECISION, -- manual drag-reorder key; see 20260725000003
-  description TEXT -- free-text notes; see 20260726000001
+  description TEXT, -- free-text notes; see 20260726000001
+  metric_progress DOUBLE PRECISION -- quantity toward a linked Summit's unit; see 20260726000002
 );
 
 -- 4. Indulgence Rewards Store Table
@@ -59,7 +60,8 @@ CREATE TABLE IF NOT EXISTS public.summits (
   unlocked_milestones JSONB DEFAULT '[]'::jsonb,
   parent_id TEXT,
   pays_currency BOOLEAN DEFAULT TRUE,
-  category TEXT
+  category TEXT,
+  unit_label TEXT -- free-text label for metric_type='units'; see 20260726000002
 );
 
 -- 6. Collections (Journeys & Backlogs) Table

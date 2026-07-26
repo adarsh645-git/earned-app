@@ -207,6 +207,7 @@ export async function pullCloudData(userId: string) {
         dateCreated: t.date_created,
         sortOrder: t.sort_order ?? undefined,
         description: t.description ?? undefined,
+        metricProgress: t.metric_progress ?? undefined,
       }));
       useTaskStore.setState((s) => ({ ...s, tasks: mergeById(s.tasks, formattedTasks) }));
     }
@@ -282,6 +283,7 @@ export async function pullCloudData(userId: string) {
         parentId: g.parent_id || undefined,
         paysCurrency: g.pays_currency !== false,
         category: g.category || undefined,
+        unitLabel: g.unit_label || undefined,
       }));
       useSummitStore.setState((s) => ({ summits: mergeById(s.summits, formattedSummits) }));
     }
@@ -404,6 +406,7 @@ export async function pushAllTasksToCloud(userId: string, tasks: Task[]) {
       // local row that predates this field writes a usable value.
       sort_order: t.sortOrder ?? Date.parse(t.dateCreated),
       description: t.description || null,
+      metric_progress: t.metricProgress ?? null,
     }));
     const { error } = await supabase.from('tasks').upsert(payload, { onConflict: 'id' });
     if (error) throw error;
@@ -511,6 +514,7 @@ export async function pushAllSummitsToCloud(userId: string, summits: Summit[]) {
       parent_id: g.parentId || null,
       pays_currency: g.paysCurrency !== false,
       category: g.category || null,
+      unit_label: g.unitLabel || null,
     }));
     const { error } = await supabase.from('summits').upsert(payload, { onConflict: 'id' });
     if (error) throw error;

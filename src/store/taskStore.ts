@@ -30,6 +30,11 @@ export type Task = {
   isIcebox: boolean;
   dateCreated: string;
   description?: string;
+  // Quantity this task contributes to its linked Summit's 'units' metric
+  // (e.g. 10 for "10 pages") — purely a Goal-progress input, never the
+  // economy payout, which always stays keyed to estimatedMinutes. Only
+  // meaningful when summitId points at a metricType:'units' Summit.
+  metricProgress?: number;
   // Manual ordering key — larger sorts lower within its group (a day's active
   // tasks, or a parent's subtasks). Optional so persisted/cloud rows that
   // predate this field still typecheck; sortKey() below covers the gap by
@@ -224,7 +229,7 @@ export const useTaskStore = create<TaskState>()(
               economyState.incrementCompletedTasks();
 
               if (task.summitId) {
-                summitState.applyLeafProgress(task.summitId, task.estimatedMinutes);
+                summitState.applyLeafProgress(task.summitId, task.estimatedMinutes, task.metricProgress);
               }
             } else if (tag?.type === 'burner') {
               economyState.spendHours(task.estimatedMinutes);
@@ -238,7 +243,7 @@ export const useTaskStore = create<TaskState>()(
               economyState.decrementCompletedTasks();
 
               if (task.summitId) {
-                summitState.revokeLeafProgress(task.summitId, task.estimatedMinutes);
+                summitState.revokeLeafProgress(task.summitId, task.estimatedMinutes, task.metricProgress);
               }
             } else if (tag?.type === 'burner') {
               economyState.addHours(task.estimatedMinutes);

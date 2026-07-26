@@ -22,6 +22,9 @@ export type Summit = {
   metricType?: 'minutes' | 'units';
   targetMetric?: number;
   completedMetric?: number;
+  // Free-text label for a 'units' goal's metric (e.g. "pages", "reps", "km") —
+  // purely a display/homogeneity concern, never an economy input.
+  unitLabel?: string;
   unlockedMilestones: number[]; // e.g. [25, 50, 75, 100]
   type?: SummitType;
   parentId?: string; // If set, this is a sub-project nested under a parent Summit
@@ -95,13 +98,20 @@ export function getEligibleParents(
   summits: Summit[],
   goal: Summit | null,
   type: SummitType,
-  metricType: 'minutes' | 'units'
+  metricType: 'minutes' | 'units',
+  // Chains must agree on what a "unit" even means, not just that they're both
+  // 'units' mode — a "pages" chain and a "reps" chain can't cascade into each
+  // other. Defaults to '' so existing call sites (no label concept yet) keep
+  // matching only other unlabeled goals, unchanged from today's behavior.
+  unitLabel: string = ''
 ): Summit[] {
   const excludeIds = goal ? new Set([goal.id, ...getDescendantIds(summits, goal.id)]) : new Set<string>();
+  const normalizedUnitLabel = unitLabel.trim().toLowerCase();
   return summits.filter(g => {
     if (excludeIds.has(g.id)) return false;
     if ((g.type || 'productive') !== type) return false;
     if ((g.metricType || 'minutes') !== metricType) return false;
+    if (metricType === 'units' && (g.unitLabel || '').trim().toLowerCase() !== normalizedUnitLabel) return false;
     if (getChainDepth(summits, g.id) >= MAX_CHAIN_DEPTH) return false;
     return true;
   });
@@ -142,9 +152,11 @@ interface SummitState {
   // completed count by delta (+1 on a leaf completion, -1 on an un-completion).
   stepCountAncestors: (parentId: string, delta: 1 | -1) => UnlockedMilestoneInfo[];
   // Routes a leaf action to the correct unit for the linked goal's chain:
-  // a discrete completion is +1 to a count goal; effort is minutes to a time goal.
-  applyLeafProgress: (goalId: string, minutes: number) => UnlockedMilestoneInfo[];
-  revokeLeafProgress: (goalId: string, minutes: number) => void;
+  // a discrete completion is +1 to a count goal (or the task's own
+  // metricAmount, e.g. "10 pages", when it reports one); effort is minutes to
+  // a time goal. metricAmount is ignored entirely for time goals.
+  applyLeafProgress: (goalId: string, minutes: number, metricAmount?: number) => UnlockedMilestoneInfo[];
+  revokeLeafProgress: (goalId: string, minutes: number, metricAmount?: number) => void;
   // Makes `goalId` the one paying level of its whole chain (root + all
   // descendants), clearing paysCurrency everywhere else in that chain.
   setPayingLevel: (goalId: string) => void;
@@ -358,19 +370,21 @@ export const useSummitStore = create<SummitState>()(
         return unlocked;
       },
 
-      applyLeafProgress: (goalId, minutes) => {
+      applyLeafProgress: (goalId, minutes, metricAmount) => {
         const goal = get().summits.find(g => g.id === goalId);
         if (!goal) return [];
-        // Count chains advance one unit per discrete completion; time chains
-        // absorb the minutes of effort. addProgress handles accumulation + the
-        // completion ripple to ancestors.
-        return get().addProgress(goalId, goal.metricType === 'units' ? 1 : minutes);
+        // Count chains advance by the task's own metricAmount (e.g. 10 pages),
+        // falling back to a flat +1 when the task never set one — preserves
+        // exact behavior for every existing units-mode goal. Time chains
+        // absorb the minutes of effort regardless. addProgress handles
+        // accumulation + the completion ripple to ancestors.
+        return get().addProgress(goalId, goal.metricType === 'units' ? (metricAmount ?? 1) : minutes);
       },
 
-      revokeLeafProgress: (goalId, minutes) => {
+      revokeLeafProgress: (goalId, minutes, metricAmount) => {
         const goal = get().summits.find(g => g.id === goalId);
         if (!goal) return;
-        get().removeProgress(goalId, goal.metricType === 'units' ? 1 : minutes);
+        get().removeProgress(goalId, goal.metricType === 'units' ? (metricAmount ?? 1) : minutes);
       },
 
       removeProgress: (id, amount) => {
