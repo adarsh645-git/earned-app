@@ -40,9 +40,14 @@ export default function DashboardScreen() {
   const today = new Date().toISOString().split('T')[0];
   const isCheckedInToday = lastCheckInDate === today;
 
+  // Today's Focus / Daily Goal only ever means tasks created today (same
+  // creation-date convention TasksScreen's day-grouping uses) — without this,
+  // every completed task ever created for the pillar kept inflating the ring
+  // and leaking into "Completed Today". Subtasks are excluded too, matching
+  // TasksScreen's top-level day buckets (they're not independent daily items).
   const activeBucketTasks = tasks.filter(t => {
     const tag = tags.find(tag => tag.id === t.tagId);
-    return tag?.pillarId === currentPillarId && !t.isIcebox;
+    return tag?.pillarId === currentPillarId && !t.isIcebox && !t.parentId && t.dateCreated.split('T')[0] === today;
   });
 
   const incompleteTasks = activeBucketTasks.filter(t => !t.completed);

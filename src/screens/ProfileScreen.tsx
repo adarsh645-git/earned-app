@@ -419,7 +419,10 @@ export default function ProfileScreen() {
             {summits.map((goal, index) => {
               const completedHours = (goal.completedMinutes / 60).toFixed(1);
               const targetHrs = (goal.targetMinutes / 60).toFixed(1);
-              const pct = Math.min(100, Math.round((goal.completedMinutes / goal.targetMinutes) * 100));
+              // targetMinutes is 0 for open-ended summits — without this guard,
+              // completedMinutes / 0 produces NaN/Infinity, which renders as an
+              // invalid width and shows the bar as already fully filled.
+              const pct = goal.targetMinutes > 0 ? Math.min(100, Math.round((goal.completedMinutes / goal.targetMinutes) * 100)) : 0;
               const unlocked = goal.unlockedMilestones || [];
               const milestones = [25, 50, 75, 100];
               const isLast = index === summits.length - 1;
