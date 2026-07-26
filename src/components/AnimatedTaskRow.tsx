@@ -52,7 +52,6 @@ interface AnimatedTaskRowProps {
   completedSubtaskCount?: number;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
-  onAddSubtask?: () => void;
   /** Rendered at the start of the left cluster, before the checkbox — used
    * for the drag-reorder grip so its gesture claims the touch before the
    * row's own onPress (toggle-expand) or any other tap target reacts. */
@@ -79,7 +78,6 @@ export default function AnimatedTaskRow({
   completedSubtaskCount = 0,
   isExpanded = false,
   onToggleExpand,
-  onAddSubtask,
   leadingAccessory,
   variant = 'default',
 }: AnimatedTaskRowProps) {
@@ -404,22 +402,11 @@ export default function AnimatedTaskRow({
               hoverClass: 'hover:bg-[#2C2C2E]',
               onPress: () => onStartTimer(task.id, task.estimatedMinutes),
             } : null,
-            onEdit ? {
-              key: 'edit',
-              icon: 'pencil',
-              color: '#8E8E93',
-              hoverClass: 'hover:bg-[#2C2C2E]',
-              onPress: () => onEdit(task),
-            } : null,
-            // Icebox and Delete moved to SwipeableRow (swipe-reveal + right-click) —
-            // see the wrapping component at the call sites in TasksScreen.tsx.
-            onAddSubtask ? {
-              key: 'add',
-              icon: 'add',
-              color: '#8E8E93',
-              hoverClass: 'hover:bg-[#2C2C2E]',
-              onPress: onAddSubtask,
-            } : null,
+            // Edit (pencil) and Add-subtask (+) buttons were retired — tapping
+            // the row itself opens the Task Detail screen, which now owns
+            // both editing and subtask creation. Icebox and Delete moved to
+            // SwipeableRow (swipe-reveal + right-click) — see the wrapping
+            // component at the call sites in TasksScreen.tsx.
             subtaskCount > 0 && onToggleExpand ? {
               key: 'expand',
               icon: isExpanded ? 'chevron-up' : 'chevron-down',

@@ -390,9 +390,6 @@ export default function TasksScreen() {
                                   completedSubtaskCount={completedSubtasks.length}
                                   isExpanded={isExpanded}
                                   onToggleExpand={() => toggleParentExpanded(task.id)}
-                                  onAddSubtask={() => {
-                                    if (!isExpanded) toggleParentExpanded(task.id);
-                                  }}
                                   leadingAccessory={leadingAccessory}
                                 />
                               </SwipeableRow>
