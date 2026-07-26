@@ -8,6 +8,7 @@ import { feedback } from '../utils/feedback';
 import { useTaskStore } from '../store/taskStore';
 import { useSummitStore, Summit, getMilestoneDollars } from '../store/summitStore';
 import { useAuthStore } from '../store/authStore';
+import { useSyncStatusStore, isSyncUnhealthy } from '../store/syncStatusStore';
 import EditSummitModal from '../components/EditSummitModal';
 
 const PremiumInput = (props: React.ComponentProps<typeof TextInput>) => (
@@ -19,6 +20,7 @@ const PremiumInput = (props: React.ComponentProps<typeof TextInput>) => (
 
 export default function ProfileScreen() {
   const { user, openModal } = useAuthStore();
+  const syncUnhealthy = useSyncStatusStore((s) => isSyncUnhealthy(s.channels));
   const {
     dollarBalance,
     streak,
@@ -134,7 +136,7 @@ export default function ProfileScreen() {
             onPress={openModal}
             style={{
               backgroundColor: '#1C1C1E',
-              borderColor: user ? 'rgba(48,209,88,0.3)' : 'rgba(191,90,242,0.3)',
+              borderColor: user && syncUnhealthy ? 'rgba(255,159,10,0.4)' : user ? 'rgba(48,209,88,0.3)' : 'rgba(191,90,242,0.3)',
               borderWidth: 1,
             }}
             className="p-4 rounded-2xl flex-row items-center justify-between"
@@ -142,7 +144,7 @@ export default function ProfileScreen() {
             <View className="flex-row items-center flex-1 pr-3">
               <View
                 style={{
-                  backgroundColor: user ? 'rgba(48,209,88,0.15)' : 'rgba(191,90,242,0.15)',
+                  backgroundColor: user && syncUnhealthy ? 'rgba(255,159,10,0.15)' : user ? 'rgba(48,209,88,0.15)' : 'rgba(191,90,242,0.15)',
                   width: 40,
                   height: 40,
                   borderRadius: 12,
@@ -150,17 +152,17 @@ export default function ProfileScreen() {
                 className="items-center justify-center mr-3"
               >
                 <Ionicons
-                  name={user ? 'person-circle' : 'log-in-outline'}
+                  name={user && syncUnhealthy ? 'cloud-offline-outline' : user ? 'person-circle' : 'log-in-outline'}
                   size={24}
-                  color={user ? '#30D158' : '#BF5AF2'}
+                  color={user && syncUnhealthy ? '#FF9F0A' : user ? '#30D158' : '#BF5AF2'}
                 />
               </View>
               <View className="flex-1">
                 <Text className="text-white font-bold text-sm">
                   {user ? user.user_metadata?.name || user.user_metadata?.full_name || 'Logged In' : 'Login'}
                 </Text>
-                <Text className="text-[#8E8E93] text-xs font-medium mt-0.5" numberOfLines={1}>
-                  {user ? user.email : 'Tap to sign in with Google'}
+                <Text style={user && syncUnhealthy ? { color: '#FF9F0A' } : undefined} className="text-[#8E8E93] text-xs font-medium mt-0.5" numberOfLines={1}>
+                  {user && syncUnhealthy ? 'Sync paused — tap for details' : user ? user.email : 'Tap to sign in with Google'}
                 </Text>
               </View>
             </View>

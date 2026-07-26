@@ -17,6 +17,7 @@ import CountUpText from '../components/CountUpText';
 import { useEconomyStore, CheckInResult } from '../store/economyStore';
 import { useAuthStore } from '../store/authStore';
 import { useCloudSync } from '../store/syncEngine';
+import { useSyncStatusStore, isSyncUnhealthy } from '../store/syncStatusStore';
 
 const Tab = createBottomTabNavigator();
 
@@ -45,6 +46,7 @@ interface SidebarProps {
 function DesktopSidebar({ currentTab, onSelectTab }: SidebarProps) {
   const { dollarBalance, streak, debt } = useEconomyStore();
   const { user, openModal } = useAuthStore();
+  const syncUnhealthy = useSyncStatusStore((s) => isSyncUnhealthy(s.channels));
 
   const navItems = [
     { name: 'Dashboard', label: 'Summary', icon: 'home-outline', activeIcon: 'home' },
@@ -70,16 +72,16 @@ function DesktopSidebar({ currentTab, onSelectTab }: SidebarProps) {
       {/* Cloud Devices Sync Pill Button */}
       <Pressable onPress={openModal} style={styles.cloudSyncPill}>
         <Ionicons
-          name={user ? 'person-circle' : 'log-in-outline'}
+          name={user && syncUnhealthy ? 'cloud-offline-outline' : user ? 'person-circle' : 'log-in-outline'}
           size={20}
-          color={user ? '#30D158' : '#BF5AF2'}
+          color={user && syncUnhealthy ? '#FF9F0A' : user ? '#30D158' : '#BF5AF2'}
         />
         <View style={{ marginLeft: 8, flex: 1 }}>
           <Text style={styles.cloudSyncTitle}>
             {user ? user.user_metadata?.name || user.user_metadata?.full_name || 'Logged In' : 'Login'}
           </Text>
-          <Text style={styles.cloudSyncSub} numberOfLines={1}>
-            {user ? user.email : 'Sign in to sync your progress'}
+          <Text style={[styles.cloudSyncSub, user && syncUnhealthy ? { color: '#FF9F0A' } : null]} numberOfLines={1}>
+            {user && syncUnhealthy ? 'Sync paused — tap for details' : user ? user.email : 'Sign in to sync your progress'}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={14} color="#8E8E93" />
