@@ -52,9 +52,9 @@ function formatDateLabel(dateStr: string, isToday: boolean): string {
 }
 
 export default function TasksScreen() {
-  const { tasks, tags, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox, reorderTasks } = useTaskStore();
+  const { tasks, tags, pillars, lastUsedTagId, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox, reorderTasks } = useTaskStore();
   const { summits } = useSummitStore();
-  const { collections } = useCollectionStore();
+  const { collections, waypoints } = useCollectionStore();
   const { startTimer } = useTimerStore();
   const isMobile = useIsMobile();
 
@@ -70,16 +70,30 @@ export default function TasksScreen() {
   // Chevron-expand draft state for the quick-add bar. Empty/false means "let
   // the store apply its normal default" — only an explicit pick overrides it.
   const [quickAddExpanded, setQuickAddExpanded] = useState(false);
-  const [quickAddOpenPill, setQuickAddOpenPill] = useState<'tag' | 'journey' | null>(null);
+  const [quickAddOpenPill, setQuickAddOpenPill] = useState<'pillar' | 'tag' | 'journey' | 'waypoint' | null>(null);
+  const [quickAddPillarId, setQuickAddPillarId] = useState('');
   const [quickAddTagId, setQuickAddTagId] = useState('');
   const [quickAddCollectionId, setQuickAddCollectionId] = useState('');
   const [quickAddSummitId, setQuickAddSummitId] = useState('');
+  const [quickAddWaypointId, setQuickAddWaypointId] = useState('');
   const [quickAddIsIcebox, setQuickAddIsIcebox] = useState(false);
+
+  const activePillars = pillars.filter(p => !p.isArchived);
+  // Which Pillar the Category dropdown is currently scoped to — an explicit
+  // pick wins, otherwise fall back to the last-used tag's pillar (continuity
+  // with the pre-existing "Tag (last used)" default) or the first Pillar.
+  const currentPillarId = quickAddPillarId
+    || tags.find(t => t.id === lastUsedTagId)?.pillarId
+    || activePillars[0]?.id
+    || '';
 
   const quickAddTagType: 'earner' | 'burner' = quickAddTagId
     ? (tags.find(t => t.id === quickAddTagId)?.type ?? 'earner')
     : 'earner';
   const quickAddEligibleJourneys = getEligibleJourneys(collections, summits, quickAddTagType);
+  const quickAddEligibleWaypoints = quickAddCollectionId
+    ? waypoints.filter(w => w.collectionId === quickAddCollectionId)
+    : [];
 
   const handleStartTimer = (taskId: string, mins: number) => {
     const res = startTimer(taskId, mins);
@@ -210,14 +224,17 @@ export default function TasksScreen() {
       tagId: quickAddTagId || undefined,
       collectionId: quickAddCollectionId || undefined,
       summitId: quickAddSummitId || undefined,
+      waypointId: quickAddWaypointId || undefined,
       isIcebox: quickAddIsIcebox,
     });
 
     feedback('taskComplete');
     setTitle('');
+    setQuickAddPillarId('');
     setQuickAddTagId('');
     setQuickAddCollectionId('');
     setQuickAddSummitId('');
+    setQuickAddWaypointId('');
     setQuickAddIsIcebox(false);
     setQuickAddOpenPill(null);
     // Duration is intentionally NOT reset — the next quick-add inherits it,
@@ -266,8 +283,25 @@ export default function TasksScreen() {
               content: (
                 <View className="flex-row items-center" style={{ flexWrap: 'wrap', gap: 6 }}>
                   <PillPicker
+                    label={activePillars.find(p => p.id === currentPillarId)?.name || 'Pillar'}
+                    options={activePillars.map(p => ({ id: p.id, label: p.name }))}
+                    selectedId={currentPillarId}
+                    onSelect={(id) => {
+                      feedback('select');
+                      setQuickAddPillarId(id);
+                      // Category must always resolve to a valid tag — jump to
+                      // the newly-picked Pillar's first Category immediately.
+                      const pillarTags = tags.filter(t => t.pillarId === id && !t.isArchived);
+                      setQuickAddTagId(pillarTags[0]?.id || '');
+                      setQuickAddOpenPill(null);
+                    }}
+                    open={quickAddOpenPill === 'pillar'}
+                    onToggle={() => setQuickAddOpenPill(p => (p === 'pillar' ? null : 'pillar'))}
+                  />
+
+                  <PillPicker
                     label={quickAddTagId ? (tags.find(t => t.id === quickAddTagId)?.name || 'Tag') : 'Tag (last used)'}
-                    options={tags.filter(t => !t.isArchived).map(t => ({ id: t.id, label: t.name }))}
+                    options={tags.filter(t => t.pillarId === currentPillarId && !t.isArchived).map(t => ({ id: t.id, label: t.name }))}
                     selectedId={quickAddTagId}
                     onSelect={(id) => { feedback('select'); setQuickAddTagId(id); setQuickAddOpenPill(null); }}
                     open={quickAddOpenPill === 'tag'}
@@ -284,10 +318,24 @@ export default function TasksScreen() {
                         const linked = quickAddEligibleJourneys.find(c => c.id === id);
                         setQuickAddCollectionId(id);
                         setQuickAddSummitId(linked?.summitId || '');
+                        // Waypoint belongs to the old Journey — clear it too.
+                        setQuickAddWaypointId('');
                         setQuickAddOpenPill(null);
                       }}
                       open={quickAddOpenPill === 'journey'}
                       onToggle={() => setQuickAddOpenPill(p => (p === 'journey' ? null : 'journey'))}
+                    />
+                  )}
+
+                  {quickAddEligibleWaypoints.length > 0 && (
+                    <PillPicker
+                      label={quickAddWaypointId ? (quickAddEligibleWaypoints.find(w => w.id === quickAddWaypointId)?.title || 'Waypoint') : 'No Waypoint'}
+                      options={[{ id: '', label: 'No Waypoint' }, ...quickAddEligibleWaypoints.map(w => ({ id: w.id, label: w.title }))]}
+                      selectedId={quickAddWaypointId}
+                      onSelect={(id) => { feedback('select'); setQuickAddWaypointId(id); setQuickAddOpenPill(null); }}
+                      open={quickAddOpenPill === 'waypoint'}
+                      onToggle={() => setQuickAddOpenPill(p => (p === 'waypoint' ? null : 'waypoint'))}
+                      accentColor="#5AC8FA"
                     />
                   )}
 
@@ -519,6 +567,7 @@ export default function TasksScreen() {
         visible={!!detailTaskId}
         tasks={tasks}
         tags={tags}
+        pillars={pillars}
         onClose={() => setDetailTaskId(null)}
         onUpdate={updateTask}
         onToggle={handleToggle}

@@ -64,6 +64,7 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
   const completedCount = collectionItems.filter(i => i.completed).length;
   const progress = collectionItems.length > 0 ? Math.round((completedCount / collectionItems.length) * 100) : 0;
   const linkedTasks = tasks.filter(t => t.collectionId === collection.id);
+  const generalTasks = linkedTasks.filter(t => !t.waypointId);
 
   const isSummitUnits = linkedSummit?.metricType === 'units';
   const summitCompleted = linkedSummit ? (isSummitUnits ? (linkedSummit.completedMetric || 0) : linkedSummit.completedMinutes) : 0;
@@ -171,8 +172,13 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
               </Text>
               {collectionWaypoints.map(wp => {
                 const wpItems = collectionItems.filter(i => i.waypointId === wp.id);
-                const wpCompleted = wpItems.filter(i => i.completed).length;
-                const targetMetric = wp.targetMetric || wpItems.length || 1;
+                const wpTasks = linkedTasks.filter(t => t.waypointId === wp.id);
+                // A Waypoint's progress counts completed Tasks alongside its
+                // CollectionItem checklist — both are "things that live under
+                // this Waypoint," just created from different surfaces.
+                const wpCompleted = wpItems.filter(i => i.completed).length + wpTasks.filter(t => t.completed).length;
+                const wpTotalCount = wpItems.length + wpTasks.length;
+                const targetMetric = wp.targetMetric || wpTotalCount || 1;
                 const wpPct = Math.min(100, Math.round((wpCompleted / targetMetric) * 100));
                 const isWpComplete = wpPct === 100;
                 const timeframeLabel = wp.month && wp.year
@@ -190,7 +196,7 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '500', marginRight: 10 }}>
-                            {wpCompleted} / {wp.targetMetric ? wp.targetMetric : wpItems.length} ({wpPct}%)
+                            {wpCompleted} / {wp.targetMetric ? wp.targetMetric : wpTotalCount} ({wpPct}%)
                           </Text>
                           <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                             <Text style={{ color: '#5AC8FA', fontSize: 10, fontWeight: '600' }}>{timeframeLabel}</Text>
@@ -251,8 +257,21 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                               </Pressable>
                             </View>
                           ))
-                        ) : (
+                        ) : wpTasks.length === 0 ? (
                           <Text style={{ color: '#8E8E93', fontSize: 12, marginTop: 10, fontStyle: 'italic' }}>No tasks added yet.</Text>
+                        ) : null}
+
+                        {wpTasks.length > 0 && (
+                          <View style={{ marginTop: wpItems.length > 0 ? 4 : 10 }}>
+                            {wpTasks.map(t => (
+                              <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
+                                <Ionicons name={t.completed ? 'checkmark-circle' : 'ellipse-outline'} size={14} color={t.completed ? '#30D158' : '#8E8E93'} style={{ marginRight: 8 }} />
+                                <Text style={{ color: t.completed ? '#8E8E93' : '#EBEBF5', fontSize: 13, flex: 1, textDecorationLine: t.completed ? 'line-through' : 'none' }} numberOfLines={1}>
+                                  {t.title}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
                         )}
 
                         <View style={{ marginTop: 10 }}>
@@ -312,13 +331,16 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
               </View>
             </View>
 
-            {/* Tasks (reverse lookup) */}
-            {linkedTasks.length > 0 && (
+            {/* Tasks (reverse lookup) — Waypoint-linked tasks already render
+                nested under their own Waypoint card above; this is only the
+                remainder with no Waypoint (or every task, if this Journey
+                has no Waypoints at all). */}
+            {generalTasks.length > 0 && (
               <View style={{ marginTop: 16 }}>
                 <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-                  Tasks
+                  {collectionWaypoints.length > 0 ? 'General' : 'Tasks'}
                 </Text>
-                {linkedTasks.map(t => (
+                {generalTasks.map(t => (
                   <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1C1E', borderRadius: 12, borderWidth: 1, borderColor: '#2C2C2E', padding: 14, marginBottom: 8 }}>
                     <Ionicons name={t.completed ? 'checkmark-circle' : 'ellipse-outline'} size={16} color={t.completed ? '#30D158' : '#8E8E93'} style={{ marginRight: 10 }} />
                     <Text style={{ color: t.completed ? '#8E8E93' : '#EBEBF5', fontSize: 14, fontWeight: '500', flex: 1, textDecorationLine: t.completed ? 'line-through' : 'none' }} numberOfLines={1}>
