@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Modal, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Task, Tag } from '../store/taskStore';
+import { Task, Tag, Pillar } from '../store/taskStore';
 import PillPicker from './PillPicker';
 import EditableText from './EditableText';
 import TimeSelectorModal from './TimeSelectorModal';
@@ -19,6 +19,7 @@ interface TaskDetailModalProps {
   visible: boolean;
   tasks: Task[]; // full list — subtasks are derived by filtering on parentId
   tags: Tag[];
+  pillars: Pillar[];
   onClose: () => void;
   onUpdate: (id: string, updates: Partial<Task>) => void;
   onToggle: (id: string) => void;
@@ -29,7 +30,7 @@ interface TaskDetailModalProps {
   addTask: (task: { title: string; parentId?: string }) => string;
 }
 
-type OpenPill = 'tag' | 'journey' | null;
+type OpenPill = 'pillar' | 'tag' | 'journey' | 'waypoint' | null;
 
 /**
  * Full-screen task detail — replaces the old centered EditTaskModal popup.
@@ -42,6 +43,7 @@ export default function TaskDetailModal({
   visible,
   tasks,
   tags,
+  pillars,
   onClose,
   onUpdate,
   onToggle,
@@ -51,7 +53,7 @@ export default function TaskDetailModal({
   onActivateFromIcebox,
   addTask,
 }: TaskDetailModalProps) {
-  const { collections } = useCollectionStore();
+  const { collections, waypoints } = useCollectionStore();
   const { goals } = useGoalStore();
   const [openPill, setOpenPill] = useState<OpenPill>(null);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
@@ -72,6 +74,9 @@ export default function TaskDetailModal({
   const accent = tagType === 'burner' ? '#5AC8FA' : '#30D158';
   const eligibleJourneys = getEligibleJourneys(collections, goals, tagType);
   const linkedJourney = task.collectionId ? collections.find(c => c.id === task.collectionId) : undefined;
+  const activePillars = pillars.filter(p => !p.isArchived);
+  const currentPillarId = tag?.pillarId || activePillars[0]?.id || '';
+  const eligibleWaypoints = task.collectionId ? waypoints.filter(w => w.collectionId === task.collectionId) : [];
   // Progress quantity (e.g. "10 pages") only matters when the linked Goal
   // is a units-mode goal — hidden entirely for time-based/unlinked tasks.
   const linkedGoal = task.goalId ? goals.find(s => s.id === task.goalId) : undefined;
@@ -147,8 +152,24 @@ export default function TaskDetailModal({
             {/* Metadata pills */}
             <View className="flex-row items-center" style={{ flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
               <PillPicker
+                label={activePillars.find(p => p.id === currentPillarId)?.name || 'Pillar'}
+                options={activePillars.map(p => ({ id: p.id, label: p.name }))}
+                selectedId={currentPillarId}
+                onSelect={(id) => {
+                  feedback('select');
+                  // Category must always resolve to a valid tag — jump to
+                  // the newly-picked Pillar's first Category immediately.
+                  const pillarTags = tags.filter(t => t.pillarId === id && !t.isArchived);
+                  onUpdate(task.id, { tagId: pillarTags[0]?.id || '' });
+                  setOpenPill(null);
+                }}
+                open={openPill === 'pillar'}
+                onToggle={() => setOpenPill(p => (p === 'pillar' ? null : 'pillar'))}
+              />
+
+              <PillPicker
                 label={tag?.name || 'Tag'}
-                options={tags.filter(t => !t.isArchived).map(t => ({ id: t.id, label: t.name }))}
+                options={tags.filter(t => t.pillarId === currentPillarId && !t.isArchived).map(t => ({ id: t.id, label: t.name }))}
                 selectedId={task.tagId}
                 onSelect={(id) => { feedback('select'); onUpdate(task.id, { tagId: id }); setOpenPill(null); }}
                 open={openPill === 'tag'}
@@ -172,12 +193,26 @@ export default function TaskDetailModal({
                   onSelect={(id) => {
                     feedback('select');
                     const linked = eligibleJourneys.find(c => c.id === id);
-                    onUpdate(task.id, { collectionId: id || undefined, goalId: linked?.goalId || undefined });
+                    // Waypoint belongs to the old Journey — clear it whenever
+                    // the Journey changes (including clearing to "No Journey").
+                    onUpdate(task.id, { collectionId: id || undefined, goalId: linked?.goalId || undefined, waypointId: undefined });
                     setOpenPill(null);
                   }}
                   open={openPill === 'journey'}
                   onToggle={() => setOpenPill(p => (p === 'journey' ? null : 'journey'))}
                   accentColor={accent}
+                />
+              )}
+
+              {eligibleWaypoints.length > 0 && (
+                <PillPicker
+                  label={task.waypointId ? (eligibleWaypoints.find(w => w.id === task.waypointId)?.title || 'Waypoint') : 'No Waypoint'}
+                  options={[{ id: '', label: 'No Waypoint' }, ...eligibleWaypoints.map(w => ({ id: w.id, label: w.title }))]}
+                  selectedId={task.waypointId || ''}
+                  onSelect={(id) => { feedback('select'); onUpdate(task.id, { waypointId: id || undefined }); setOpenPill(null); }}
+                  open={openPill === 'waypoint'}
+                  onToggle={() => setOpenPill(p => (p === 'waypoint' ? null : 'waypoint'))}
+                  accentColor="#5AC8FA"
                 />
               )}
             </View>

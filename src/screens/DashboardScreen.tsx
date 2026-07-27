@@ -348,6 +348,7 @@ export default function DashboardScreen() {
         visible={!!detailTaskId}
         tasks={tasks}
         tags={tags}
+        pillars={pillars}
         onClose={() => setDetailTaskId(null)}
         onUpdate={updateTask}
         onToggle={toggleTask}

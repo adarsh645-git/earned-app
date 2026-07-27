@@ -1,4 +1,4 @@
-# 022 — Summit → Goal Rename
+# 023 — Summit → Goal Rename
 
 ## Objective
 
@@ -31,7 +31,7 @@ has already been run against production, so the DB currently has `summits`,
   `tasks.summit_id` → `tasks.goal_id`; `collections.summit_id` →
   `collections.goal_id`. RLS policies renamed to match (`"Users can view own
   summits"` → `"Users can view own goals"`, etc.). Migration:
-  `supabase/migrations/20260727000001_rename_summit_to_goal.sql`, guarded/
+  `supabase/migrations/20260727000002_rename_summit_to_goal.sql`, guarded/
   idempotent (checks `information_schema` before each step, matching the 016
   migration's defensive pattern) — **must be run in the Supabase SQL Editor
   before/alongside this deploy**, per AGENTS.md's migration-tracking rule.
@@ -57,7 +57,7 @@ has already been run against production, so the DB currently has `summits`,
 
 ## Implementation Checklist
 
-- [x] Migration `20260727000001_rename_summit_to_goal.sql` written (guarded)
+- [x] Migration `20260727000002_rename_summit_to_goal.sql` written (guarded)
 - [x] `supabase/schema.sql` baseline updated to the post-rename shape
 - [x] `summitStore.ts` → `goalStore.ts` rename (type, store, actions)
 - [x] `goalId` field rename in `taskStore.ts` / `collectionStore.ts`
@@ -75,7 +75,9 @@ has already been run against production, so the DB currently has `summits`,
       and every task/collection's goal link) without one; not part of the
       original scope call above but a direct consequence of the "full
       rename" choice, so it's covered under the same pass
-- [ ] User confirms migration has been run against the live Supabase project
+- [x] User confirms migration has been run against the live Supabase project
+      — verified via anon-key REST query: `goals`/`goal_type` reachable,
+      `tasks.goal_id`/`collections.goal_id` reachable, `public.summits` 404s
 
 ## Notes
 
@@ -86,3 +88,8 @@ has already been run against production, so the DB currently has `summits`,
   file change.
 - `docs/sdd/*.md` historical specs (016–021) are left as written — a
   point-in-time design record, not living copy.
+- Originally numbered 022; renumbered to 023 on merge with `main`, which had
+  independently claimed 022 for `022-task-waypoint-and-pillar-scoped-category.md`.
+  Same reason the migration moved from `20260727000001` to `20260727000002` —
+  `main`'s `20260727000001_task_waypoint_id.sql` (unrelated: adds
+  `tasks.waypoint_id`) claimed that timestamp first.

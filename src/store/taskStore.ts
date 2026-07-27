@@ -24,6 +24,7 @@ export type Task = {
   tagId: string;
   goalId?: string;
   collectionId?: string; // Journey this task belongs to
+  waypointId?: string; // Sub-bucket of collectionId's Journey, if any
   parentId?: string; // ID of the parent task if this is a subtask
   estimatedMinutes: number;
   completed: boolean;
@@ -67,7 +68,7 @@ interface TaskState {
   // Task Actions
   // title is the only required field — quick-add can create a task from just
   // a title; tagId/estimatedMinutes/isIcebox get safe defaults filled in below.
-  addTask: (task: { title: string; tagId?: string; estimatedMinutes?: number; isIcebox?: boolean; goalId?: string; collectionId?: string; parentId?: string; }) => string;
+  addTask: (task: { title: string; tagId?: string; estimatedMinutes?: number; isIcebox?: boolean; goalId?: string; collectionId?: string; waypointId?: string; parentId?: string; }) => string;
   setLastUsedTagId: (id: string) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
@@ -152,6 +153,7 @@ export const useTaskStore = create<TaskState>()(
             isIcebox,
             goalId: task.goalId,
             collectionId: task.collectionId,
+            waypointId: task.waypointId,
             parentId: task.parentId,
             id,
             completed: false,

@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   date_created TIMESTAMPTZ DEFAULT NOW(),
   sort_order DOUBLE PRECISION, -- manual drag-reorder key; see 20260725000003
   description TEXT, -- free-text notes; see 20260726000001
-  metric_progress DOUBLE PRECISION -- quantity toward a linked Goal's unit; see 20260726000002
+  metric_progress DOUBLE PRECISION, -- quantity toward a linked Goal's unit; see 20260726000002
+  waypoint_id TEXT -- Waypoint sub-bucket of collection_id's Journey; see 20260727000001
 );
 
 -- 4. Indulgence Rewards Store Table
