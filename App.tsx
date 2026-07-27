@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import AppNavigator from './src/navigation/AppNavigator';
 import ConfettiCanvas from './src/components/ConfettiCanvas';
 import { useEconomyStore } from './src/store/economyStore';
-import { useSummitStore } from './src/store/summitStore';
+import { useGoalStore } from './src/store/goalStore';
 import { useCollectionStore } from './src/store/collectionStore';
 import { useTaskStore } from './src/store/taskStore';
 import './global.css';
@@ -25,15 +25,15 @@ export default function App() {
   useEffect(() => {
     Promise.all([
       waitForHydration(useEconomyStore),
-      waitForHydration(useSummitStore),
+      waitForHydration(useGoalStore),
       waitForHydration(useCollectionStore),
       waitForHydration(useTaskStore),
     ]).then(() => {
       useEconomyStore.getState().applyEntertainmentClawback();
-      useSummitStore.getState().applyPaysCurrencyDefaults();
-      // Must run after both Summits and Collections have hydrated — it reads
+      useGoalStore.getState().applyPaysCurrencyDefaults();
+      // Must run after both Goals and Collections have hydrated — it reads
       // one store and writes the other.
-      useCollectionStore.getState().backfillJourneysForOrphanSummits();
+      useCollectionStore.getState().backfillJourneysForOrphanGoals();
       useTaskStore.getState().backfillTagPillarIds();
     });
   }, []);

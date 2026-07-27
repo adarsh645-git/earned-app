@@ -2,28 +2,28 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Modal, TextInput, Pressable, ScrollView, Animated, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Summit, useSummitStore, getEligibleParents, getMilestoneDollars } from '../store/summitStore';
+import { Goal, useGoalStore, getEligibleParents, getMilestoneDollars } from '../store/goalStore';
 import { useCollectionStore } from '../store/collectionStore';
 import EditableText from './EditableText';
 import TimeSelectorModal from './TimeSelectorModal';
 import ConfirmModal from './ConfirmModal';
 
 interface GoalDetailModalProps {
-  goal: Summit | null;
+  goal: Goal | null;
   visible: boolean;
   onClose: () => void;
-  onSave: (id: string, updates: Partial<Summit>) => void;
+  onSave: (id: string, updates: Partial<Goal>) => void;
   onDelete: (id: string) => void;
-  onQuickStart?: (goal: Summit) => void;
+  onQuickStart?: (goal: Goal) => void;
   // Lets a sub-goal row (or the parent, from a sub-goal's own detail) reopen
-  // this same modal for a different Summit — the pencil-on-subgoal pattern
-  // AnimatedSummitCard already used against EditSummitModal, generalized.
-  onNavigate?: (goal: Summit) => void;
+  // this same modal for a different Goal — the pencil-on-subgoal pattern
+  // AnimatedGoalCard already used against EditGoalModal, generalized.
+  onNavigate?: (goal: Goal) => void;
 }
 
 /**
- * Full-screen goal detail — replaces the old centered EditSummitModal popup.
- * Opened by tapping a Summit card (or its pencil); fields autosave immediately
+ * Full-screen goal detail — replaces the old centered EditGoalModal popup.
+ * Opened by tapping a Goal card (or its pencil); fields autosave immediately
  * on change/blur, same convention as TaskDetailModal, so there's no separate
  * "Save" step.
  */
@@ -36,7 +36,7 @@ export default function GoalDetailModal({
   onQuickStart,
   onNavigate,
 }: GoalDetailModalProps) {
-  const { summits: allGoals, setPayingLevel } = useSummitStore();
+  const { goals: allGoals, setPayingLevel } = useGoalStore();
   const { collections } = useCollectionStore();
 
   const [horizon, setHorizon] = useState<'monthly' | 'yearly'>('monthly');
@@ -78,7 +78,7 @@ export default function GoalDetailModal({
 
   const eligibleParents = getEligibleParents(allGoals, goal, goal.type || 'productive', goal.metricType || 'minutes', unitLabel);
   const subGoals = allGoals.filter(g => g.parentId === goal.id);
-  const linkedJourneys = collections.filter(c => c.summitId === goal.id);
+  const linkedJourneys = collections.filter(c => c.goalId === goal.id);
   const unlocked = goal.unlockedMilestones || [];
   const milestones = [25, 50, 75, 100];
 
@@ -409,11 +409,11 @@ export default function GoalDetailModal({
         icon="trash-outline"
         iconColor="#FF453A"
         accentColor="#FF453A"
-        title="Delete Summit?"
+        title="Delete Goal?"
         message={`"${goal.title}" will be removed${goal.parentId ? '' : ', along with any of its sub-goals'}. Linked tasks and Journeys stay put — they just lose their link to this goal. This cannot be undone.`}
         actions={[
           { label: 'Keep It', onPress: () => {}, style: 'cancel' },
-          { label: 'Delete Summit', style: 'destructive', onPress: () => { onDelete(goal.id); setConfirmDelete(false); onClose(); } },
+          { label: 'Delete Goal', style: 'destructive', onPress: () => { onDelete(goal.id); setConfirmDelete(false); onClose(); } },
         ]}
       />
     </Modal>

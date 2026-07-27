@@ -6,7 +6,7 @@ import { useEconomyStore, IOU_CAP } from '../store/economyStore';
 import { usePreferencesStore } from '../store/preferencesStore';
 import { feedback } from '../utils/feedback';
 import { useTaskStore } from '../store/taskStore';
-import { useSummitStore, Summit, getMilestoneDollars } from '../store/summitStore';
+import { useGoalStore, Goal, getMilestoneDollars } from '../store/goalStore';
 import { useAuthStore } from '../store/authStore';
 import { useSyncStatusStore, isSyncUnhealthy } from '../store/syncStatusStore';
 import GoalDetailModal from '../components/GoalDetailModal';
@@ -29,10 +29,10 @@ export default function ProfileScreen() {
     clearDebtForTesting
   } = useEconomyStore();
   const { tasks, pillars, tags, addPillar, archivePillar, addTag, archiveTag } = useTaskStore();
-  const { summits: allSummits, updateSummit, deleteSummit } = useSummitStore();
-  // Summits shown here are productive goals only — entertainment projects live in the Store.
-  const summits = allSummits.filter(g => !g.type || g.type === 'productive');
-  const [editingGoal, setEditingGoal] = useState<Summit | null>(null);
+  const { goals: allGoals, updateGoal, deleteGoal } = useGoalStore();
+  // Goals shown here are productive goals only — entertainment projects live in the Store.
+  const goals = allGoals.filter(g => !g.type || g.type === 'productive');
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const { soundEnabled, toggleSound } = usePreferencesStore();
 
   // Pillars & Categories state
@@ -401,29 +401,29 @@ export default function ProfileScreen() {
           })}
         </View>
 
-        {/* Summits Section — created from the Journeys tab; this is a read/edit/delete view */}
+        {/* Goals Section — created from the Journeys tab; this is a read/edit/delete view */}
         <View className="flex-row justify-between items-center mb-3 mt-1">
           <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px]">
-            Summits
+            Goals
           </Text>
         </View>
 
-        {summits.length === 0 ? (
+        {goals.length === 0 ? (
           <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl p-8 items-center justify-center border-dashed">
             <Ionicons name="shapes-outline" size={32} color="#8E8E93" />
-            <Text className="text-white text-center font-semibold mt-3">No Summits yet</Text>
-            <Text className="text-[#8E8E93] text-xs text-center mt-1">Create a Journey to start tracking a long-term goal — Journeys are where Summits get created.</Text>
+            <Text className="text-white text-center font-semibold mt-3">No Goals yet</Text>
+            <Text className="text-[#8E8E93] text-xs text-center mt-1">Create a Journey to start tracking a long-term goal — Journeys are where Goals get created.</Text>
           </View>
         ) : (
           <View style={{ backgroundColor: '#1C1C1E', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1 }} className="rounded-2xl overflow-hidden mb-3">
-            {summits.map((goal, index) => {
+            {goals.map((goal, index) => {
               // Units-mode goals (e.g. "pages", "reps") track completedMetric/
               // targetMetric, not minutes — this used to always show hours
               // regardless of metricType, which was meaningless for a Count goal.
               const isUnits = goal.metricType === 'units';
               const completed = isUnits ? (goal.completedMetric || 0) : goal.completedMinutes;
               const target = isUnits ? (goal.targetMetric || 0) : goal.targetMinutes;
-              // target is 0 for open-ended summits — without this guard,
+              // target is 0 for open-ended goals — without this guard,
               // completed / 0 produces NaN/Infinity, which renders as an
               // invalid width and shows the bar as already fully filled.
               const pct = target > 0 ? Math.min(100, Math.round((completed / target) * 100)) : 0;
@@ -432,7 +432,7 @@ export default function ProfileScreen() {
                 : `${(goal.completedMinutes / 60).toFixed(1)} / ${(goal.targetMinutes / 60).toFixed(1)} hrs (${pct}%)`;
               const unlocked = goal.unlockedMilestones || [];
               const milestones = [25, 50, 75, 100];
-              const isLast = index === summits.length - 1;
+              const isLast = index === goals.length - 1;
               return (
                 <Pressable
                   key={goal.id}
@@ -507,8 +507,8 @@ export default function ProfileScreen() {
         goal={editingGoal}
         visible={!!editingGoal}
         onClose={() => setEditingGoal(null)}
-        onSave={(id, updates) => updateSummit(id, updates)}
-        onDelete={(id) => deleteSummit(id)}
+        onSave={(id, updates) => updateGoal(id, updates)}
+        onDelete={(id) => deleteGoal(id)}
         onNavigate={(g) => setEditingGoal(g)}
       />
     </SafeAreaView>

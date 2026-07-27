@@ -7,7 +7,7 @@ import PillPicker from './PillPicker';
 import EditableText from './EditableText';
 import TimeSelectorModal from './TimeSelectorModal';
 import { useCollectionStore } from '../store/collectionStore';
-import { useSummitStore } from '../store/summitStore';
+import { useGoalStore } from '../store/goalStore';
 import { getEligibleJourneys } from './LinkProgressPicker';
 import useIsMobile from '../hooks/useIsMobile';
 
@@ -105,8 +105,8 @@ export default function AnimatedTaskRow({
   const ACTION_DIVIDER_HEIGHT = isSubtask ? 14 : 16;
 
   const { collections } = useCollectionStore();
-  const { summits } = useSummitStore();
-  const eligibleJourneys = onUpdate ? getEligibleJourneys(collections, summits, tagType === 'burner' ? 'burner' : 'earner') : [];
+  const { goals } = useGoalStore();
+  const eligibleJourneys = onUpdate ? getEligibleJourneys(collections, goals, tagType === 'burner' ? 'burner' : 'earner') : [];
   const linkedJourney = task.collectionId ? collections.find(c => c.id === task.collectionId) : undefined;
   const createdTime = formatCreatedTime(task.dateCreated);
 
@@ -335,7 +335,7 @@ export default function AnimatedTaskRow({
                     onSelect={(id) => {
                       feedback('select');
                       const linked = eligibleJourneys.find(c => c.id === id);
-                      onUpdate(task.id, { collectionId: id || undefined, summitId: linked?.summitId || undefined });
+                      onUpdate(task.id, { collectionId: id || undefined, goalId: linked?.goalId || undefined });
                       setOpenPill(null);
                     }}
                     open={openPill === 'journey'}

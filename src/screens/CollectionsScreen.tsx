@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useCollectionStore, CollectionCategory } from '../store/collectionStore';
-import { useSummitStore, getChainTrail, getEligibleParents } from '../store/summitStore';
+import { useGoalStore, getChainTrail, getEligibleParents } from '../store/goalStore';
 import { useConfettiStore } from '../store/confettiStore';
 import { PrimaryButton } from '../components/PrimaryButton';
 import AnimatedProgressBar from '../components/AnimatedProgressBar';
@@ -80,13 +80,13 @@ export default function CollectionsScreen() {
     toggleItemCompletion,
   } = useCollectionStore();
 
-  const { summits, addSummit, deleteSummit } = useSummitStore();
+  const { goals, addGoal, deleteGoal } = useGoalStore();
   const { triggerConfetti } = useConfettiStore();
 
   // Celebration feedback modal
   const [celebrationInfo, setCelebrationInfo] = useState<CelebrationInfo | null>(null);
 
-  // Chain-legibility toast (shown when a completed item feeds a Summit chain)
+  // Chain-legibility toast (shown when a completed item feeds a Goal chain)
   const [chainToastVisible, setChainToastVisible] = useState(false);
   const [chainToastTrail, setChainToastTrail] = useState<string[]>([]);
 
@@ -97,21 +97,21 @@ export default function CollectionsScreen() {
   const [journeyCategory, setJourneyCategory] = useState<CollectionCategory>('books');
   const [journeyValidationError, setJourneyValidationError] = useState('');
 
-  // Journey's Summit link — goal creation is Journey-only, so this modal is
-  // also the only place a Summit gets created: None / link an existing one /
+  // Journey's Goal link — goal creation is Journey-only, so this modal is
+  // also the only place a Goal gets created: None / link an existing one /
   // create a brand new one inline (title/track-by/target/horizon/chain-parent).
   const [journeyLinkMode, setJourneyLinkMode] = useState<JourneyLinkMode>('none');
   const [selectedMacroId, setSelectedMacroId] = useState('');
-  const [newSummitTitle, setNewSummitTitle] = useState('');
-  const [newSummitMetricType, setNewSummitMetricType] = useState<'minutes' | 'units'>('minutes');
-  const [newSummitTargetHours, setNewSummitTargetHours] = useState('');
-  const [newSummitTargetCount, setNewSummitTargetCount] = useState('');
-  const [newSummitUnitLabel, setNewSummitUnitLabel] = useState('');
-  const [newSummitHorizon, setNewSummitHorizon] = useState<'monthly' | 'yearly'>('monthly');
-  const [newSummitParentId, setNewSummitParentId] = useState('');
+  const [newGoalTitle, setNewGoalTitle] = useState('');
+  const [newGoalMetricType, setNewGoalMetricType] = useState<'minutes' | 'units'>('minutes');
+  const [newGoalTargetHours, setNewGoalTargetHours] = useState('');
+  const [newGoalTargetCount, setNewGoalTargetCount] = useState('');
+  const [newGoalUnitLabel, setNewGoalUnitLabel] = useState('');
+  const [newGoalHorizon, setNewGoalHorizon] = useState<'monthly' | 'yearly'>('monthly');
+  const [newGoalParentId, setNewGoalParentId] = useState('');
 
   // New Journey — collapsible inline form (no modal). Shares all the state
-  // above (journeyTitle, journeyCategory, journeyLinkMode, newSummit*) and
+  // above (journeyTitle, journeyCategory, journeyLinkMode, newGoal*) and
   // handleSaveJourney with the Edit modal below; only the container + open
   // state differ.
   const [isNewJourneyExpanded, setIsNewJourneyExpanded] = useState(false);
@@ -127,13 +127,13 @@ export default function CollectionsScreen() {
     setJourneyValidationError('');
     setJourneyLinkMode('none');
     setSelectedMacroId('');
-    setNewSummitTitle('');
-    setNewSummitMetricType('minutes');
-    setNewSummitTargetHours('');
-    setNewSummitTargetCount('');
-    setNewSummitUnitLabel('');
-    setNewSummitHorizon('monthly');
-    setNewSummitParentId('');
+    setNewGoalTitle('');
+    setNewGoalMetricType('minutes');
+    setNewGoalTargetHours('');
+    setNewGoalTargetCount('');
+    setNewGoalUnitLabel('');
+    setNewGoalHorizon('monthly');
+    setNewGoalParentId('');
     setNewJourneyOpenPill(null);
     setIsNewJourneyExpanded(true);
   };
@@ -148,41 +148,41 @@ export default function CollectionsScreen() {
     if (!journeyTitle.trim()) return;
     setJourneyValidationError('');
 
-    let linkedSummitId: string | undefined;
+    let linkedGoalId: string | undefined;
 
     if (journeyLinkMode === 'existing') {
-      linkedSummitId = selectedMacroId || undefined;
+      linkedGoalId = selectedMacroId || undefined;
     } else if (journeyLinkMode === 'new') {
-      if (!newSummitTitle.trim()) {
-        setJourneyValidationError('Summit title is required');
+      if (!newGoalTitle.trim()) {
+        setJourneyValidationError('Goal title is required');
         return;
       }
-      if (newSummitMetricType === 'units') {
-        const count = parseInt(newSummitTargetCount, 10);
+      if (newGoalMetricType === 'units') {
+        const count = parseInt(newGoalTargetCount, 10);
         if (isNaN(count) || count <= 0) {
           setJourneyValidationError('Target count must be a valid positive number');
           return;
         }
-        linkedSummitId = addSummit({
-          title: newSummitTitle.trim(),
-          horizon: newSummitHorizon,
+        linkedGoalId = addGoal({
+          title: newGoalTitle.trim(),
+          horizon: newGoalHorizon,
           targetMinutes: 0,
           metricType: 'units',
           targetMetric: count,
-          unitLabel: newSummitUnitLabel.trim() || undefined,
-          parentId: newSummitParentId || undefined,
+          unitLabel: newGoalUnitLabel.trim() || undefined,
+          parentId: newGoalParentId || undefined,
         });
       } else {
-        const hours = parseFloat(newSummitTargetHours);
+        const hours = parseFloat(newGoalTargetHours);
         if (isNaN(hours) || hours <= 0) {
           setJourneyValidationError('Target hours must be a valid positive number');
           return;
         }
-        linkedSummitId = addSummit({
-          title: newSummitTitle.trim(),
-          horizon: newSummitHorizon,
+        linkedGoalId = addGoal({
+          title: newGoalTitle.trim(),
+          horizon: newGoalHorizon,
           targetMinutes: Math.round(hours * 60),
-          parentId: newSummitParentId || undefined,
+          parentId: newGoalParentId || undefined,
         });
       }
     }
@@ -190,7 +190,7 @@ export default function CollectionsScreen() {
     addCollection({
       title: journeyTitle.trim(),
       category: journeyCategory,
-      summitId: linkedSummitId,
+      goalId: linkedGoalId,
     });
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setIsNewJourneyExpanded(false);
@@ -199,7 +199,7 @@ export default function CollectionsScreen() {
     // Trigger celebration feedback
     triggerConfetti();
     feedback('select');
-    const linkedGoal = summits.find(g => g.id === linkedSummitId) || (journeyLinkMode === 'new' ? { type: 'productive' } : undefined);
+    const linkedGoal = goals.find(g => g.id === linkedGoalId) || (journeyLinkMode === 'new' ? { type: 'productive' } : undefined);
     const isEntertainment = linkedGoal?.type === 'entertainment';
     setCelebrationInfo({
       title: 'Journey started',
@@ -224,10 +224,10 @@ export default function CollectionsScreen() {
     if (!wasCompleted) {
       feedback('taskComplete');
 
-      // Surface the linked Summit chain reacting, if any (Phase 4 legibility).
+      // Surface the linked Goal chain reacting, if any (Phase 4 legibility).
       const collection = collections.find(c => c.id === collectionId);
-      if (collection?.summitId) {
-        const trail = getChainTrail(summits, collection.summitId);
+      if (collection?.goalId) {
+        const trail = getChainTrail(goals, collection.goalId);
         if (trail.length > 1) {
           setChainToastTrail(trail);
           setChainToastVisible(true);
@@ -247,7 +247,7 @@ export default function CollectionsScreen() {
             title: 'Waypoint complete',
             subtitle: `You finished every item in "${wp?.title || 'Waypoint'}".`,
             iconType: 'award',
-            payoutText: 'Milestone reward added. Progress synced to your Summit.',
+            payoutText: 'Milestone reward added. Progress synced to your Goal.',
             badgeLabel: 'WAYPOINT COMPLETE',
           });
           return;
@@ -276,10 +276,10 @@ export default function CollectionsScreen() {
   const completedItems = items.filter(i => i.completed).length;
   const overallCompletionRate = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
-  // Eligible chain-parents for a Summit being created inline (root goals only,
+  // Eligible chain-parents for a Goal being created inline (root goals only,
   // same type/metricType, no cycles) — mirrors the old Profile creation form.
   const eligibleParents = journeyLinkMode === 'new'
-    ? getEligibleParents(summits, null, 'productive', newSummitMetricType, newSummitUnitLabel)
+    ? getEligibleParents(goals, null, 'productive', newGoalMetricType, newGoalUnitLabel)
     : [];
 
   const celebrationAccent = celebrationInfo ? getCelebrationAccent(celebrationInfo.iconType) : '#BF5AF2';
@@ -364,12 +364,12 @@ export default function CollectionsScreen() {
               <PillPicker
                 label={`Goal: ${
                   journeyLinkMode === 'existing'
-                    ? (summits.find(s => s.id === selectedMacroId)?.title || 'Select...')
+                    ? (goals.find(s => s.id === selectedMacroId)?.title || 'Select...')
                     : journeyLinkMode === 'new'
-                    ? (newSummitTitle.trim() ? `New — ${newSummitTitle.trim()}` : 'New Goal...')
+                    ? (newGoalTitle.trim() ? `New — ${newGoalTitle.trim()}` : 'New Goal...')
                     : 'None'
                 }`}
-                options={[{ id: '', label: 'None' }, ...summits.map(s => ({ id: s.id, label: s.title }))]}
+                options={[{ id: '', label: 'None' }, ...goals.map(s => ({ id: s.id, label: s.title }))]}
                 selectedId={journeyLinkMode === 'existing' ? selectedMacroId : ''}
                 onSelect={(id) => {
                   feedback('select');
@@ -393,13 +393,13 @@ export default function CollectionsScreen() {
 
             {journeyLinkMode === 'new' && (
               <View style={{ marginTop: 12 }}>
-                <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Summit Title</Text>
+                <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Goal Title</Text>
                 <PremiumInput
                   style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, fontSize: 15, marginBottom: 14, borderWidth: 1, borderColor: '#2C2C2E' }}
                   placeholder="e.g. Hike 100 miles, Write a Novel, Learn French"
                   placeholderTextColor="#5C5C5E"
-                  value={newSummitTitle}
-                  onChangeText={setNewSummitTitle}
+                  value={newGoalTitle}
+                  onChangeText={setNewGoalTitle}
                 />
 
                 <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Track By</Text>
@@ -408,11 +408,11 @@ export default function CollectionsScreen() {
                     { key: 'minutes' as const, label: 'Time' },
                     { key: 'units' as const, label: 'Count' },
                   ]).map(({ key, label }) => {
-                    const isActive = newSummitMetricType === key;
+                    const isActive = newGoalMetricType === key;
                     return (
                       <Pressable
                         key={key}
-                        onPress={() => setNewSummitMetricType(key)}
+                        onPress={() => setNewGoalMetricType(key)}
                         style={{
                           flex: 1,
                           paddingVertical: 8,
@@ -428,24 +428,24 @@ export default function CollectionsScreen() {
                 </View>
 
                 <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>
-                  {newSummitMetricType === 'units' ? 'Target Count' : 'Target Hours'}
+                  {newGoalMetricType === 'units' ? 'Target Count' : 'Target Hours'}
                 </Text>
-                {newSummitMetricType === 'units' ? (
+                {newGoalMetricType === 'units' ? (
                   <>
                     <PremiumInput
                       style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, fontSize: 15, marginBottom: 8, borderWidth: 1, borderColor: '#2C2C2E' }}
                       placeholder="e.g. 20 (books, games, workouts...)"
                       placeholderTextColor="#5C5C5E"
                       keyboardType="numeric"
-                      value={newSummitTargetCount}
-                      onChangeText={setNewSummitTargetCount}
+                      value={newGoalTargetCount}
+                      onChangeText={setNewGoalTargetCount}
                     />
                     <PremiumInput
                       style={{ backgroundColor: '#151517', color: '#FFF', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, fontSize: 15, marginBottom: 14, borderWidth: 1, borderColor: '#2C2C2E' }}
                       placeholder="Unit label (e.g. pages, reps, km)"
                       placeholderTextColor="#5C5C5E"
-                      value={newSummitUnitLabel}
-                      onChangeText={setNewSummitUnitLabel}
+                      value={newGoalUnitLabel}
+                      onChangeText={setNewGoalUnitLabel}
                     />
                   </>
                 ) : (
@@ -454,19 +454,19 @@ export default function CollectionsScreen() {
                     placeholder="e.g. 50"
                     placeholderTextColor="#5C5C5E"
                     keyboardType="numeric"
-                    value={newSummitTargetHours}
-                    onChangeText={setNewSummitTargetHours}
+                    value={newGoalTargetHours}
+                    onChangeText={setNewGoalTargetHours}
                   />
                 )}
 
                 <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Time Horizon</Text>
                 <View style={{ backgroundColor: '#151517', borderColor: '#2C2C2E', borderWidth: 1 }} className="flex-row p-1 rounded-xl mb-4">
                   {(['monthly', 'yearly'] as const).map((h) => {
-                    const isActive = newSummitHorizon === h;
+                    const isActive = newGoalHorizon === h;
                     return (
                       <Pressable
                         key={h}
-                        onPress={() => setNewSummitHorizon(h)}
+                        onPress={() => setNewGoalHorizon(h)}
                         style={{
                           flex: 1,
                           paddingVertical: 8,
@@ -486,25 +486,25 @@ export default function CollectionsScreen() {
                     <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Contributes To (Optional)</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                       <Pressable
-                        onPress={() => setNewSummitParentId('')}
+                        onPress={() => setNewGoalParentId('')}
                         style={{
                           paddingHorizontal: 16,
                           paddingVertical: 10,
                           borderRadius: 9999,
                           borderWidth: 1,
                           marginRight: 8,
-                          backgroundColor: !newSummitParentId ? 'rgba(191,90,242,0.15)' : '#151517',
-                          borderColor: !newSummitParentId ? 'rgba(191,90,242,0.3)' : '#2C2C2E',
+                          backgroundColor: !newGoalParentId ? 'rgba(191,90,242,0.15)' : '#151517',
+                          borderColor: !newGoalParentId ? 'rgba(191,90,242,0.3)' : '#2C2C2E',
                         }}
                       >
-                        <Text style={{ color: !newSummitParentId ? '#FFFFFF' : '#8E8E93', fontSize: 13, fontWeight: !newSummitParentId ? '700' : '500' }}>None</Text>
+                        <Text style={{ color: !newGoalParentId ? '#FFFFFF' : '#8E8E93', fontSize: 13, fontWeight: !newGoalParentId ? '700' : '500' }}>None</Text>
                       </Pressable>
                       {eligibleParents.map((p) => {
-                        const isSelected = newSummitParentId === p.id;
+                        const isSelected = newGoalParentId === p.id;
                         return (
                           <Pressable
                             key={p.id}
-                            onPress={() => setNewSummitParentId(p.id)}
+                            onPress={() => setNewGoalParentId(p.id)}
                             style={{
                               paddingHorizontal: 16,
                               paddingVertical: 10,
@@ -562,20 +562,20 @@ export default function CollectionsScreen() {
             const collectionItems = items.filter(i => i.collectionId === collection.id);
             const completedCount = collectionItems.filter(i => i.completed).length;
             const progress = collectionItems.length > 0 ? Math.round((completedCount / collectionItems.length) * 100) : 0;
-            const linkedSummit = summits.find(g => g.id === collection.summitId);
+            const linkedGoal = goals.find(g => g.id === collection.goalId);
             const isFullyComplete = progress === 100 && collectionItems.length > 0;
 
-            // Mirrors the linked Summit's own progress (from Tasks/subtasks
-            // cascading up via summitId) — a Journey has no progress of its
+            // Mirrors the linked Goal's own progress (from Tasks/subtasks
+            // cascading up via goalId) — a Journey has no progress of its
             // own, so this surfaces the Goal it actually feeds right where
             // tasks get created, without a tap to the Profile/Dashboard.
-            const isSummitUnits = linkedSummit?.metricType === 'units';
-            const summitCompleted = linkedSummit ? (isSummitUnits ? (linkedSummit.completedMetric || 0) : linkedSummit.completedMinutes) : 0;
-            const summitTarget = linkedSummit ? (isSummitUnits ? (linkedSummit.targetMetric || 0) : linkedSummit.targetMinutes) : 0;
-            const summitPct = summitTarget > 0 ? Math.min(100, Math.round((summitCompleted / summitTarget) * 100)) : 0;
-            const summitProgressLabel = isSummitUnits
-              ? `${summitCompleted}/${summitTarget}${linkedSummit?.unitLabel ? ` ${linkedSummit.unitLabel}` : ''}`
-              : `${(summitCompleted / 60).toFixed(1)}/${(summitTarget / 60).toFixed(1)}h`;
+            const isGoalUnits = linkedGoal?.metricType === 'units';
+            const goalCompleted = linkedGoal ? (isGoalUnits ? (linkedGoal.completedMetric || 0) : linkedGoal.completedMinutes) : 0;
+            const goalTarget = linkedGoal ? (isGoalUnits ? (linkedGoal.targetMetric || 0) : linkedGoal.targetMinutes) : 0;
+            const goalPct = goalTarget > 0 ? Math.min(100, Math.round((goalCompleted / goalTarget) * 100)) : 0;
+            const goalProgressLabel = isGoalUnits
+              ? `${goalCompleted}/${goalTarget}${linkedGoal?.unitLabel ? ` ${linkedGoal.unitLabel}` : ''}`
+              : `${(goalCompleted / 60).toFixed(1)}/${(goalTarget / 60).toFixed(1)}h`;
 
             return (
               <Pressable
@@ -599,17 +599,17 @@ export default function CollectionsScreen() {
                         {collection.category}
                       </Text>
                     </View>
-                    {linkedSummit && (
+                    {linkedGoal && (
                       <View style={{ backgroundColor: '#5AC8FA15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, borderWidth: 1, borderColor: '#5AC8FA44', flexDirection: 'row', alignItems: 'center' }}>
                         <FontAwesome5 name="bullseye" size={9} color="#5AC8FA" style={{ marginRight: 4 }} />
-                        <Text style={{ color: '#5AC8FA', fontSize: 10, fontWeight: '700' }}>{linkedSummit.title}</Text>
+                        <Text style={{ color: '#5AC8FA', fontSize: 10, fontWeight: '700' }}>{linkedGoal.title}</Text>
                       </View>
                     )}
                   </View>
-                  {linkedSummit && (
+                  {linkedGoal && (
                     <View style={{ marginTop: 6 }}>
-                      <AnimatedProgressBar progress={summitPct} color="#5AC8FA" height={4} />
-                      <Text style={{ color: '#8E8E93', fontSize: 10, marginTop: 3 }}>{summitProgressLabel} toward goal · {summitPct}%</Text>
+                      <AnimatedProgressBar progress={goalPct} color="#5AC8FA" height={4} />
+                      <Text style={{ color: '#8E8E93', fontSize: 10, marginTop: 3 }}>{goalProgressLabel} toward goal · {goalPct}%</Text>
                     </View>
                   )}
                 </View>

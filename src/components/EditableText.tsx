@@ -13,7 +13,7 @@ interface EditableTextProps {
 /**
  * Tap the text to rename it in place — Enter or blur commits, empty/unchanged
  * reverts. Generalizes the InlineEditableText pattern already proven in
- * AnimatedSummitCard.tsx for reuse across Task/Journey/Waypoint/Item titles.
+ * AnimatedGoalCard.tsx for reuse across Task/Journey/Waypoint/Item titles.
  * The clickable/editable box always hugs the text's own width (measured via
  * onLayout) rather than stretching to fill its container.
  */

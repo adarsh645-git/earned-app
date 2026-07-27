@@ -10,7 +10,7 @@ import ConfirmModal from './ConfirmModal';
 import QuickAddBar from './QuickAddBar';
 import AnimatedTaskRow from './AnimatedTaskRow';
 import { useCollectionStore } from '../store/collectionStore';
-import { useSummitStore } from '../store/summitStore';
+import { useGoalStore } from '../store/goalStore';
 import { getEligibleJourneys } from './LinkProgressPicker';
 import { feedback } from '../utils/feedback';
 
@@ -54,7 +54,7 @@ export default function TaskDetailModal({
   addTask,
 }: TaskDetailModalProps) {
   const { collections, waypoints } = useCollectionStore();
-  const { summits } = useSummitStore();
+  const { goals } = useGoalStore();
   const [openPill, setOpenPill] = useState<OpenPill>(null);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -72,16 +72,16 @@ export default function TaskDetailModal({
   const tag = tags.find(t => t.id === task.tagId);
   const tagType: 'earner' | 'burner' = tag?.type === 'burner' ? 'burner' : 'earner';
   const accent = tagType === 'burner' ? '#5AC8FA' : '#30D158';
-  const eligibleJourneys = getEligibleJourneys(collections, summits, tagType);
+  const eligibleJourneys = getEligibleJourneys(collections, goals, tagType);
   const linkedJourney = task.collectionId ? collections.find(c => c.id === task.collectionId) : undefined;
   const activePillars = pillars.filter(p => !p.isArchived);
   const currentPillarId = tag?.pillarId || activePillars[0]?.id || '';
   const eligibleWaypoints = task.collectionId ? waypoints.filter(w => w.collectionId === task.collectionId) : [];
-  // Progress quantity (e.g. "10 pages") only matters when the linked Summit
+  // Progress quantity (e.g. "10 pages") only matters when the linked Goal
   // is a units-mode goal — hidden entirely for time-based/unlinked tasks.
-  const linkedSummit = task.summitId ? summits.find(s => s.id === task.summitId) : undefined;
-  const isUnitsGoal = linkedSummit?.metricType === 'units';
-  const unitLabel = linkedSummit?.unitLabel || 'units';
+  const linkedGoal = task.goalId ? goals.find(s => s.id === task.goalId) : undefined;
+  const isUnitsGoal = linkedGoal?.metricType === 'units';
+  const unitLabel = linkedGoal?.unitLabel || 'units';
 
   const subtasks = tasks.filter(t => t.parentId === task.id);
   const completedSubtasks = subtasks.filter(t => t.completed);
@@ -195,7 +195,7 @@ export default function TaskDetailModal({
                     const linked = eligibleJourneys.find(c => c.id === id);
                     // Waypoint belongs to the old Journey — clear it whenever
                     // the Journey changes (including clearing to "No Journey").
-                    onUpdate(task.id, { collectionId: id || undefined, summitId: linked?.summitId || undefined, waypointId: undefined });
+                    onUpdate(task.id, { collectionId: id || undefined, goalId: linked?.goalId || undefined, waypointId: undefined });
                     setOpenPill(null);
                   }}
                   open={openPill === 'journey'}
@@ -217,7 +217,7 @@ export default function TaskDetailModal({
               )}
             </View>
 
-            {/* Progress toward goal — only for a units-mode linked Summit */}
+            {/* Progress toward goal — only for a units-mode linked Goal */}
             {isUnitsGoal && (
               <View style={{ marginBottom: 24 }}>
                 <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>

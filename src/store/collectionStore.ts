@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { safeStorage } from './safeStorage';
-import { useSummitStore } from './summitStore';
+import { useGoalStore } from './goalStore';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -21,7 +21,7 @@ export type Collection = {
   id: string;
   title: string;
   category: CollectionCategory;
-  summitId?: string; // Links to a Summit
+  goalId?: string; // Links to a Goal
   dateCreated: string;
 };
 
@@ -43,7 +43,7 @@ interface CollectionState {
   journeyBackfillApplied: boolean;
   // category is required on the stored record, but optional here — quick-add
   // can create a Journey from just a title, defaulting category to 'general'.
-  addCollection: (collection: { title: string; category?: CollectionCategory; summitId?: string }) => string;
+  addCollection: (collection: { title: string; category?: CollectionCategory; goalId?: string }) => string;
   updateCollection: (id: string, updates: Partial<Collection>) => void;
   deleteCollection: (id: string) => void;
   addWaypoint: (waypoint: Omit<Waypoint, 'id' | 'dateCreated'>) => string;
@@ -54,10 +54,10 @@ interface CollectionState {
   toggleItemCompletion: (id: string) => void;
   deleteItem: (id: string) => void;
   // One-time: goals could previously be created without a Journey at all. Now
-  // that goal creation is Journey-only, any pre-existing Journey-less Summit
+  // that goal creation is Journey-only, any pre-existing Journey-less Goal
   // gets an auto-created Journey wrapper so it stays reachable from task
   // creation's Journey-only LinkProgressPicker instead of going silently dark.
-  backfillJourneysForOrphanSummits: () => void;
+  backfillJourneysForOrphanGoals: () => void;
 }
 
 export const useCollectionStore = create<CollectionState>()(
@@ -76,7 +76,7 @@ export const useCollectionStore = create<CollectionState>()(
             {
               title: collectionData.title,
               category: collectionData.category ?? 'general',
-              summitId: collectionData.summitId,
+              goalId: collectionData.goalId,
               id,
               dateCreated: new Date().toISOString(),
             },
@@ -124,7 +124,7 @@ export const useCollectionStore = create<CollectionState>()(
 
         // Dynamic require avoids a circular import (taskStore doesn't import
         // this store, but this store is imported widely) — same pattern
-        // summitStore.deleteSummit already uses to unlink Tasks elsewhere.
+        // goalStore.deleteGoal already uses to unlink Tasks elsewhere.
         const { useTaskStore } = require('./taskStore');
         useTaskStore.setState((s: any) => ({
           tasks: s.tasks.map((t: any) => (t.waypointId === id ? { ...t, waypointId: undefined } : t)),
@@ -156,13 +156,13 @@ export const useCollectionStore = create<CollectionState>()(
         // Only trigger progress logic if we are completing it (not un-completing)
         if (!isCurrentlyCompleted) {
           const collection = get().collections.find((c) => c.id === item.collectionId);
-          if (collection && collection.summitId) {
-            const summit = useSummitStore.getState().summits.find(g => g.id === collection.summitId);
+          if (collection && collection.goalId) {
+            const goal = useGoalStore.getState().goals.find(g => g.id === collection.goalId);
 
-            if (summit) {
+            if (goal) {
               // Routes to +1 for a count chain or the item's minutes for a time
               // chain; cascades up the chain from there.
-              useSummitStore.getState().applyLeafProgress(summit.id, item.estimatedMinutes || 60);
+              useGoalStore.getState().applyLeafProgress(goal.id, item.estimatedMinutes || 60);
             }
           }
         }
@@ -179,21 +179,21 @@ export const useCollectionStore = create<CollectionState>()(
         }));
       },
 
-      backfillJourneysForOrphanSummits: () => {
+      backfillJourneysForOrphanGoals: () => {
         if (get().journeyBackfillApplied) return;
 
-        const summits = useSummitStore.getState().summits;
-        const referencedSummitIds = new Set(
-          get().collections.map((c) => c.summitId).filter(Boolean)
+        const goals = useGoalStore.getState().goals;
+        const referencedGoalIds = new Set(
+          get().collections.map((c) => c.goalId).filter(Boolean)
         );
-        const orphanSummits = summits.filter((s) => !referencedSummitIds.has(s.id));
+        const orphanGoals = goals.filter((s) => !referencedGoalIds.has(s.id));
 
-        if (orphanSummits.length > 0) {
-          const newCollections: Collection[] = orphanSummits.map((s) => ({
+        if (orphanGoals.length > 0) {
+          const newCollections: Collection[] = orphanGoals.map((s) => ({
             id: uuidv4(),
             title: s.title,
             category: 'general',
-            summitId: s.id,
+            goalId: s.id,
             dateCreated: new Date().toISOString(),
           }));
           set((state) => ({
@@ -207,6 +207,22 @@ export const useCollectionStore = create<CollectionState>()(
     {
       name: 'earned-collections',
       storage: createJSONStorage(() => safeStorage),
+      // v0 persisted collections have `summitId` per-collection
+      // (pre-spec-022 field name). Carry it forward into `goalId` so
+      // existing Journeys don't lose their linked-goal association.
+      version: 1,
+      migrate: (persistedState: any, version) => {
+        if (version < 1 && persistedState?.collections) {
+          persistedState.collections = persistedState.collections.map((c: any) => {
+            if ('summitId' in c) {
+              const { summitId, ...rest } = c;
+              return { ...rest, goalId: summitId };
+            }
+            return c;
+          });
+        }
+        return persistedState;
+      },
     }
   )
 );

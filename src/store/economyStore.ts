@@ -35,7 +35,7 @@ export interface EconomyState {
   debt: number;
   debtTakenDate: string | null;
   completedTasksCount: number;
-  completedSummitsCount: number;
+  completedGoalsCount: number;
   entertainmentClawbackApplied: boolean;
 
   // Getters
@@ -51,7 +51,7 @@ export interface EconomyState {
   spendHours: (minutes: number) => boolean;
   incrementCompletedTasks: () => void;
   decrementCompletedTasks: () => void;
-  incrementCompletedSummits: () => void;
+  incrementCompletedGoals: () => void;
   incrementStreak: () => void;
   checkInDaily: () => CheckInResult;
   clearDebtForTesting: () => void;
@@ -64,7 +64,7 @@ export const IOU_CAP = 25.0;
 
 // Historical payout formula, frozen as of the entertainment reward-asymmetry fix.
 // Used only once, to claw back Dollars already paid out under the old (type-agnostic)
-// milestone rule. Must NOT be updated if the live formula in summitStore changes later.
+// milestone rule. Must NOT be updated if the live formula in goalStore changes later.
 const calculateLegacyEntertainmentMilestoneDollars = (targetMinutes: number, milestone: number): number => {
   const totalBonusKeys = Math.max(1, Math.round(targetMinutes / 60));
   const keys25 = Math.round(totalBonusKeys * 0.2);
@@ -88,12 +88,12 @@ const calculateLegacyEntertainmentMilestoneDollars = (targetMinutes: number, mil
 export const calculateDisciplineScore = (state: {
   streak: number;
   completedTasksCount: number;
-  completedSummitsCount: number;
+  completedGoalsCount: number;
 }): number => {
   let score = 600; // Base score
   score += Math.min(150, state.streak * 10);
   score += Math.min(100, state.completedTasksCount * 5);
-  score += Math.min(200, state.completedSummitsCount * 50);
+  score += Math.min(200, state.completedGoalsCount * 50);
 
   return Math.max(300, Math.min(850, score));
 };
@@ -112,12 +112,12 @@ export const useEconomyStore = create<EconomyState>()(
       debt: 0,
       debtTakenDate: null,
       completedTasksCount: 0,
-      completedSummitsCount: 0,
+      completedGoalsCount: 0,
       entertainmentClawbackApplied: false,
 
       getDisciplineScore: () => {
-        const { streak, completedTasksCount, completedSummitsCount } = get();
-        return calculateDisciplineScore({ streak, completedTasksCount, completedSummitsCount });
+        const { streak, completedTasksCount, completedGoalsCount } = get();
+        return calculateDisciplineScore({ streak, completedTasksCount, completedGoalsCount });
       },
 
       getConversionRate: () => {
@@ -224,8 +224,8 @@ export const useEconomyStore = create<EconomyState>()(
         completedTasksCount: Math.max(0, state.completedTasksCount - 1)
       })),
 
-      incrementCompletedSummits: () => set((state) => ({
-        completedSummitsCount: state.completedSummitsCount + 1
+      incrementCompletedGoals: () => set((state) => ({
+        completedGoalsCount: state.completedGoalsCount + 1
       })),
 
       clearDebtForTesting: () => set({
@@ -236,12 +236,12 @@ export const useEconomyStore = create<EconomyState>()(
       applyEntertainmentClawback: () => {
         if (get().entertainmentClawbackApplied) return;
 
-        // Required to avoid a circular import with summitStore, which imports this store.
-        const { useSummitStore } = require('./summitStore');
-        const summits = useSummitStore.getState().summits;
+        // Required to avoid a circular import with goalStore, which imports this store.
+        const { useGoalStore } = require('./goalStore');
+        const goals = useGoalStore.getState().goals;
 
         let totalToClawBack = 0;
-        summits
+        goals
           .filter((g: { type?: string }) => g.type === 'entertainment')
           .forEach((g: { targetMinutes: number; unlockedMilestones: number[] }) => {
             (g.unlockedMilestones || []).forEach((m: number) => {
@@ -326,6 +326,17 @@ export const useEconomyStore = create<EconomyState>()(
     {
       name: 'earned-economy-storage',
       storage: createJSONStorage(() => safeStorage),
+      // v0 persisted state has `completedSummitsCount` (pre-spec-022 field
+      // name). Carry it forward so existing users don't see their Discipline
+      // Score drop from a silently-reset counter.
+      version: 1,
+      migrate: (persistedState: any, version) => {
+        if (version < 1 && persistedState && 'completedSummitsCount' in persistedState) {
+          persistedState.completedGoalsCount = persistedState.completedSummitsCount;
+          delete persistedState.completedSummitsCount;
+        }
+        return persistedState;
+      },
     }
   )
 );
