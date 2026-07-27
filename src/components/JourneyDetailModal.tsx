@@ -11,6 +11,7 @@ import QuickAddBar from './QuickAddBar';
 import AnimatedProgressBar from './AnimatedProgressBar';
 import ConfirmModal from './ConfirmModal';
 import { CategoryVectorIcon } from '../utils/categoryIcons';
+import { getPillarColor } from '../utils/pillarColor';
 import { feedback } from '../utils/feedback';
 
 const MONTH_NAMES = [
@@ -44,7 +45,7 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
     addItem, updateItem, deleteItem,
   } = useCollectionStore();
   const { goals, deleteGoal } = useGoalStore();
-  const { tasks } = useTaskStore();
+  const { tasks, tags, pillars } = useTaskStore();
 
   const [categoryPillOpen, setCategoryPillOpen] = useState(false);
   const [goalPillOpen, setGoalPillOpen] = useState(false);
@@ -264,7 +265,17 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                         {wpTasks.length > 0 && (
                           <View style={{ marginTop: wpItems.length > 0 ? 4 : 10 }}>
                             {wpTasks.map(t => (
-                              <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
+                              <View
+                                key={t.id}
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  paddingVertical: 6,
+                                  paddingLeft: 8,
+                                  borderLeftWidth: 3,
+                                  borderLeftColor: getPillarColor(tags.find(tag => tag.id === t.tagId)?.pillarId, pillars),
+                                }}
+                              >
                                 <Ionicons name={t.completed ? 'checkmark-circle' : 'ellipse-outline'} size={14} color={t.completed ? '#30D158' : '#8E8E93'} style={{ marginRight: 8 }} />
                                 <Text style={{ color: t.completed ? '#8E8E93' : '#EBEBF5', fontSize: 13, flex: 1, textDecorationLine: t.completed ? 'line-through' : 'none' }} numberOfLines={1}>
                                   {t.title}
@@ -341,7 +352,21 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                   {collectionWaypoints.length > 0 ? 'General' : 'Tasks'}
                 </Text>
                 {generalTasks.map(t => (
-                  <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1C1E', borderRadius: 12, borderWidth: 1, borderColor: '#2C2C2E', padding: 14, marginBottom: 8 }}>
+                  <View
+                    key={t.id}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: '#1C1C1E',
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: '#2C2C2E',
+                      borderLeftWidth: 3,
+                      borderLeftColor: getPillarColor(tags.find(tag => tag.id === t.tagId)?.pillarId, pillars),
+                      padding: 14,
+                      marginBottom: 8,
+                    }}
+                  >
                     <Ionicons name={t.completed ? 'checkmark-circle' : 'ellipse-outline'} size={16} color={t.completed ? '#30D158' : '#8E8E93'} style={{ marginRight: 10 }} />
                     <Text style={{ color: t.completed ? '#8E8E93' : '#EBEBF5', fontSize: 14, fontWeight: '500', flex: 1, textDecorationLine: t.completed ? 'line-through' : 'none' }} numberOfLines={1}>
                       {t.title}
