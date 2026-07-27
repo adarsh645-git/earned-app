@@ -121,6 +121,14 @@ export const useCollectionStore = create<CollectionState>()(
           waypoints: (state.waypoints || []).filter((w) => w.id !== id),
           items: state.items.map((i) => (i.waypointId === id ? { ...i, waypointId: undefined } : i)),
         }));
+
+        // Dynamic require avoids a circular import (taskStore doesn't import
+        // this store, but this store is imported widely) — same pattern
+        // summitStore.deleteSummit already uses to unlink Tasks elsewhere.
+        const { useTaskStore } = require('./taskStore');
+        useTaskStore.setState((s: any) => ({
+          tasks: s.tasks.map((t: any) => (t.waypointId === id ? { ...t, waypointId: undefined } : t)),
+        }));
       },
 
       addItem: (itemData) => {
