@@ -22,7 +22,7 @@ export type Task = {
   id: string;
   title: string;
   tagId: string;
-  summitId?: string;
+  goalId?: string;
   collectionId?: string; // Journey this task belongs to
   parentId?: string; // ID of the parent task if this is a subtask
   estimatedMinutes: number;
@@ -30,10 +30,10 @@ export type Task = {
   isIcebox: boolean;
   dateCreated: string;
   description?: string;
-  // Quantity this task contributes to its linked Summit's 'units' metric
+  // Quantity this task contributes to its linked Goal's 'units' metric
   // (e.g. 10 for "10 pages") — purely a Goal-progress input, never the
   // economy payout, which always stays keyed to estimatedMinutes. Only
-  // meaningful when summitId points at a metricType:'units' Summit.
+  // meaningful when goalId points at a metricType:'units' Goal.
   metricProgress?: number;
   // Manual ordering key — larger sorts lower within its group (a day's active
   // tasks, or a parent's subtasks). Optional so persisted/cloud rows that
@@ -67,7 +67,7 @@ interface TaskState {
   // Task Actions
   // title is the only required field — quick-add can create a task from just
   // a title; tagId/estimatedMinutes/isIcebox get safe defaults filled in below.
-  addTask: (task: { title: string; tagId?: string; estimatedMinutes?: number; isIcebox?: boolean; summitId?: string; collectionId?: string; parentId?: string; }) => string;
+  addTask: (task: { title: string; tagId?: string; estimatedMinutes?: number; isIcebox?: boolean; goalId?: string; collectionId?: string; parentId?: string; }) => string;
   setLastUsedTagId: (id: string) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
@@ -150,7 +150,7 @@ export const useTaskStore = create<TaskState>()(
             tagId,
             estimatedMinutes,
             isIcebox,
-            summitId: task.summitId,
+            goalId: task.goalId,
             collectionId: task.collectionId,
             parentId: task.parentId,
             id,
@@ -214,10 +214,10 @@ export const useTaskStore = create<TaskState>()(
           
           // Require stores dynamically inside to avoid circular dependencies if any
           const { useEconomyStore } = require('./economyStore');
-          const { useSummitStore } = require('./summitStore');
+          const { useGoalStore } = require('./goalStore');
 
           const economyState = useEconomyStore.getState();
-          const summitState = useSummitStore.getState();
+          const goalState = useGoalStore.getState();
 
           if (isCompleting) {
             // Payout
@@ -228,8 +228,8 @@ export const useTaskStore = create<TaskState>()(
               economyState.incrementStreak();
               economyState.incrementCompletedTasks();
 
-              if (task.summitId) {
-                summitState.applyLeafProgress(task.summitId, task.estimatedMinutes, task.metricProgress);
+              if (task.goalId) {
+                goalState.applyLeafProgress(task.goalId, task.estimatedMinutes, task.metricProgress);
               }
             } else if (tag?.type === 'burner') {
               economyState.spendHours(task.estimatedMinutes);
@@ -242,8 +242,8 @@ export const useTaskStore = create<TaskState>()(
               economyState.removeHours(hoursEarned);
               economyState.decrementCompletedTasks();
 
-              if (task.summitId) {
-                summitState.revokeLeafProgress(task.summitId, task.estimatedMinutes, task.metricProgress);
+              if (task.goalId) {
+                goalState.revokeLeafProgress(task.goalId, task.estimatedMinutes, task.metricProgress);
               }
             } else if (tag?.type === 'burner') {
               economyState.addHours(task.estimatedMinutes);
@@ -340,6 +340,22 @@ export const useTaskStore = create<TaskState>()(
     {
       name: 'earned-task-storage',
       storage: createJSONStorage(() => safeStorage),
+      // v0 persisted tasks have `summitId` per-task (pre-spec-022 field
+      // name). Carry it forward into `goalId` so existing tasks don't lose
+      // their linked-goal association on next load.
+      version: 1,
+      migrate: (persistedState: any, version) => {
+        if (version < 1 && persistedState?.tasks) {
+          persistedState.tasks = persistedState.tasks.map((t: any) => {
+            if ('summitId' in t) {
+              const { summitId, ...rest } = t;
+              return { ...rest, goalId: summitId };
+            }
+            return t;
+          });
+        }
+        return persistedState;
+      },
     }
   )
 );

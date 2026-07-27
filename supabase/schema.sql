@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   tag_id TEXT NOT NULL,
-  summit_id TEXT,
+  goal_id TEXT,
   collection_id TEXT,
   parent_id TEXT, -- subtask link (one level only); not a FK, see 20260725000004
   estimated_minutes INTEGER NOT NULL,
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   date_created TIMESTAMPTZ DEFAULT NOW(),
   sort_order DOUBLE PRECISION, -- manual drag-reorder key; see 20260725000003
   description TEXT, -- free-text notes; see 20260726000001
-  metric_progress DOUBLE PRECISION -- quantity toward a linked Summit's unit; see 20260726000002
+  metric_progress DOUBLE PRECISION -- quantity toward a linked Goal's unit; see 20260726000002
 );
 
 -- 4. Indulgence Rewards Store Table
@@ -45,15 +45,15 @@ CREATE TABLE IF NOT EXISTS public.rewards (
   date_created TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. Summits (long-term goal targets) Table
-CREATE TABLE IF NOT EXISTS public.summits (
+-- 5. Goals (long-term goal targets) Table
+CREATE TABLE IF NOT EXISTS public.goals (
   id TEXT PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   horizon TEXT DEFAULT 'monthly' CHECK (horizon IN ('monthly', 'yearly')),
   target_minutes INTEGER NOT NULL,
   completed_minutes INTEGER DEFAULT 0,
-  summit_type TEXT DEFAULT 'productive' CHECK (summit_type IN ('productive', 'entertainment')),
+  goal_type TEXT DEFAULT 'productive' CHECK (goal_type IN ('productive', 'entertainment')),
   metric_type TEXT DEFAULT 'minutes',
   target_metric INTEGER,
   completed_metric INTEGER DEFAULT 0,
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS public.collections (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   category TEXT NOT NULL,
-  summit_id TEXT REFERENCES public.summits(id) ON DELETE SET NULL,
+  goal_id TEXT REFERENCES public.goals(id) ON DELETE SET NULL,
   date_created TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -123,7 +123,7 @@ CREATE TRIGGER on_auth_user_created
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rewards ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.summits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.goals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.collections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.waypoints ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.collection_items ENABLE ROW LEVEL SECURITY;
@@ -164,18 +164,18 @@ CREATE POLICY "Users can update own rewards" ON public.rewards FOR UPDATE USING 
 DROP POLICY IF EXISTS "Users can delete own rewards" ON public.rewards;
 CREATE POLICY "Users can delete own rewards" ON public.rewards FOR DELETE USING (auth.uid() = user_id);
 
--- Summits Policies
-DROP POLICY IF EXISTS "Users can view own summits" ON public.summits;
-CREATE POLICY "Users can view own summits" ON public.summits FOR SELECT USING (auth.uid() = user_id);
+-- Goals Policies
+DROP POLICY IF EXISTS "Users can view own goals" ON public.goals;
+CREATE POLICY "Users can view own goals" ON public.goals FOR SELECT USING (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Users can insert own summits" ON public.summits;
-CREATE POLICY "Users can insert own summits" ON public.summits FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own goals" ON public.goals;
+CREATE POLICY "Users can insert own goals" ON public.goals FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Users can update own summits" ON public.summits;
-CREATE POLICY "Users can update own summits" ON public.summits FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own goals" ON public.goals;
+CREATE POLICY "Users can update own goals" ON public.goals FOR UPDATE USING (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Users can delete own summits" ON public.summits;
-CREATE POLICY "Users can delete own summits" ON public.summits FOR DELETE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own goals" ON public.goals;
+CREATE POLICY "Users can delete own goals" ON public.goals FOR DELETE USING (auth.uid() = user_id);
 
 -- Collections Policies
 DROP POLICY IF EXISTS "Users can view their own collections." ON public.collections;

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { useEconomyStore } from './economyStore';
 import { useTaskStore } from './taskStore';
-import { useSummitStore, UnlockedMilestoneInfo, getChainTrail } from './summitStore';
+import { useGoalStore, UnlockedMilestoneInfo, getChainTrail } from './goalStore';
 import * as Notifications from 'expo-notifications';
 
 Notifications.setNotificationHandler({
@@ -197,12 +197,12 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     // Mark task as completed (pass false to prevent manual payout logic)
     useTaskStore.getState().toggleTask(activeTaskId, false);
 
-    // Roll up progress to the Summit if linked & capture milestone rewards (awards Dollars at milestones)
+    // Roll up progress to the Goal if linked & capture milestone rewards (awards Dollars at milestones)
     let unlockedMilestones: UnlockedMilestoneInfo[] = [];
     let chainTrail: string[] = [];
-    if (task?.summitId) {
-      unlockedMilestones = useSummitStore.getState().applyLeafProgress(task.summitId, minutesElapsed);
-      chainTrail = getChainTrail(useSummitStore.getState().summits, task.summitId);
+    if (task?.goalId) {
+      unlockedMilestones = useGoalStore.getState().applyLeafProgress(task.goalId, minutesElapsed);
+      chainTrail = getChainTrail(useGoalStore.getState().goals, task.goalId);
     }
 
     const result: SessionCompletionResult = {

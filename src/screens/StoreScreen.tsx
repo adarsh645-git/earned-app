@@ -4,12 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEconomyStore, IOU_CAP } from '../store/economyStore';
 import { useRewardStore, Reward } from '../store/rewardStore';
-import { useSummitStore, Summit, getEligibleParents } from '../store/summitStore';
+import { useGoalStore, Goal, getEligibleParents } from '../store/goalStore';
 import TimeSelectorModal from '../components/TimeSelectorModal';
 import { feedback } from '../utils/feedback';
 import { useConfettiStore } from '../store/confettiStore';
 import ConfirmModal, { ConfirmAction } from '../components/ConfirmModal';
-import AnimatedSummitCard from '../components/AnimatedSummitCard';
+import AnimatedGoalCard from '../components/AnimatedGoalCard';
 import CountUpText from '../components/CountUpText';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { useTaskStore } from '../store/taskStore';
@@ -34,10 +34,10 @@ export default function StoreScreen() {
     getConversionRate,
   } = useEconomyStore();
   const { rewards, addReward, deleteReward } = useRewardStore();
-  const { summits, addSummit } = useSummitStore();
+  const { goals, addGoal } = useGoalStore();
 
   const conversionInfo = getConversionRate();
-  const entertainmentGoals = summits.filter((g) => g.type === 'entertainment');
+  const entertainmentGoals = goals.filter((g) => g.type === 'entertainment');
 
   // Tab state ('time' vs 'material')
   const [activeTab, setActiveTab] = useState<'time' | 'material'>('time');
@@ -50,7 +50,7 @@ export default function StoreScreen() {
   const [showTimeSelector, setShowTimeSelector] = useState(false);
   const [validationError, setValidationError] = useState('');
   const [selectedParentId, setSelectedParentId] = useState<string>('');
-  const [quickStartGoal, setQuickStartGoal] = useState<Summit | null>(null);
+  const [quickStartGoal, setQuickStartGoal] = useState<Goal | null>(null);
   
   const [projectCategory, setProjectCategory] = useState<'video-game' | 'movie' | 'tv-show' | 'youtube' | 'custom'>('custom');
   const [isOpenEnded, setIsOpenEnded] = useState(false);
@@ -103,7 +103,7 @@ export default function StoreScreen() {
         setValidationError('Target count must be a valid positive number');
         return;
       }
-      addSummit({
+      addGoal({
         title: title.trim(),
         horizon: 'yearly',
         targetMinutes: 0,
@@ -126,7 +126,7 @@ export default function StoreScreen() {
         return;
       }
 
-      addSummit({
+      addGoal({
         title: title.trim(),
         horizon: 'yearly',
         targetMinutes: (selectedParentId && isOpenEnded) ? 0 : projectMinutes,
@@ -151,7 +151,7 @@ export default function StoreScreen() {
       title: t,
       tagId,
       estimatedMinutes: minutes,
-      summitId: targetId,
+      goalId: targetId,
       isIcebox: false,
     });
     const res = startTimer(newTaskId, minutes);
@@ -594,7 +594,7 @@ export default function StoreScreen() {
               {/* Active Entertainment Projects List */}
               <View style={{ marginTop: 8 }}>
                 {entertainmentGoals.filter(g => !g.parentId).map((goal) => (
-                  <AnimatedSummitCard
+                  <AnimatedGoalCard
                     key={goal.id}
                     goal={goal}
                     subGoals={entertainmentGoals.filter(g => g.parentId === goal.id)}
@@ -785,7 +785,7 @@ export default function StoreScreen() {
           visible={!!quickStartGoal}
           onClose={() => setQuickStartGoal(null)}
           goal={quickStartGoal}
-          subGoals={summits.filter(g => g.parentId === quickStartGoal.id)}
+          subGoals={goals.filter(g => g.parentId === quickStartGoal.id)}
           onStart={handleQuickStart}
         />
       )}

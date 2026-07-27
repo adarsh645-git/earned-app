@@ -21,7 +21,7 @@ const CARD_STYLE = {
   shadowRadius: 12,
   elevation: 3,
 } as const;
-import { useSummitStore, getChainTrail } from '../store/summitStore';
+import { useGoalStore, getChainTrail } from '../store/goalStore';
 import { useCollectionStore } from '../store/collectionStore';
 import { useEconomyStore } from '../store/economyStore';
 import { useTimerStore } from '../store/timerStore';
@@ -53,7 +53,7 @@ function formatDateLabel(dateStr: string, isToday: boolean): string {
 
 export default function TasksScreen() {
   const { tasks, tags, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox, reorderTasks } = useTaskStore();
-  const { summits } = useSummitStore();
+  const { goals } = useGoalStore();
   const { collections } = useCollectionStore();
   const { startTimer } = useTimerStore();
   const isMobile = useIsMobile();
@@ -73,13 +73,13 @@ export default function TasksScreen() {
   const [quickAddOpenPill, setQuickAddOpenPill] = useState<'tag' | 'journey' | null>(null);
   const [quickAddTagId, setQuickAddTagId] = useState('');
   const [quickAddCollectionId, setQuickAddCollectionId] = useState('');
-  const [quickAddSummitId, setQuickAddSummitId] = useState('');
+  const [quickAddGoalId, setQuickAddGoalId] = useState('');
   const [quickAddIsIcebox, setQuickAddIsIcebox] = useState(false);
 
   const quickAddTagType: 'earner' | 'burner' = quickAddTagId
     ? (tags.find(t => t.id === quickAddTagId)?.type ?? 'earner')
     : 'earner';
-  const quickAddEligibleJourneys = getEligibleJourneys(collections, summits, quickAddTagType);
+  const quickAddEligibleJourneys = getEligibleJourneys(collections, goals, quickAddTagType);
 
   const handleStartTimer = (taskId: string, mins: number) => {
     const res = startTimer(taskId, mins);
@@ -114,7 +114,7 @@ export default function TasksScreen() {
         setToastMessage(`-${(task.estimatedMinutes / 60).toFixed(1)}h leisure spent`);
         setToastSubtext(`Enjoyed "${task.title}" guilt-free`);
       }
-      setToastChainTrail(task.summitId ? getChainTrail(summits, task.summitId) : []);
+      setToastChainTrail(task.goalId ? getChainTrail(goals, task.goalId) : []);
       setToastVisible(true);
     }
     toggleTask(id);
@@ -209,7 +209,7 @@ export default function TasksScreen() {
       estimatedMinutes,
       tagId: quickAddTagId || undefined,
       collectionId: quickAddCollectionId || undefined,
-      summitId: quickAddSummitId || undefined,
+      goalId: quickAddGoalId || undefined,
       isIcebox: quickAddIsIcebox,
     });
 
@@ -217,7 +217,7 @@ export default function TasksScreen() {
     setTitle('');
     setQuickAddTagId('');
     setQuickAddCollectionId('');
-    setQuickAddSummitId('');
+    setQuickAddGoalId('');
     setQuickAddIsIcebox(false);
     setQuickAddOpenPill(null);
     // Duration is intentionally NOT reset — the next quick-add inherits it,
@@ -283,7 +283,7 @@ export default function TasksScreen() {
                         feedback('select');
                         const linked = quickAddEligibleJourneys.find(c => c.id === id);
                         setQuickAddCollectionId(id);
-                        setQuickAddSummitId(linked?.summitId || '');
+                        setQuickAddGoalId(linked?.goalId || '');
                         setQuickAddOpenPill(null);
                       }}
                       open={quickAddOpenPill === 'journey'}

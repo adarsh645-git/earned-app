@@ -1,20 +1,20 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { View, Text, Animated, Dimensions, Pressable, TextInput } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Summit, getMilestoneDollars, useSummitStore } from '../store/summitStore';
+import { Goal, getMilestoneDollars, useGoalStore } from '../store/goalStore';
 import { hapticHeavyImpact, hapticMediumImpact } from '../utils/haptics';
 import { useConfettiStore } from '../store/confettiStore';
 import GoalDetailModal from './GoalDetailModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-interface AnimatedSummitCardProps {
-  goal: Summit;
-  subGoals?: Summit[];
+interface AnimatedGoalCardProps {
+  goal: Goal;
+  subGoals?: Goal[];
   accentColor: string; // '#BF5AF2' for productive, '#5AC8FA' for entertainment
   showIcon?: boolean;
   iconName?: string;
-  onQuickStart?: (goal: Summit) => void;
+  onQuickStart?: (goal: Goal) => void;
   onAddSubGoal?: (parentId: string) => void;
 }
 
@@ -240,7 +240,7 @@ function InlineEditableText({
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
-export default function AnimatedSummitCard({
+export default function AnimatedGoalCard({
   goal,
   subGoals = [],
   accentColor,
@@ -248,9 +248,9 @@ export default function AnimatedSummitCard({
   iconName,
   onQuickStart,
   onAddSubGoal,
-}: AnimatedSummitCardProps) {
-  const { updateSummit, deleteSummit } = useSummitStore();
-  const [editingGoal, setEditingGoal] = useState<Summit | null>(null);
+}: AnimatedGoalCardProps) {
+  const { updateGoal, deleteGoal } = useGoalStore();
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const isUnits = goal.metricType === 'units';
   const isEntertainment = goal.type === 'entertainment';
   const target = isUnits ? (goal.targetMetric || 1) : goal.targetMinutes;
@@ -343,7 +343,7 @@ export default function AnimatedSummitCard({
           <InlineEditableText
             initialValue={goal.title}
             textStyle={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14 }}
-            onSave={(newTitle) => updateSummit(goal.id, { title: newTitle })}
+            onSave={(newTitle) => updateGoal(goal.id, { title: newTitle })}
           />
           {displayCategory !== '' && (
             <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 4 }}>
@@ -448,7 +448,7 @@ export default function AnimatedSummitCard({
                     <InlineEditableText
                       initialValue={subGoal.title}
                       textStyle={{ color: '#EBEBF5', fontSize: 13, fontWeight: '500' }}
-                      onSave={(newTitle) => updateSummit(subGoal.id, { title: newTitle })}
+                      onSave={(newTitle) => updateGoal(subGoal.id, { title: newTitle })}
                       numberOfLines={1}
                     />
                     <Pressable onPress={() => setEditingGoal(subGoal)} style={{ padding: 4 }}>
@@ -511,8 +511,8 @@ export default function AnimatedSummitCard({
         goal={editingGoal}
         visible={!!editingGoal}
         onClose={() => setEditingGoal(null)}
-        onSave={(id, updates) => updateSummit(id, updates)}
-        onDelete={(id) => deleteSummit(id)}
+        onSave={(id, updates) => updateGoal(id, updates)}
+        onDelete={(id) => deleteGoal(id)}
         onQuickStart={onQuickStart}
         onNavigate={(g) => setEditingGoal(g)}
       />

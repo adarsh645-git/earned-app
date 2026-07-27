@@ -3,7 +3,7 @@ import { View, Text, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platfor
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Collection, CollectionCategory, useCollectionStore } from '../store/collectionStore';
-import { useSummitStore } from '../store/summitStore';
+import { useGoalStore } from '../store/goalStore';
 import { useTaskStore } from '../store/taskStore';
 import EditableText from './EditableText';
 import PillPicker from './PillPicker';
@@ -43,7 +43,7 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
     addWaypoint, updateWaypoint,
     addItem, updateItem, deleteItem,
   } = useCollectionStore();
-  const { summits, deleteSummit } = useSummitStore();
+  const { goals, deleteGoal } = useGoalStore();
   const { tasks } = useTaskStore();
 
   const [categoryPillOpen, setCategoryPillOpen] = useState(false);
@@ -58,20 +58,20 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
   if (!collection) return null;
 
   const currentYear = new Date().getFullYear();
-  const linkedSummit = summits.find(s => s.id === collection.summitId);
+  const linkedGoal = goals.find(s => s.id === collection.goalId);
   const collectionWaypoints = waypoints.filter(w => w.collectionId === collection.id);
   const collectionItems = items.filter(i => i.collectionId === collection.id);
   const completedCount = collectionItems.filter(i => i.completed).length;
   const progress = collectionItems.length > 0 ? Math.round((completedCount / collectionItems.length) * 100) : 0;
   const linkedTasks = tasks.filter(t => t.collectionId === collection.id);
 
-  const isSummitUnits = linkedSummit?.metricType === 'units';
-  const summitCompleted = linkedSummit ? (isSummitUnits ? (linkedSummit.completedMetric || 0) : linkedSummit.completedMinutes) : 0;
-  const summitTarget = linkedSummit ? (isSummitUnits ? (linkedSummit.targetMetric || 0) : linkedSummit.targetMinutes) : 0;
-  const summitPct = summitTarget > 0 ? Math.min(100, Math.round((summitCompleted / summitTarget) * 100)) : 0;
-  const summitProgressLabel = isSummitUnits
-    ? `${summitCompleted}/${summitTarget}${linkedSummit?.unitLabel ? ` ${linkedSummit.unitLabel}` : ''}`
-    : `${(summitCompleted / 60).toFixed(1)}/${(summitTarget / 60).toFixed(1)}h`;
+  const isGoalUnits = linkedGoal?.metricType === 'units';
+  const goalCompleted = linkedGoal ? (isGoalUnits ? (linkedGoal.completedMetric || 0) : linkedGoal.completedMinutes) : 0;
+  const goalTarget = linkedGoal ? (isGoalUnits ? (linkedGoal.targetMetric || 0) : linkedGoal.targetMinutes) : 0;
+  const goalPct = goalTarget > 0 ? Math.min(100, Math.round((goalCompleted / goalTarget) * 100)) : 0;
+  const goalProgressLabel = isGoalUnits
+    ? `${goalCompleted}/${goalTarget}${linkedGoal?.unitLabel ? ` ${linkedGoal.unitLabel}` : ''}`
+    : `${(goalCompleted / 60).toFixed(1)}/${(goalTarget / 60).toFixed(1)}h`;
 
   const toggleWaypoint = (id: string) => {
     feedback('expand');
@@ -135,17 +135,17 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                 onToggle={() => setCategoryPillOpen(p => !p)}
               />
               <PillPicker
-                label={linkedSummit ? linkedSummit.title : 'No Goal'}
-                options={[{ id: '', label: 'No Goal' }, ...summits.map(s => ({ id: s.id, label: s.title }))]}
-                selectedId={collection.summitId || ''}
-                onSelect={(id) => { feedback('select'); updateCollection(collection.id, { summitId: id || undefined }); setGoalPillOpen(false); }}
+                label={linkedGoal ? linkedGoal.title : 'No Goal'}
+                options={[{ id: '', label: 'No Goal' }, ...goals.map(s => ({ id: s.id, label: s.title }))]}
+                selectedId={collection.goalId || ''}
+                onSelect={(id) => { feedback('select'); updateCollection(collection.id, { goalId: id || undefined }); setGoalPillOpen(false); }}
                 open={goalPillOpen}
                 onToggle={() => setGoalPillOpen(p => !p)}
                 accentColor="#5AC8FA"
               />
             </View>
 
-            {/* Progress — Journey's own item checklist, and (separately) the mirrored linked-Summit progress */}
+            {/* Progress — Journey's own item checklist, and (separately) the mirrored linked-Goal progress */}
             <View style={{ marginBottom: 24 }}>
               <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
                 This Journey
@@ -154,13 +154,13 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
               <Text style={{ color: '#8E8E93', fontSize: 11, marginTop: 6 }}>{completedCount}/{collectionItems.length} tasks ({progress}%)</Text>
             </View>
 
-            {linkedSummit && (
+            {linkedGoal && (
               <View style={{ marginBottom: 24 }}>
                 <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-                  Linked Summit
+                  Linked Goal
                 </Text>
-                <AnimatedProgressBar progress={summitPct} color="#5AC8FA" height={8} />
-                <Text style={{ color: '#8E8E93', fontSize: 11, marginTop: 6 }}>{summitProgressLabel} toward "{linkedSummit.title}" ({summitPct}%)</Text>
+                <AnimatedProgressBar progress={goalPct} color="#5AC8FA" height={8} />
+                <Text style={{ color: '#8E8E93', fontSize: 11, marginTop: 6 }}>{goalProgressLabel} toward "{linkedGoal.title}" ({goalPct}%)</Text>
               </View>
             )}
 
@@ -341,11 +341,11 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
         title="Delete Journey?"
         message="Historically earned milestone cash rewards will remain safe in your balance."
         actions={
-          linkedSummit
+          linkedGoal
             ? [
                 { label: 'Cancel', onPress: () => {}, style: 'cancel' },
-                { label: 'Delete Journey Only (Keep Summit)', onPress: () => { deleteCollection(collection.id); onClose(); } },
-                { label: 'Delete Journey & Linked Summit', style: 'destructive', onPress: () => { deleteSummit(linkedSummit.id); deleteCollection(collection.id); onClose(); } },
+                { label: 'Delete Journey Only (Keep Goal)', onPress: () => { deleteCollection(collection.id); onClose(); } },
+                { label: 'Delete Journey & Linked Goal', style: 'destructive', onPress: () => { deleteGoal(linkedGoal.id); deleteCollection(collection.id); onClose(); } },
               ]
             : [
                 { label: 'Cancel', onPress: () => {}, style: 'cancel' },

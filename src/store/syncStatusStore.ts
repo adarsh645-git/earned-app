@@ -53,7 +53,7 @@ const CHANNEL_LABELS: Record<string, string> = {
   pillars: 'Categories',
   tags: 'Journeys/Tags',
   rewards: 'Store Rewards',
-  summits: 'Summits',
+  goals: 'Goals',
   collections: 'Journeys',
 };
 
