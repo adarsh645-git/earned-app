@@ -85,12 +85,17 @@ function JourneyRow({
   goals,
   updateCollection,
   onOpen,
+  nested = false,
 }: {
   collection: Collection;
   items: CollectionItem[];
   goals: Goal[];
   updateCollection: (id: string, updates: { title?: string }) => void;
   onOpen: (id: string) => void;
+  // True when rendered directly under its Goal's own card — that card
+  // already shows the goal name + full progress, so the pill/mirror below
+  // would just repeat it. Standalone Journeys (no goal link) keep both.
+  nested?: boolean;
 }) {
   const collectionItems = items.filter(i => i.collectionId === collection.id);
   const completedCount = collectionItems.filter(i => i.completed).length;
@@ -130,14 +135,14 @@ function JourneyRow({
               {collection.category}
             </Text>
           </View>
-          {linkedGoal && (
+          {linkedGoal && !nested && (
             <View style={{ backgroundColor: '#5AC8FA15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, borderWidth: 1, borderColor: '#5AC8FA44', flexDirection: 'row', alignItems: 'center' }}>
               <FontAwesome5 name="bullseye" size={9} color="#5AC8FA" style={{ marginRight: 4 }} />
               <Text style={{ color: '#5AC8FA', fontSize: 10, fontWeight: '700' }}>{linkedGoal.title}</Text>
             </View>
           )}
         </View>
-        {linkedGoal && (
+        {linkedGoal && !nested && (
           <View style={{ marginTop: 6 }}>
             <AnimatedProgressBar progress={goalPct} color="#5AC8FA" height={4} />
             <Text style={{ color: '#8E8E93', fontSize: 10, marginTop: 3 }}>{goalProgressLabel} toward goal · {goalPct}%</Text>
@@ -213,6 +218,10 @@ export default function CollectionsScreen() {
   const [newGoalHorizon, setNewGoalHorizon] = useState<'monthly' | 'yearly'>('monthly');
   const [newGoalParentId, setNewGoalParentId] = useState('');
   const [newGoalPillarId, setNewGoalPillarId] = useState('');
+
+  // Narrows the Pillar -> Goal -> Journey hierarchy below to a single Pillar.
+  // '' = "All" (everything, unchanged).
+  const [journeyPillarFilter, setJourneyPillarFilter] = useState('');
 
   // New Journey — collapsible inline form (no modal). Shares all the state
   // above (journeyTitle, journeyCategory, journeyLinkMode, newGoal*) and
@@ -681,6 +690,52 @@ export default function CollectionsScreen() {
 
       {/* Pillar -> Goal -> Journey Hierarchy */}
       <View style={{ paddingHorizontal: 16 }}>
+        {activePillars.length > 0 && (
+          <View style={{ backgroundColor: '#1C1C1E', borderColor: '#2C2C2E', borderWidth: 1, borderRadius: 12, marginBottom: 16 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 4 }}>
+              <Pressable
+                onPress={() => setJourneyPillarFilter('')}
+                style={{
+                  paddingHorizontal: 20,
+                  paddingVertical: 8,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  backgroundColor: journeyPillarFilter === '' ? '#2C2C2E' : 'transparent',
+                  borderWidth: journeyPillarFilter === '' ? 1 : 0,
+                  borderColor: journeyPillarFilter === '' ? '#BF5AF2' : 'transparent',
+                }}
+              >
+                <Text style={{ fontWeight: journeyPillarFilter === '' ? '700' : '500', fontSize: 13, color: journeyPillarFilter === '' ? '#FFFFFF' : '#8E8E93' }}>
+                  All
+                </Text>
+              </Pressable>
+              {activePillars.map((pillar) => {
+                const isActive = journeyPillarFilter === pillar.id;
+                const pillarColor = getPillarColor(pillar.id, pillars);
+                return (
+                  <Pressable
+                    key={pillar.id}
+                    onPress={() => setJourneyPillarFilter(pillar.id)}
+                    style={{
+                      paddingHorizontal: 20,
+                      paddingVertical: 8,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                      backgroundColor: isActive ? '#2C2C2E' : 'transparent',
+                      borderWidth: isActive ? 1 : 0,
+                      borderColor: isActive ? pillarColor : 'transparent',
+                    }}
+                  >
+                    <Text style={{ fontWeight: isActive ? '700' : '500', fontSize: 13, color: isActive ? '#FFFFFF' : '#8E8E93' }}>
+                      {pillar.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         {collections.length === 0 ? (
           <View style={{ alignItems: 'center', marginTop: 40, backgroundColor: '#1C1C1E', borderRadius: 20, padding: 32, borderWidth: 1, borderColor: '#2C2C2E' }}>
             <View style={{ backgroundColor: '#BF5AF222', width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
@@ -720,7 +775,7 @@ export default function CollectionsScreen() {
                     {linkedJourneys.length > 0 && (
                       <View style={{ marginTop: 4, marginLeft: 12 }}>
                         {linkedJourneys.map(c => (
-                          <JourneyRow key={c.id} collection={c} items={items} goals={goals} updateCollection={updateCollection} onOpen={setDetailJourneyId} />
+                          <JourneyRow key={c.id} collection={c} items={items} goals={goals} updateCollection={updateCollection} onOpen={setDetailJourneyId} nested />
                         ))}
                       </View>
                     )}
@@ -731,6 +786,7 @@ export default function CollectionsScreen() {
               return (
                 <>
                   {activePillars.map(pillar => {
+                    if (journeyPillarFilter && journeyPillarFilter !== pillar.id) return null;
                     const pillarGoals = productiveRootGoals.filter(g => g.pillarId === pillar.id);
                     if (pillarGoals.length === 0) return null;
                     const pillarColor = getPillarColor(pillar.id, pillars);
@@ -745,7 +801,7 @@ export default function CollectionsScreen() {
                     );
                   })}
 
-                  {unassignedGoals.length > 0 && (
+                  {!journeyPillarFilter && unassignedGoals.length > 0 && (
                     <View style={{ marginBottom: 8 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: FALLBACK_COLOR, marginRight: 8 }} />
@@ -755,14 +811,14 @@ export default function CollectionsScreen() {
                     </View>
                   )}
 
-                  {entertainmentRootGoals.length > 0 && (
+                  {!journeyPillarFilter && entertainmentRootGoals.length > 0 && (
                     <View style={{ marginBottom: 8 }}>
                       <Text style={{ color: '#5AC8FA', fontSize: 16, fontWeight: '800', marginBottom: 12 }}>Entertainment Projects</Text>
                       {entertainmentRootGoals.map(g => renderGoalWithJourneys(g, '#5AC8FA', { showIcon: true, iconName: 'game-controller' }))}
                     </View>
                   )}
 
-                  {standaloneJourneys.length > 0 && (
+                  {!journeyPillarFilter && standaloneJourneys.length > 0 && (
                     <View style={{ marginBottom: 8 }}>
                       <Text style={{ color: '#8E8E93', fontSize: 16, fontWeight: '800', marginBottom: 12 }}>Other Journeys</Text>
                       {standaloneJourneys.map(c => (

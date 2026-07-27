@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { View, Text, Animated, Dimensions, Pressable, TextInput } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Goal, getMilestoneDollars, useGoalStore } from '../store/goalStore';
+import { Goal, useGoalStore } from '../store/goalStore';
 import { hapticHeavyImpact, hapticMediumImpact } from '../utils/haptics';
 import { useConfettiStore } from '../store/confettiStore';
 import GoalDetailModal from './GoalDetailModal';
@@ -80,76 +80,6 @@ function MiniBurst({ color, trigger }: { color: string; trigger: boolean }) {
         />
       ))}
     </View>
-  );
-}
-
-// ─── Animated Milestone Badge ────────────────────────────────────────────────
-function MilestoneBadge({
-  milestone,
-  isUnlocked,
-  justUnlocked,
-  dollars,
-  accentColor,
-}: {
-  milestone: number;
-  isUnlocked: boolean;
-  justUnlocked: boolean;
-  dollars: number;
-  accentColor: string;
-}) {
-  const badgeScale = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (justUnlocked) {
-      hapticMediumImpact();
-      Animated.sequence([
-        Animated.spring(badgeScale, {
-          toValue: 1.4,
-          useNativeDriver: true,
-          speed: 60,
-          bounciness: 18,
-        }),
-        Animated.spring(badgeScale, {
-          toValue: 1,
-          useNativeDriver: true,
-          speed: 30,
-          bounciness: 8,
-        }),
-      ]).start();
-    }
-  }, [justUnlocked]);
-
-  const bgColor = isUnlocked ? `${accentColor}26` : '#2C2C2E'; // 26 = ~15% opacity hex
-  const borderColor = isUnlocked ? `${accentColor}66` : 'rgba(255,255,255,0.05)'; // 66 = ~40% opacity hex
-
-  return (
-    <Animated.View
-      style={{
-        backgroundColor: bgColor,
-        borderColor: borderColor,
-        borderWidth: 1,
-        borderRadius: 99,
-        paddingHorizontal: 6,
-        paddingVertical: 4,
-        flexDirection: 'row',
-        alignItems: 'center',
-        transform: [{ scale: badgeScale }],
-        position: 'relative',
-        overflow: 'visible',
-      }}
-    >
-      <MiniBurst color={accentColor} trigger={justUnlocked} />
-      <Ionicons
-        name={isUnlocked ? 'checkmark-circle' : 'lock-closed'}
-        size={10}
-        color={isUnlocked ? accentColor : '#8E8E93'}
-      />
-      <Text
-        style={{ color: isUnlocked ? accentColor : '#8E8E93', fontSize: 9, fontWeight: '700', marginLeft: 4 }}
-      >
-        {milestone}% (+${dollars.toFixed(2)})
-      </Text>
-    </Animated.View>
   );
 }
 
@@ -290,11 +220,15 @@ export default function AnimatedGoalCard({
     }
   });
 
-  // If 100% just unlocked, trigger full-screen confetti + heavy haptic
+  // 100% just unlocked -> full-screen confetti + heavy haptic; any other
+  // milestone just unlocked -> a lighter medium haptic (the summary chip's
+  // own MiniBurst handles the visual flourish for both cases).
   useEffect(() => {
     if (justUnlockedSet.has(100)) {
       hapticHeavyImpact();
       useConfettiStore.getState().triggerConfetti();
+    } else if (justUnlockedSet.size > 0) {
+      hapticMediumImpact();
     }
     // Update ref after rendering
     prevUnlocked.current = [...unlocked];
@@ -381,24 +315,36 @@ export default function AnimatedGoalCard({
         </View>
       )}
 
-      {/* Milestone Badges Row (Hide if open ended) */}
+      {/* Milestone Summary Chip (Hide if open ended) — full 25/50/75/100%
+          breakdown lives in GoalDetailModal (tap the card); the list view
+          only needs the count so it doesn't dominate a scrolling list. */}
       {!isOpenEnded && (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', rowGap: 8, columnGap: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }}>
-        {milestones.map((m) => {
-          const isUnlocked = unlocked.includes(m);
-          const justNowUnlocked = justUnlockedSet.has(m);
-          const dollars = getMilestoneDollars(goal.targetMinutes, m, goal.type || 'productive');
-          return (
-            <MilestoneBadge
-              key={m}
-              milestone={m}
-              isUnlocked={isUnlocked}
-              justUnlocked={justNowUnlocked}
-              dollars={dollars}
-              accentColor={accentColor}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }}>
+          <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '600' }}>Milestones</Text>
+          <View
+            style={{
+              backgroundColor: unlocked.length > 0 ? `${accentColor}26` : '#2C2C2E',
+              borderColor: unlocked.length > 0 ? `${accentColor}66` : 'rgba(255,255,255,0.05)',
+              borderWidth: 1,
+              borderRadius: 99,
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              flexDirection: 'row',
+              alignItems: 'center',
+              position: 'relative',
+              overflow: 'visible',
+            }}
+          >
+            <MiniBurst color={accentColor} trigger={justUnlockedSet.size > 0} />
+            <Ionicons
+              name={unlocked.length === milestones.length ? 'checkmark-circle' : 'lock-closed'}
+              size={10}
+              color={unlocked.length > 0 ? accentColor : '#8E8E93'}
             />
-          );
-        })}
+            <Text style={{ color: unlocked.length > 0 ? accentColor : '#8E8E93', fontSize: 9, fontWeight: '700', marginLeft: 4 }}>
+              {unlocked.length}/{milestones.length} Milestones
+            </Text>
+          </View>
         </View>
       )}
 
