@@ -114,20 +114,29 @@ function JourneyRow({
     ? `${goalCompleted}/${goalTarget}${linkedGoal?.unitLabel ? ` ${linkedGoal.unitLabel}` : ''}`
     : `${(goalCompleted / 60).toFixed(1)}/${(goalTarget / 60).toFixed(1)}h`;
 
+  const iconBoxSize = nested ? 22 : 30;
+  const iconSize = nested ? 12 : 15;
+  const titleFontSize = nested ? 14 : 16;
+  const titleFontWeight = nested ? ('500' as const) : ('700' as const);
+
   return (
     <Pressable
       onPress={() => onOpen(collection.id)}
-      style={{ marginBottom: 10, backgroundColor: '#1C1C1E', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: isFullyComplete ? '#BF5AF255' : '#2C2C2E', shadowColor: isFullyComplete ? '#BF5AF2' : '#000', shadowRadius: 6, shadowOpacity: isFullyComplete ? 0.2 : 0.08, flexDirection: 'row', alignItems: 'center' }}
+      style={
+        nested
+          ? { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }
+          : { marginBottom: 10, backgroundColor: '#1C1C1E', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: isFullyComplete ? '#BF5AF255' : '#2C2C2E', shadowColor: isFullyComplete ? '#BF5AF2' : '#000', shadowRadius: 6, shadowOpacity: isFullyComplete ? 0.2 : 0.08, flexDirection: 'row', alignItems: 'center' }
+      }
     >
-      <View style={{ backgroundColor: '#BF5AF215', width: 30, height: 30, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 10, borderWidth: 1, borderColor: '#BF5AF233' }}>
-        <CategoryVectorIcon category={collection.category} size={15} color="#BF5AF2" />
+      <View style={{ backgroundColor: '#BF5AF215', width: iconBoxSize, height: iconBoxSize, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 10, borderWidth: 1, borderColor: '#BF5AF233' }}>
+        <CategoryVectorIcon category={collection.category} size={iconSize} color="#BF5AF2" />
       </View>
 
       <View style={{ flex: 1, marginRight: 8 }}>
         <EditableText
           value={collection.title}
           onSave={(title) => updateCollection(collection.id, { title })}
-          textStyle={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}
+          textStyle={{ color: '#FFF', fontSize: titleFontSize, fontWeight: titleFontWeight }}
         />
         <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 3 }}>
           <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginRight: 6 }}>
@@ -154,8 +163,8 @@ function JourneyRow({
         {completedCount}/{collectionItems.length} ({progress}%)
       </Text>
 
-      <Pressable onPress={() => onOpen(collection.id)} style={{ padding: 6, backgroundColor: '#2C2C2E', borderRadius: 8 }}>
-        <Ionicons name="pencil" size={14} color="#8E8E93" />
+      <Pressable onPress={() => onOpen(collection.id)} style={{ padding: 6, backgroundColor: nested ? 'transparent' : '#2C2C2E', borderRadius: 8 }}>
+        <Ionicons name="pencil" size={nested ? 12 : 14} color="#8E8E93" />
       </Pressable>
     </Pressable>
   );
@@ -222,6 +231,12 @@ export default function CollectionsScreen() {
   // Narrows the Pillar -> Goal -> Journey hierarchy below to a single Pillar.
   // '' = "All" (everything, unchanged).
   const [journeyPillarFilter, setJourneyPillarFilter] = useState('');
+
+  // Per-Goal expand/collapse for its nested Journeys — defaults to expanded
+  // (missing key !== false) since Journeys are primary content here, unlike
+  // Task subtasks which default collapsed as secondary detail.
+  const [expandedGoals, setExpandedGoals] = useState<Record<string, boolean>>({});
+  const isGoalExpanded = (goalId: string) => expandedGoals[goalId] !== false;
 
   // New Journey — collapsible inline form (no modal). Shares all the state
   // above (journeyTitle, journeyCategory, journeyLinkMode, newGoal*) and
@@ -770,10 +785,13 @@ export default function CollectionsScreen() {
                       subGoals={subGoals}
                       accentColor={accentColor}
                       onQuickStart={setQuickStartGoal}
+                      journeyCount={linkedJourneys.length}
+                      isExpanded={isGoalExpanded(goal.id)}
+                      onToggleExpand={() => setExpandedGoals(prev => ({ ...prev, [goal.id]: !isGoalExpanded(goal.id) }))}
                       {...extraProps}
                     />
-                    {linkedJourneys.length > 0 && (
-                      <View style={{ marginTop: 4, marginLeft: 12 }}>
+                    {linkedJourneys.length > 0 && isGoalExpanded(goal.id) && (
+                      <View style={{ marginTop: 4, marginLeft: 32, paddingLeft: 16 }}>
                         {linkedJourneys.map(c => (
                           <JourneyRow key={c.id} collection={c} items={items} goals={goals} updateCollection={updateCollection} onOpen={setDetailJourneyId} nested />
                         ))}

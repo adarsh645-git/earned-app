@@ -16,6 +16,13 @@ interface AnimatedGoalCardProps {
   iconName?: string;
   onQuickStart?: (goal: Goal) => void;
   onAddSubGoal?: (parentId: string) => void;
+  // Journeys nested under this Goal (owned by the caller, e.g.
+  // CollectionsScreen) — mirrors AnimatedTaskRow's subtaskCount/isExpanded/
+  // onToggleExpand so a Goal's Journeys read as the same parent/child
+  // pattern as a Task's subtasks.
+  journeyCount?: number;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 // ─── Mini Confetti Burst (localized to a milestone badge) ────────────────────
@@ -178,6 +185,9 @@ export default function AnimatedGoalCard({
   iconName,
   onQuickStart,
   onAddSubGoal,
+  journeyCount = 0,
+  isExpanded = false,
+  onToggleExpand,
 }: AnimatedGoalCardProps) {
   const { updateGoal, deleteGoal } = useGoalStore();
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
@@ -348,6 +358,34 @@ export default function AnimatedGoalCard({
         </View>
       )}
 
+      {/* Journeys count + expand/collapse — same parent/child language as a
+          Task's subtaskCount/chevron in AnimatedTaskRow. */}
+      {journeyCount > 0 && onToggleExpand && (
+        <Pressable
+          onPress={onToggleExpand}
+          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 }}
+        >
+          <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '600' }}>Journeys</Text>
+          <View
+            style={{
+              backgroundColor: '#2C2C2E',
+              borderColor: 'rgba(255,255,255,0.05)',
+              borderWidth: 1,
+              borderRadius: 99,
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ color: '#8E8E93', fontSize: 9, fontWeight: '700', marginRight: 4 }}>
+              {journeyCount}
+            </Text>
+            <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={10} color="#8E8E93" />
+          </View>
+        </Pressable>
+      )}
+
       {/* Header for Sub-Projects (shown if we have subgoals OR if we can add them) */}
       {(subGoals && subGoals.length > 0 || onAddSubGoal) && (
         <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }}>
@@ -430,33 +468,6 @@ export default function AnimatedGoalCard({
               </View>
             );
           })}
-        </View>
-      )}
-
-      {/* Quick Start Button (Only show if no subGoals) — a compact tinted
-          pill, matching the milestone badges' translucent style, instead of
-          a full-width solid bar. */}
-      {onQuickStart && (!subGoals || subGoals.length === 0) && (
-        <View style={{ marginTop: 14, alignItems: 'flex-end' }}>
-          <Pressable
-            onPress={() => onQuickStart(goal)}
-            style={({ pressed, hovered }: any) => ({
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: hovered ? `${accentColor}3D` : `${accentColor}26`,
-              borderWidth: 1,
-              borderColor: `${accentColor}66`,
-              paddingVertical: 7,
-              paddingHorizontal: 14,
-              borderRadius: 999,
-              opacity: pressed ? 0.8 : 1,
-            })}
-          >
-            <Ionicons name="play" size={12} color={accentColor} style={{ marginRight: 5 }} />
-            <Text style={{ color: accentColor, fontWeight: '700', fontSize: 13 }}>
-              {isEntertainment ? 'Indulge' : 'Focus'}
-            </Text>
-          </Pressable>
         </View>
       )}
 
