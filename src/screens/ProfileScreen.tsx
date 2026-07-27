@@ -10,6 +10,7 @@ import { useGoalStore, Goal, getMilestoneDollars } from '../store/goalStore';
 import { useAuthStore } from '../store/authStore';
 import { useSyncStatusStore, isSyncUnhealthy } from '../store/syncStatusStore';
 import GoalDetailModal from '../components/GoalDetailModal';
+import { getPillarColor } from '../utils/pillarColor';
 
 const PremiumInput = (props: React.ComponentProps<typeof TextInput>) => (
   <TextInput
@@ -327,7 +328,10 @@ export default function ProfileScreen() {
                   onPress={() => setExpandedPillarId(isExpanded ? null : pillar.id)}
                   style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 }}
                 >
-                  <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '600' }}>{pillar.name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: getPillarColor(pillar.id, pillars) }} />
+                    <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '600' }}>{pillar.name}</Text>
+                  </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                     <Text style={{ color: '#8E8E93', fontSize: 12 }}>{pillarTags.length} Categories</Text>
                     <Pressable onPress={() => {
