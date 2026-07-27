@@ -487,20 +487,27 @@ export default function AnimatedGoalCard({
         </View>
       )}
 
-      {/* Quick Start Button (Only show if no subGoals) */}
+      {/* Quick Start Button (Only show if no subGoals) — a compact tinted
+          pill, matching the milestone badges' translucent style, instead of
+          a full-width solid bar. */}
       {onQuickStart && (!subGoals || subGoals.length === 0) && (
-        <View style={{ marginTop: 16 }}>
+        <View style={{ marginTop: 14, alignItems: 'flex-end' }}>
           <Pressable
             onPress={() => onQuickStart(goal)}
             style={({ pressed, hovered }: any) => ({
-              backgroundColor: hovered ? (isEntertainment ? '#47A3D1' : '#A442D6') : (isEntertainment ? '#5AC8FA' : '#BF5AF2'),
-              paddingVertical: 10,
-              borderRadius: 12,
+              flexDirection: 'row',
               alignItems: 'center',
-              opacity: pressed ? 0.9 : 1,
+              backgroundColor: hovered ? `${accentColor}3D` : `${accentColor}26`,
+              borderWidth: 1,
+              borderColor: `${accentColor}66`,
+              paddingVertical: 7,
+              paddingHorizontal: 14,
+              borderRadius: 999,
+              opacity: pressed ? 0.8 : 1,
             })}
           >
-            <Text style={{ color: isEntertainment ? '#000000' : '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
+            <Ionicons name="play" size={12} color={accentColor} style={{ marginRight: 5 }} />
+            <Text style={{ color: accentColor, fontWeight: '700', fontSize: 13 }}>
               {isEntertainment ? 'Indulge' : 'Focus'}
             </Text>
           </Pressable>

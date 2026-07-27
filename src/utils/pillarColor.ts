@@ -5,7 +5,7 @@ import { Pillar } from '../store/taskStore';
 // accent/CTA, red #FF453A = debt/errors, orange #FF9F0A = streak/warnings).
 export const PILLAR_PALETTE = [
   '#FFD60A', // yellow
-  '#FF375F', // pink
+  '#5E8CFF', // cornflower blue (replaces pink — reads more premium/professional for a default pillar like "Office")
   '#66D4CF', // mint
   '#6AC4DC', // teal
   '#7D7AFF', // indigo

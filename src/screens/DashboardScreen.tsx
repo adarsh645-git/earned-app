@@ -223,7 +223,46 @@ export default function DashboardScreen() {
           />
         </View>
 
-        <View className="flex-row justify-between items-center mt-3 mb-3">
+        {/* Goal Progress (Productive Goals) — leads above Today's Focus so the
+            long-term "why" sits ahead of the day's tactical task list. */}
+        {productiveGoals.length > 0 && (
+          <View className="mt-2">
+            <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3">
+              Goals
+            </Text>
+            {productiveGoals.map((goal) => (
+              <AnimatedGoalCard
+                key={goal.id}
+                goal={goal}
+                subGoals={goals.filter(g => g.parentId === goal.id)}
+                accentColor="#BF5AF2"
+                onQuickStart={setQuickStartGoal}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* Entertainment Projects (Burner Goals) */}
+        {entertainmentGoals.length > 0 && (
+          <View className="mt-2">
+            <Text className="text-[#5AC8FA] font-bold text-xs uppercase tracking-[1.5px] mb-3">
+              Entertainment Projects
+            </Text>
+            {entertainmentGoals.map((goal) => (
+              <AnimatedGoalCard
+                key={goal.id}
+                goal={goal}
+                subGoals={goals.filter(g => g.parentId === goal.id)}
+                accentColor="#5AC8FA"
+                showIcon
+                iconName="game-controller"
+                onQuickStart={setQuickStartGoal}
+              />
+            ))}
+          </View>
+        )}
+
+        <View className="flex-row justify-between items-center mt-5 mb-3">
           <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px]">
             Today's Focus
           </Text>
@@ -291,44 +330,6 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Goal Progress (Productive Goals) */}
-        {productiveGoals.length > 0 && (
-          <View className="mt-5">
-            <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3">
-              Goals
-            </Text>
-            {productiveGoals.map((goal) => (
-              <AnimatedGoalCard
-                key={goal.id}
-                goal={goal}
-                subGoals={goals.filter(g => g.parentId === goal.id)}
-                accentColor="#BF5AF2"
-                onQuickStart={setQuickStartGoal}
-              />
-            ))}
-          </View>
-        )}
-
-        {/* Entertainment Projects (Burner Goals) */}
-        {entertainmentGoals.length > 0 && (
-          <View className="mt-5">
-            <Text className="text-[#5AC8FA] font-bold text-xs uppercase tracking-[1.5px] mb-3">
-              Entertainment Projects
-            </Text>
-            {entertainmentGoals.map((goal) => (
-              <AnimatedGoalCard
-                key={goal.id}
-                goal={goal}
-                subGoals={goals.filter(g => g.parentId === goal.id)}
-                accentColor="#5AC8FA"
-                showIcon
-                iconName="game-controller"
-                onQuickStart={setQuickStartGoal}
-              />
-            ))}
-          </View>
-        )}
-        
       </ScrollView>
 
       {/* Blocked Timer Modal */}

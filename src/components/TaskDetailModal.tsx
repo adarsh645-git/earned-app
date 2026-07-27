@@ -77,6 +77,7 @@ export default function TaskDetailModal({
   const linkedJourney = task.collectionId ? collections.find(c => c.id === task.collectionId) : undefined;
   const activePillars = pillars.filter(p => !p.isArchived);
   const currentPillarId = tag?.pillarId || activePillars[0]?.id || '';
+  const pillarColor = getPillarColor(currentPillarId, pillars);
   const eligibleWaypoints = task.collectionId ? waypoints.filter(w => w.collectionId === task.collectionId) : [];
   // Progress quantity (e.g. "10 pages") only matters when the linked Goal
   // is a units-mode goal — hidden entirely for time-based/unlinked tasks.
@@ -103,7 +104,7 @@ export default function TaskDetailModal({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.96)' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.96)', borderLeftWidth: 4, borderLeftColor: pillarColor }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           {/* Header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 }}>
@@ -166,6 +167,7 @@ export default function TaskDetailModal({
                 }}
                 open={openPill === 'pillar'}
                 onToggle={() => setOpenPill(p => (p === 'pillar' ? null : 'pillar'))}
+                accentColor={pillarColor}
               />
 
               <PillPicker
