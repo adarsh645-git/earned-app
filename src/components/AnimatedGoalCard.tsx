@@ -129,7 +129,7 @@ function MilestoneBadge({
         borderColor: borderColor,
         borderWidth: 1,
         borderRadius: 99,
-        paddingHorizontal: 8,
+        paddingHorizontal: 6,
         paddingVertical: 4,
         flexDirection: 'row',
         alignItems: 'center',
@@ -383,7 +383,7 @@ export default function AnimatedGoalCard({
 
       {/* Milestone Badges Row (Hide if open ended) */}
       {!isOpenEnded && (
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', rowGap: 8, columnGap: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }}>
         {milestones.map((m) => {
           const isUnlocked = unlocked.includes(m);
           const justNowUnlocked = justUnlockedSet.has(m);

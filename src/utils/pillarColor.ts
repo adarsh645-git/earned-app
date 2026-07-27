@@ -12,7 +12,7 @@ export const PILLAR_PALETTE = [
   '#AC8E68', // brown
 ];
 
-const FALLBACK_COLOR = '#8E8E93'; // pillarId not found (e.g. deleted pillar)
+export const FALLBACK_COLOR = '#8E8E93'; // pillarId not found (e.g. deleted pillar)
 
 /**
  * Stable per-pillar color: sorts ALL pillars (including archived, so

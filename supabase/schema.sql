@@ -62,7 +62,8 @@ CREATE TABLE IF NOT EXISTS public.goals (
   parent_id TEXT,
   pays_currency BOOLEAN DEFAULT TRUE,
   category TEXT,
-  unit_label TEXT -- free-text label for metric_type='units'; see 20260726000002
+  unit_label TEXT, -- free-text label for metric_type='units'; see 20260726000002
+  pillar_id TEXT -- see 20260727000003; FK added below once public.pillars exists
 );
 
 -- 6. Collections (Journeys & Backlogs) Table
@@ -265,6 +266,11 @@ CREATE TABLE IF NOT EXISTS public.tags (
   is_archived BOOLEAN DEFAULT FALSE,
   date_created TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- goals.pillar_id's FK is added here, not on the goals table above, since
+-- public.pillars doesn't exist yet at that point in this script; see 20260727000003
+ALTER TABLE public.goals
+  ADD CONSTRAINT goals_pillar_id_fkey FOREIGN KEY (pillar_id) REFERENCES public.pillars(id) ON DELETE SET NULL;
 
 -- ==============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES

@@ -4,17 +4,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useCollectionStore, CollectionCategory } from '../store/collectionStore';
-import { useGoalStore, getChainTrail, getEligibleParents } from '../store/goalStore';
+import { useCollectionStore, CollectionCategory, Collection, CollectionItem } from '../store/collectionStore';
+import { useGoalStore, Goal, getChainTrail, getEligibleParents } from '../store/goalStore';
+import { useTaskStore } from '../store/taskStore';
 import { useConfettiStore } from '../store/confettiStore';
+import { getPillarColor, FALLBACK_COLOR } from '../utils/pillarColor';
 import { PrimaryButton } from '../components/PrimaryButton';
 import AnimatedProgressBar from '../components/AnimatedProgressBar';
+import AnimatedGoalCard from '../components/AnimatedGoalCard';
+import QuickStartModal from '../components/QuickStartModal';
 import RewardToast from '../components/RewardToast';
 import PillPicker from '../components/PillPicker';
 import EditableText from '../components/EditableText';
 import JourneyDetailModal from '../components/JourneyDetailModal';
 import { feedback } from '../utils/feedback';
 import { CategoryVectorIcon } from '../utils/categoryIcons';
+import useTimerLauncher from '../hooks/useTimerLauncher';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -70,6 +75,87 @@ function CelebrationVectorIcon({ type, category }: { type: CelebrationInfo['icon
   }
 }
 
+// A single Journey card — title, category badge, linked-Goal progress mirror
+// (if any), and item-completion count. Extracted so it can render both
+// nested under its Goal's Pillar section and, for goal-less Journeys, in the
+// standalone "Other Journeys" section, without duplicating the ~45 lines.
+function JourneyRow({
+  collection,
+  items,
+  goals,
+  updateCollection,
+  onOpen,
+}: {
+  collection: Collection;
+  items: CollectionItem[];
+  goals: Goal[];
+  updateCollection: (id: string, updates: { title?: string }) => void;
+  onOpen: (id: string) => void;
+}) {
+  const collectionItems = items.filter(i => i.collectionId === collection.id);
+  const completedCount = collectionItems.filter(i => i.completed).length;
+  const progress = collectionItems.length > 0 ? Math.round((completedCount / collectionItems.length) * 100) : 0;
+  const linkedGoal = goals.find(g => g.id === collection.goalId);
+  const isFullyComplete = progress === 100 && collectionItems.length > 0;
+
+  // Mirrors the linked Goal's own progress (from Tasks/subtasks cascading up
+  // via goalId) — a Journey has no progress of its own, so this surfaces the
+  // Goal it actually feeds right where tasks get created.
+  const isGoalUnits = linkedGoal?.metricType === 'units';
+  const goalCompleted = linkedGoal ? (isGoalUnits ? (linkedGoal.completedMetric || 0) : linkedGoal.completedMinutes) : 0;
+  const goalTarget = linkedGoal ? (isGoalUnits ? (linkedGoal.targetMetric || 0) : linkedGoal.targetMinutes) : 0;
+  const goalPct = goalTarget > 0 ? Math.min(100, Math.round((goalCompleted / goalTarget) * 100)) : 0;
+  const goalProgressLabel = isGoalUnits
+    ? `${goalCompleted}/${goalTarget}${linkedGoal?.unitLabel ? ` ${linkedGoal.unitLabel}` : ''}`
+    : `${(goalCompleted / 60).toFixed(1)}/${(goalTarget / 60).toFixed(1)}h`;
+
+  return (
+    <Pressable
+      onPress={() => onOpen(collection.id)}
+      style={{ marginBottom: 10, backgroundColor: '#1C1C1E', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: isFullyComplete ? '#BF5AF255' : '#2C2C2E', shadowColor: isFullyComplete ? '#BF5AF2' : '#000', shadowRadius: 6, shadowOpacity: isFullyComplete ? 0.2 : 0.08, flexDirection: 'row', alignItems: 'center' }}
+    >
+      <View style={{ backgroundColor: '#BF5AF215', width: 30, height: 30, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 10, borderWidth: 1, borderColor: '#BF5AF233' }}>
+        <CategoryVectorIcon category={collection.category} size={15} color="#BF5AF2" />
+      </View>
+
+      <View style={{ flex: 1, marginRight: 8 }}>
+        <EditableText
+          value={collection.title}
+          onSave={(title) => updateCollection(collection.id, { title })}
+          textStyle={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}
+        />
+        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 3 }}>
+          <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginRight: 6 }}>
+            <Text style={{ color: '#BF5AF2', fontSize: 10, textTransform: 'uppercase', fontWeight: '700' }}>
+              {collection.category}
+            </Text>
+          </View>
+          {linkedGoal && (
+            <View style={{ backgroundColor: '#5AC8FA15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, borderWidth: 1, borderColor: '#5AC8FA44', flexDirection: 'row', alignItems: 'center' }}>
+              <FontAwesome5 name="bullseye" size={9} color="#5AC8FA" style={{ marginRight: 4 }} />
+              <Text style={{ color: '#5AC8FA', fontSize: 10, fontWeight: '700' }}>{linkedGoal.title}</Text>
+            </View>
+          )}
+        </View>
+        {linkedGoal && (
+          <View style={{ marginTop: 6 }}>
+            <AnimatedProgressBar progress={goalPct} color="#5AC8FA" height={4} />
+            <Text style={{ color: '#8E8E93', fontSize: 10, marginTop: 3 }}>{goalProgressLabel} toward goal · {goalPct}%</Text>
+          </View>
+        )}
+      </View>
+
+      <Text style={{ color: isFullyComplete ? '#30D158' : '#FFF', fontSize: 13, fontWeight: '700', marginRight: 10 }}>
+        {completedCount}/{collectionItems.length} ({progress}%)
+      </Text>
+
+      <Pressable onPress={() => onOpen(collection.id)} style={{ padding: 6, backgroundColor: '#2C2C2E', borderRadius: 8 }}>
+        <Ionicons name="pencil" size={14} color="#8E8E93" />
+      </Pressable>
+    </Pressable>
+  );
+}
+
 export default function CollectionsScreen() {
   const {
     collections,
@@ -81,7 +167,24 @@ export default function CollectionsScreen() {
   } = useCollectionStore();
 
   const { goals, addGoal, deleteGoal } = useGoalStore();
+  const { pillars, addTask } = useTaskStore();
+  const activePillars = pillars.filter(p => !p.isArchived);
   const { triggerConfetti } = useConfettiStore();
+  const { launchTimer, blockedTimerModal } = useTimerLauncher();
+
+  // Goal Quick Start — creates a task for the picked Goal/sub-goal and
+  // immediately starts its timer (moved here from Dashboard along with Goals).
+  const [quickStartGoal, setQuickStartGoal] = useState<Goal | null>(null);
+  const handleQuickStart = (title: string, tagId: string, targetId: string, minutes: number) => {
+    const newTaskId = addTask({
+      title,
+      tagId,
+      estimatedMinutes: minutes,
+      goalId: targetId,
+      isIcebox: false,
+    });
+    launchTimer(newTaskId, minutes);
+  };
 
   // Celebration feedback modal
   const [celebrationInfo, setCelebrationInfo] = useState<CelebrationInfo | null>(null);
@@ -109,6 +212,7 @@ export default function CollectionsScreen() {
   const [newGoalUnitLabel, setNewGoalUnitLabel] = useState('');
   const [newGoalHorizon, setNewGoalHorizon] = useState<'monthly' | 'yearly'>('monthly');
   const [newGoalParentId, setNewGoalParentId] = useState('');
+  const [newGoalPillarId, setNewGoalPillarId] = useState('');
 
   // New Journey — collapsible inline form (no modal). Shares all the state
   // above (journeyTitle, journeyCategory, journeyLinkMode, newGoal*) and
@@ -134,6 +238,7 @@ export default function CollectionsScreen() {
     setNewGoalUnitLabel('');
     setNewGoalHorizon('monthly');
     setNewGoalParentId('');
+    setNewGoalPillarId('');
     setNewJourneyOpenPill(null);
     setIsNewJourneyExpanded(true);
   };
@@ -157,6 +262,10 @@ export default function CollectionsScreen() {
         setJourneyValidationError('Goal title is required');
         return;
       }
+      if (!newGoalPillarId) {
+        setJourneyValidationError('Pick a Pillar for this Goal');
+        return;
+      }
       if (newGoalMetricType === 'units') {
         const count = parseInt(newGoalTargetCount, 10);
         if (isNaN(count) || count <= 0) {
@@ -171,6 +280,7 @@ export default function CollectionsScreen() {
           targetMetric: count,
           unitLabel: newGoalUnitLabel.trim() || undefined,
           parentId: newGoalParentId || undefined,
+          pillarId: newGoalPillarId,
         });
       } else {
         const hours = parseFloat(newGoalTargetHours);
@@ -183,6 +293,7 @@ export default function CollectionsScreen() {
           horizon: newGoalHorizon,
           targetMinutes: Math.round(hours * 60),
           parentId: newGoalParentId || undefined,
+          pillarId: newGoalPillarId,
         });
       }
     }
@@ -402,6 +513,34 @@ export default function CollectionsScreen() {
                   onChangeText={setNewGoalTitle}
                 />
 
+                <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Pillar</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                  {activePillars.map((pillar) => {
+                    const isSelected = newGoalPillarId === pillar.id;
+                    const color = getPillarColor(pillar.id, pillars);
+                    return (
+                      <Pressable
+                        key={pillar.id}
+                        onPress={() => setNewGoalPillarId(pillar.id)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 16,
+                          paddingVertical: 10,
+                          borderRadius: 9999,
+                          borderWidth: 1,
+                          marginRight: 8,
+                          backgroundColor: isSelected ? `${color}26` : '#151517',
+                          borderColor: isSelected ? `${color}66` : '#2C2C2E',
+                        }}
+                      >
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color, marginRight: 6 }} />
+                        <Text style={{ color: isSelected ? '#FFFFFF' : '#8E8E93', fontSize: 13, fontWeight: isSelected ? '700' : '500' }}>{pillar.name}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+
                 <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Track By</Text>
                 <View style={{ backgroundColor: '#151517', borderColor: '#2C2C2E', borderWidth: 1 }} className="flex-row p-1 rounded-xl mb-4">
                   {([
@@ -540,7 +679,7 @@ export default function CollectionsScreen() {
         )}
       </View>
 
-      {/* Journeys List */}
+      {/* Pillar -> Goal -> Journey Hierarchy */}
       <View style={{ paddingHorizontal: 16 }}>
         {collections.length === 0 ? (
           <View style={{ alignItems: 'center', marginTop: 40, backgroundColor: '#1C1C1E', borderRadius: 20, padding: 32, borderWidth: 1, borderColor: '#2C2C2E' }}>
@@ -558,72 +697,83 @@ export default function CollectionsScreen() {
             />
           </View>
         ) : (
-          collections.map(collection => {
-            const collectionItems = items.filter(i => i.collectionId === collection.id);
-            const completedCount = collectionItems.filter(i => i.completed).length;
-            const progress = collectionItems.length > 0 ? Math.round((completedCount / collectionItems.length) * 100) : 0;
-            const linkedGoal = goals.find(g => g.id === collection.goalId);
-            const isFullyComplete = progress === 100 && collectionItems.length > 0;
+          <>
+            {(() => {
+              const productiveRootGoals = goals.filter(g => !g.parentId && (!g.type || g.type === 'productive'));
+              const entertainmentRootGoals = goals.filter(g => !g.parentId && g.type === 'entertainment');
+              const unassignedGoals = productiveRootGoals.filter(g => !g.pillarId);
+              const standaloneJourneys = collections.filter(c => !c.goalId || !goals.find(g => g.id === c.goalId));
 
-            // Mirrors the linked Goal's own progress (from Tasks/subtasks
-            // cascading up via goalId) — a Journey has no progress of its
-            // own, so this surfaces the Goal it actually feeds right where
-            // tasks get created, without a tap to the Profile/Dashboard.
-            const isGoalUnits = linkedGoal?.metricType === 'units';
-            const goalCompleted = linkedGoal ? (isGoalUnits ? (linkedGoal.completedMetric || 0) : linkedGoal.completedMinutes) : 0;
-            const goalTarget = linkedGoal ? (isGoalUnits ? (linkedGoal.targetMetric || 0) : linkedGoal.targetMinutes) : 0;
-            const goalPct = goalTarget > 0 ? Math.min(100, Math.round((goalCompleted / goalTarget) * 100)) : 0;
-            const goalProgressLabel = isGoalUnits
-              ? `${goalCompleted}/${goalTarget}${linkedGoal?.unitLabel ? ` ${linkedGoal.unitLabel}` : ''}`
-              : `${(goalCompleted / 60).toFixed(1)}/${(goalTarget / 60).toFixed(1)}h`;
-
-            return (
-              <Pressable
-                key={collection.id}
-                onPress={() => setDetailJourneyId(collection.id)}
-                style={{ marginBottom: 10, backgroundColor: '#1C1C1E', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: isFullyComplete ? '#BF5AF255' : '#2C2C2E', shadowColor: isFullyComplete ? '#BF5AF2' : '#000', shadowRadius: 6, shadowOpacity: isFullyComplete ? 0.2 : 0.08, flexDirection: 'row', alignItems: 'center' }}
-              >
-                <View style={{ backgroundColor: '#BF5AF215', width: 30, height: 30, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 10, borderWidth: 1, borderColor: '#BF5AF233' }}>
-                  <CategoryVectorIcon category={collection.category} size={15} color="#BF5AF2" />
-                </View>
-
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <EditableText
-                    value={collection.title}
-                    onSave={(title) => updateCollection(collection.id, { title })}
-                    textStyle={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}
-                  />
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 3 }}>
-                    <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginRight: 6 }}>
-                      <Text style={{ color: '#BF5AF2', fontSize: 10, textTransform: 'uppercase', fontWeight: '700' }}>
-                        {collection.category}
-                      </Text>
-                    </View>
-                    {linkedGoal && (
-                      <View style={{ backgroundColor: '#5AC8FA15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, borderWidth: 1, borderColor: '#5AC8FA44', flexDirection: 'row', alignItems: 'center' }}>
-                        <FontAwesome5 name="bullseye" size={9} color="#5AC8FA" style={{ marginRight: 4 }} />
-                        <Text style={{ color: '#5AC8FA', fontSize: 10, fontWeight: '700' }}>{linkedGoal.title}</Text>
+              const renderGoalWithJourneys = (goal: Goal, accentColor: string, extraProps: Partial<React.ComponentProps<typeof AnimatedGoalCard>> = {}) => {
+                const subGoals = goals.filter(g => g.parentId === goal.id);
+                const feedingIds = new Set([goal.id, ...subGoals.map(sg => sg.id)]);
+                const linkedJourneys = collections.filter(c => c.goalId && feedingIds.has(c.goalId));
+                return (
+                  <View key={goal.id} style={{ marginBottom: 16 }}>
+                    <AnimatedGoalCard
+                      goal={goal}
+                      subGoals={subGoals}
+                      accentColor={accentColor}
+                      onQuickStart={setQuickStartGoal}
+                      {...extraProps}
+                    />
+                    {linkedJourneys.length > 0 && (
+                      <View style={{ marginTop: 4, marginLeft: 12 }}>
+                        {linkedJourneys.map(c => (
+                          <JourneyRow key={c.id} collection={c} items={items} goals={goals} updateCollection={updateCollection} onOpen={setDetailJourneyId} />
+                        ))}
                       </View>
                     )}
                   </View>
-                  {linkedGoal && (
-                    <View style={{ marginTop: 6 }}>
-                      <AnimatedProgressBar progress={goalPct} color="#5AC8FA" height={4} />
-                      <Text style={{ color: '#8E8E93', fontSize: 10, marginTop: 3 }}>{goalProgressLabel} toward goal · {goalPct}%</Text>
+                );
+              };
+
+              return (
+                <>
+                  {activePillars.map(pillar => {
+                    const pillarGoals = productiveRootGoals.filter(g => g.pillarId === pillar.id);
+                    if (pillarGoals.length === 0) return null;
+                    const pillarColor = getPillarColor(pillar.id, pillars);
+                    return (
+                      <View key={pillar.id} style={{ marginBottom: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: pillarColor, marginRight: 8 }} />
+                          <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '800' }}>{pillar.name}</Text>
+                        </View>
+                        {pillarGoals.map(g => renderGoalWithJourneys(g, '#BF5AF2'))}
+                      </View>
+                    );
+                  })}
+
+                  {unassignedGoals.length > 0 && (
+                    <View style={{ marginBottom: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: FALLBACK_COLOR, marginRight: 8 }} />
+                        <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '800' }}>Unassigned</Text>
+                      </View>
+                      {unassignedGoals.map(g => renderGoalWithJourneys(g, '#BF5AF2'))}
                     </View>
                   )}
-                </View>
 
-                <Text style={{ color: isFullyComplete ? '#30D158' : '#FFF', fontSize: 13, fontWeight: '700', marginRight: 10 }}>
-                  {completedCount}/{collectionItems.length} ({progress}%)
-                </Text>
+                  {entertainmentRootGoals.length > 0 && (
+                    <View style={{ marginBottom: 8 }}>
+                      <Text style={{ color: '#5AC8FA', fontSize: 16, fontWeight: '800', marginBottom: 12 }}>Entertainment Projects</Text>
+                      {entertainmentRootGoals.map(g => renderGoalWithJourneys(g, '#5AC8FA', { showIcon: true, iconName: 'game-controller' }))}
+                    </View>
+                  )}
 
-                <Pressable onPress={() => setDetailJourneyId(collection.id)} style={{ padding: 6, backgroundColor: '#2C2C2E', borderRadius: 8 }}>
-                  <Ionicons name="pencil" size={14} color="#8E8E93" />
-                </Pressable>
-              </Pressable>
-            );
-          })
+                  {standaloneJourneys.length > 0 && (
+                    <View style={{ marginBottom: 8 }}>
+                      <Text style={{ color: '#8E8E93', fontSize: 16, fontWeight: '800', marginBottom: 12 }}>Other Journeys</Text>
+                      {standaloneJourneys.map(c => (
+                        <JourneyRow key={c.id} collection={c} items={items} goals={goals} updateCollection={updateCollection} onOpen={setDetailJourneyId} />
+                      ))}
+                    </View>
+                  )}
+                </>
+              );
+            })()}
+          </>
         )}
       </View>
       </ScrollView>
@@ -743,6 +893,18 @@ export default function CollectionsScreen() {
         onClose={() => setDetailJourneyId(null)}
         onToggleItem={handleToggleItem}
       />
+
+      {quickStartGoal && (
+        <QuickStartModal
+          visible={!!quickStartGoal}
+          onClose={() => setQuickStartGoal(null)}
+          goal={quickStartGoal}
+          subGoals={goals.filter(g => g.parentId === quickStartGoal.id)}
+          onStart={handleQuickStart}
+        />
+      )}
+
+      {blockedTimerModal}
 
     </SafeAreaView>
   );

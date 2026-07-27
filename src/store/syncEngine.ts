@@ -285,6 +285,7 @@ export async function pullCloudData(userId: string) {
         paysCurrency: g.pays_currency !== false,
         category: g.category || undefined,
         unitLabel: g.unit_label || undefined,
+        pillarId: g.pillar_id || undefined,
       }));
       useGoalStore.setState((s) => ({ goals: mergeById(s.goals, formattedGoals) }));
     }
@@ -517,6 +518,7 @@ export async function pushAllGoalsToCloud(userId: string, goals: Goal[]) {
       pays_currency: g.paysCurrency !== false,
       category: g.category || null,
       unit_label: g.unitLabel || null,
+      pillar_id: g.pillarId || null,
     }));
     const { error } = await supabase.from('goals').upsert(payload, { onConflict: 'id' });
     if (error) throw error;

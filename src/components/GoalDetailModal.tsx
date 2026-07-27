@@ -4,6 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Goal, useGoalStore, getEligibleParents, getMilestoneDollars } from '../store/goalStore';
 import { useCollectionStore } from '../store/collectionStore';
+import { useTaskStore } from '../store/taskStore';
+import { getPillarColor } from '../utils/pillarColor';
 import EditableText from './EditableText';
 import TimeSelectorModal from './TimeSelectorModal';
 import ConfirmModal from './ConfirmModal';
@@ -38,6 +40,8 @@ export default function GoalDetailModal({
 }: GoalDetailModalProps) {
   const { goals: allGoals, setPayingLevel } = useGoalStore();
   const { collections } = useCollectionStore();
+  const { pillars } = useTaskStore();
+  const activePillars = pillars.filter(p => !p.isArchived);
 
   const [horizon, setHorizon] = useState<'monthly' | 'yearly'>('monthly');
   const [targetMinutes, setTargetMinutes] = useState(0);
@@ -48,6 +52,7 @@ export default function GoalDetailModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [parentId, setParentId] = useState('');
   const [paysCurrency, setPaysCurrency] = useState(true);
+  const [pillarId, setPillarId] = useState('');
 
   useEffect(() => {
     if (goal && visible) {
@@ -58,6 +63,7 @@ export default function GoalDetailModal({
       setIsOpenEnded((goal.targetMetric ?? goal.targetMinutes) === 0);
       setParentId(goal.parentId || '');
       setPaysCurrency(goal.paysCurrency !== false);
+      setPillarId(goal.pillarId || '');
     }
   }, [goal?.id, visible]);
 
@@ -123,6 +129,11 @@ export default function GoalDetailModal({
     onSave(goal.id, { parentId: id || undefined });
   };
 
+  const selectPillar = (id: string) => {
+    setPillarId(id);
+    onSave(goal.id, { pillarId: id || undefined });
+  };
+
   const selectHorizon = (h: 'monthly' | 'yearly') => {
     setHorizon(h);
     onSave(goal.id, { horizon: h });
@@ -181,7 +192,7 @@ export default function GoalDetailModal({
 
             {/* Milestones */}
             {!goalIsOpenEnded && (
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, marginBottom: 24, borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', rowGap: 8, columnGap: 6, paddingVertical: 12, marginBottom: 24, borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
                 {milestones.map((m) => {
                   const isUnlocked = unlocked.includes(m);
                   const dollars = getMilestoneDollars(goal.targetMinutes, m, goal.type || 'productive');
@@ -191,7 +202,7 @@ export default function GoalDetailModal({
                       style={{
                         backgroundColor: isUnlocked ? `${accentColor}26` : '#2C2C2E',
                         borderColor: isUnlocked ? `${accentColor}66` : 'rgba(255,255,255,0.05)',
-                        borderWidth: 1, borderRadius: 99, paddingHorizontal: 8, paddingVertical: 4,
+                        borderWidth: 1, borderRadius: 99, paddingHorizontal: 6, paddingVertical: 4,
                         flexDirection: 'row', alignItems: 'center',
                       }}
                     >
@@ -234,6 +245,41 @@ export default function GoalDetailModal({
                 <Text style={{ color: '#5C5C5E', fontSize: 11, marginTop: 6 }}>
                   Progress here drips up automatically. {isUnits ? 'Finishing this contributes +1 up the chain.' : 'Minutes cascade up the chain.'}
                 </Text>
+              </View>
+            )}
+
+            {/* Pillar — Entertainment goals aren't pillar-scoped */}
+            {!isEntertainment && (
+              <View style={{ marginBottom: 24 }}>
+                <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                  Pillar
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {activePillars.map((p) => {
+                    const isSelected = pillarId === p.id;
+                    const color = getPillarColor(p.id, pillars);
+                    return (
+                      <Pressable
+                        key={p.id}
+                        onPress={() => selectPillar(p.id)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 16,
+                          paddingVertical: 10,
+                          borderRadius: 9999,
+                          borderWidth: 1,
+                          marginRight: 8,
+                          backgroundColor: isSelected ? `${color}26` : '#2C2C2E',
+                          borderColor: isSelected ? `${color}66` : '#3A3A3C',
+                        }}
+                      >
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color, marginRight: 6 }} />
+                        <Text style={{ color: isSelected ? '#FFFFFF' : '#A1A1AA', fontSize: 13, fontWeight: isSelected ? '700' : '500' }}>{p.name}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
               </View>
             )}
 

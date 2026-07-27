@@ -35,6 +35,9 @@ export default function App() {
       // one store and writes the other.
       useCollectionStore.getState().backfillJourneysForOrphanGoals();
       useTaskStore.getState().backfillTagPillarIds();
+      // Must run after backfillTagPillarIds — it reads Tag.pillarId, not the
+      // legacy `bucket` field, to guess each Goal's Pillar from its tasks.
+      useGoalStore.getState().backfillGoalPillarIds();
     });
   }, []);
 

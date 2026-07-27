@@ -4,19 +4,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEconomyStore } from '../store/economyStore';
 import { useTaskStore } from '../store/taskStore';
-import { useGoalStore, Goal } from '../store/goalStore';
-import { useTimerStore } from '../store/timerStore';
 import { feedback } from '../utils/feedback';
 import { useConfettiStore } from '../store/confettiStore';
-import ConfirmModal from '../components/ConfirmModal';
 import AnimatedTaskRow from '../components/AnimatedTaskRow';
 import SwipeableRow from '../components/SwipeableRow';
-import AnimatedGoalCard from '../components/AnimatedGoalCard';
 import AnimatedProgressRing from '../components/AnimatedProgressRing';
 import CurrencyPill from '../components/CurrencyPill';
 import TaskDetailModal from '../components/TaskDetailModal';
-import QuickStartModal from '../components/QuickStartModal';
 import { getPillarColor } from '../utils/pillarColor';
+import useTimerLauncher from '../hooks/useTimerLauncher';
 
 export default function DashboardScreen() {
   const { width } = useWindowDimensions();
@@ -25,18 +21,15 @@ export default function DashboardScreen() {
   const strokeWidth = isDesktop ? 14 : 11;
 
   const [activePillarId, setActivePillarId] = useState<string>('');
-  const [blockedModal, setBlockedModal] = useState<{ title: string; message: string } | null>(null);
   // Id-based (not a snapshot) so the detail screen reflects live edits while open.
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
-  const [quickStartGoal, setQuickStartGoal] = useState<Goal | null>(null);
 
   const { dollarBalance, hoursBalanceMinutes, debt, streak, lastCheckInDate } = useEconomyStore();
   const { tasks, tags, pillars, toggleTask, moveToIcebox, deleteTask, updateTask, addTask } = useTaskStore();
   const detailTask = tasks.find(t => t.id === detailTaskId) || null;
   const activePillars = pillars.filter(p => !p.isArchived);
   const currentPillarId = activePillarId || activePillars[0]?.id;
-  const { goals } = useGoalStore();
-  const { startTimer } = useTimerStore();
+  const { launchTimer, blockedTimerModal } = useTimerLauncher();
 
   const today = new Date().toISOString().split('T')[0];
   const isCheckedInToday = lastCheckInDate === today;
@@ -58,37 +51,11 @@ export default function DashboardScreen() {
   const completedMinutes = activeBucketTasks.reduce((acc, t) => acc + (t.completed ? t.estimatedMinutes : 0), 0);
   const progressPercent = totalMinutes > 0 ? Math.min(100, Math.round((completedMinutes / totalMinutes) * 100)) : 0;
 
-  const rootGoals = goals.filter((g) => !g.parentId);
-  const productiveGoals = rootGoals.filter(g => !g.type || g.type === 'productive');
-  const entertainmentGoals = rootGoals.filter(g => g.type === 'entertainment');
-
   const formattedDate = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'short',
     day: 'numeric',
   }).toUpperCase();
-
-  const handleStartTimer = (taskId: string, mins: number) => {
-    const res = startTimer(taskId, mins);
-    if (res && res.success === false && res.reason === 'insufficient_hours') {
-      const missingHours = ((res.missingMinutes || 0) / 60).toFixed(1);
-      setBlockedModal({
-        title: 'Not Enough Time Earned',
-        message: `You need ${missingHours} more hours of focus to earn this entertainment session. Focus on productive tasks to earn leisure time!`,
-      });
-    }
-  };
-
-  const handleQuickStart = (title: string, tagId: string, targetId: string, minutes: number) => {
-    const newTaskId = addTask({
-      title,
-      tagId,
-      estimatedMinutes: minutes,
-      goalId: targetId,
-      isIcebox: false,
-    });
-    handleStartTimer(newTaskId, minutes);
-  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }}>
@@ -223,45 +190,6 @@ export default function DashboardScreen() {
           />
         </View>
 
-        {/* Goal Progress (Productive Goals) — leads above Today's Focus so the
-            long-term "why" sits ahead of the day's tactical task list. */}
-        {productiveGoals.length > 0 && (
-          <View className="mt-2">
-            <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3">
-              Goals
-            </Text>
-            {productiveGoals.map((goal) => (
-              <AnimatedGoalCard
-                key={goal.id}
-                goal={goal}
-                subGoals={goals.filter(g => g.parentId === goal.id)}
-                accentColor="#BF5AF2"
-                onQuickStart={setQuickStartGoal}
-              />
-            ))}
-          </View>
-        )}
-
-        {/* Entertainment Projects (Burner Goals) */}
-        {entertainmentGoals.length > 0 && (
-          <View className="mt-2">
-            <Text className="text-[#5AC8FA] font-bold text-xs uppercase tracking-[1.5px] mb-3">
-              Entertainment Projects
-            </Text>
-            {entertainmentGoals.map((goal) => (
-              <AnimatedGoalCard
-                key={goal.id}
-                goal={goal}
-                subGoals={goals.filter(g => g.parentId === goal.id)}
-                accentColor="#5AC8FA"
-                showIcon
-                iconName="game-controller"
-                onQuickStart={setQuickStartGoal}
-              />
-            ))}
-          </View>
-        )}
-
         <View className="flex-row justify-between items-center mt-5 mb-3">
           <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px]">
             Today's Focus
@@ -292,7 +220,7 @@ export default function DashboardScreen() {
                     pillarColor={getPillarColor(tag?.pillarId, pillars)}
                     isLast={isLast}
                     onToggle={toggleTask}
-                    onStartTimer={handleStartTimer}
+                    onStartTimer={launchTimer}
                     onEdit={(t) => setDetailTaskId(t.id)}
                     showStartButton
                   />
@@ -332,21 +260,7 @@ export default function DashboardScreen() {
 
       </ScrollView>
 
-      {/* Blocked Timer Modal */}
-      {blockedModal && (
-        <ConfirmModal
-          visible={!!blockedModal}
-          onClose={() => setBlockedModal(null)}
-          icon="time-outline"
-          iconColor="#FF9F0A"
-          accentColor="#FF9F0A"
-          title={blockedModal.title}
-          message={blockedModal.message}
-          actions={[
-            { label: 'Got it', onPress: () => setBlockedModal(null), style: 'default' },
-          ]}
-        />
-      )}
+      {blockedTimerModal}
 
       <TaskDetailModal
         task={detailTask}
@@ -358,20 +272,10 @@ export default function DashboardScreen() {
         onUpdate={updateTask}
         onToggle={toggleTask}
         onDelete={(id) => { deleteTask(id); setDetailTaskId(null); }}
-        onStartTimer={handleStartTimer}
+        onStartTimer={launchTimer}
         onMoveToIcebox={moveToIcebox}
         addTask={addTask}
       />
-
-      {quickStartGoal && (
-        <QuickStartModal
-          visible={!!quickStartGoal}
-          onClose={() => setQuickStartGoal(null)}
-          goal={quickStartGoal}
-          subGoals={goals.filter(g => g.parentId === quickStartGoal.id)}
-          onStart={handleQuickStart}
-        />
-      )}
     </SafeAreaView>
   );
 }

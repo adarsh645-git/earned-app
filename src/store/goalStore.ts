@@ -30,6 +30,10 @@ export type Goal = {
   parentId?: string; // If set, this is a sub-project nested under a parent Goal
   category?: 'video-game' | 'movie' | 'tv-show' | 'youtube' | 'custom'; // For dynamic categorization
   paysCurrency?: boolean; // The one level in a chain that pays currency. Undefined = pays (back-compat).
+  // Pillar (life area) this Goal belongs to. Undefined for Entertainment-type
+  // goals (never pillar-scoped) and for productive Goals with no pillar
+  // signal yet (pre-backfill, or genuinely unassigned) — see backfillGoalPillarIds.
+  pillarId?: string;
 };
 
 // Chains are capped at 3 levels (depth 0, 1, 2) to keep progress legible —
@@ -143,6 +147,11 @@ interface GoalState {
   goals: Goal[];
   paysCurrencyDefaultsApplied: boolean;
   applyPaysCurrencyDefaults: () => void;
+  backfillGoalPillarIdsApplied: boolean;
+  // One-time: existing productive Goals predate pillarId and would otherwise
+  // sit in "Unassigned" forever. Best-effort guess from the pillar of the
+  // Goal's own linked tasks — see docs/sdd/024-goal-pillar-hierarchy.md.
+  backfillGoalPillarIds: () => void;
   addGoal: (goal: Omit<Goal, 'id' | 'completedMinutes' | 'completedMetric' | 'unlockedMilestones'>) => string;
   updateGoal: (id: string, updates: Partial<Goal>) => void;
   deleteGoal: (id: string) => void;
@@ -167,6 +176,7 @@ export const useGoalStore = create<GoalState>()(
     (set, get) => ({
       goals: [],
       paysCurrencyDefaultsApplied: false,
+      backfillGoalPillarIdsApplied: false,
 
       // One-time: existing chains predate the single-paying-level rule and would
       // otherwise pay at every level. Default the root of each chain to pay and
@@ -179,6 +189,28 @@ export const useGoalStore = create<GoalState>()(
             ...g,
             paysCurrency: g.paysCurrency !== undefined ? g.paysCurrency : !g.parentId,
           })),
+        }));
+      },
+
+      backfillGoalPillarIds: () => {
+        if (get().backfillGoalPillarIdsApplied) return;
+
+        // Dynamic require avoids a circular import (taskStore doesn't import
+        // this store, but keeping the same defensive pattern used elsewhere
+        // in this file, e.g. deleteGoal below).
+        const { useTaskStore } = require('./taskStore');
+        const { tasks, tags } = useTaskStore.getState();
+
+        set((state) => ({
+          backfillGoalPillarIdsApplied: true,
+          goals: state.goals.map(g => {
+            if (g.pillarId || g.type === 'entertainment') return g;
+            const task = tasks.find((t: any) => t.goalId === g.id);
+            const tag = task ? tags.find((tg: any) => tg.id === task.tagId) : undefined;
+            // No signal → leave undefined (lands in the "Unassigned" bucket)
+            // rather than inventing a fake pillar assignment.
+            return tag?.pillarId ? { ...g, pillarId: tag.pillarId } : g;
+          }),
         }));
       },
 
