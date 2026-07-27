@@ -41,6 +41,10 @@ interface AnimatedTaskRowProps {
   tagType?: 'earner' | 'burner';
   /** All non-archived tags — powers the row's Tag pill. */
   tags?: Tag[];
+  /** Stable per-Pillar color (see src/utils/pillarColor.ts) — rendered as a
+   * left-edge accent bar, structurally separate from the checkbox's
+   * earner/burner accent so the two signals never compete. */
+  pillarColor?: string;
   /** Fixes a single field in place (Tag/Duration/Journey pills) without opening the full edit modal. */
   onUpdate?: (id: string, updates: Partial<Task>) => void;
   isLast: boolean;
@@ -68,6 +72,7 @@ export default function AnimatedTaskRow({
   tagName,
   tagType,
   tags = [],
+  pillarColor,
   onUpdate,
   isLast,
   onToggle,
@@ -205,6 +210,8 @@ export default function AnimatedTaskRow({
       style={{
         borderBottomWidth: isLast ? 0 : 0.5,
         borderBottomColor: 'rgba(255,255,255,0.08)',
+        borderLeftWidth: 3,
+        borderLeftColor: pillarColor ?? 'transparent',
         opacity: rowOpacity,
         transform: [{ translateX: rowTranslateX }],
       }}

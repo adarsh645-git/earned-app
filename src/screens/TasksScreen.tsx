@@ -35,6 +35,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import QuickAddBar from '../components/QuickAddBar';
 import PillPicker from '../components/PillPicker';
 import { getEligibleJourneys } from '../components/LinkProgressPicker';
+import { getPillarColor } from '../utils/pillarColor';
 import useIsMobile from '../hooks/useIsMobile';
 
 // "Today's Focus List — Friday, July 25" / "Yesterday" / "Wed, Jul 23"
@@ -428,6 +429,7 @@ export default function TasksScreen() {
                                   tagName={tag?.name}
                                   tagType={tag?.type}
                                   tags={tags}
+                                  pillarColor={getPillarColor(tag?.pillarId, pillars)}
                                   onUpdate={updateTask}
                                   isLast={true} // Handle bottom border in the wrapper View
                                   onToggle={handleToggle}
@@ -458,6 +460,7 @@ export default function TasksScreen() {
                                           tagName={subTag?.name}
                                           tagType={subTag?.type}
                                           tags={tags}
+                                          pillarColor={getPillarColor(subTag?.pillarId, pillars)}
                                           onUpdate={updateTask}
                                           isLast={true} // no divider line between subtasks — spacing alone separates them
                                           onToggle={handleToggle}

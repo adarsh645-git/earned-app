@@ -16,6 +16,7 @@ import AnimatedProgressRing from '../components/AnimatedProgressRing';
 import CurrencyPill from '../components/CurrencyPill';
 import TaskDetailModal from '../components/TaskDetailModal';
 import QuickStartModal from '../components/QuickStartModal';
+import { getPillarColor } from '../utils/pillarColor';
 
 export default function DashboardScreen() {
   const { width } = useWindowDimensions();
@@ -180,6 +181,7 @@ export default function DashboardScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 4 }}>
             {activePillars.map((pillar) => {
               const isActive = currentPillarId === pillar.id;
+              const pillarColor = getPillarColor(pillar.id, pillars);
               return (
                 <Pressable
                   key={pillar.id}
@@ -191,7 +193,7 @@ export default function DashboardScreen() {
                     alignItems: 'center',
                     backgroundColor: isActive ? '#2C2C2E' : 'transparent',
                     borderWidth: isActive ? 1 : 0,
-                    borderColor: isActive ? 'rgba(255,255,255,0.15)' : 'transparent',
+                    borderColor: isActive ? pillarColor : 'transparent',
                   }}
                 >
                   <Text
@@ -248,6 +250,7 @@ export default function DashboardScreen() {
                   <AnimatedTaskRow
                     task={task}
                     tagName={tag?.name}
+                    pillarColor={getPillarColor(tag?.pillarId, pillars)}
                     isLast={isLast}
                     onToggle={toggleTask}
                     onStartTimer={handleStartTimer}
@@ -275,6 +278,7 @@ export default function DashboardScreen() {
                     <AnimatedTaskRow
                       task={task}
                       tagName={tag?.name}
+                      pillarColor={getPillarColor(tag?.pillarId, pillars)}
                       isLast={isLast}
                       onToggle={toggleTask}
                       onEdit={(t) => setDetailTaskId(t.id)}
