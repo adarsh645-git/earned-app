@@ -12,6 +12,7 @@ import AnimatedTaskRow from './AnimatedTaskRow';
 import { useCollectionStore } from '../store/collectionStore';
 import { useGoalStore } from '../store/goalStore';
 import { getEligibleJourneys } from './LinkProgressPicker';
+import { getPillarColor } from '../utils/pillarColor';
 import { feedback } from '../utils/feedback';
 
 interface TaskDetailModalProps {
@@ -284,6 +285,7 @@ export default function TaskDetailModal({
                     tagName={subTag?.name}
                     tagType={subTag?.type}
                     tags={tags}
+                    pillarColor={getPillarColor(subTag?.pillarId, pillars)}
                     onUpdate={onUpdate}
                     isLast={i === subtasks.length - 1}
                     onToggle={onToggle}

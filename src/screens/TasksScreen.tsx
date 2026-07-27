@@ -527,6 +527,8 @@ export default function TasksScreen() {
                       style={{
                         borderBottomWidth: isLast ? 0 : 0.5,
                         borderBottomColor: 'rgba(255,255,255,0.05)',
+                        borderLeftWidth: 3,
+                        borderLeftColor: getPillarColor(tag?.pillarId, pillars),
                       }}
                       className="p-4 flex-row items-center justify-between"
                     >
