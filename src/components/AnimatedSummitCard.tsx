@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Summit, getMilestoneDollars, useSummitStore } from '../store/summitStore';
 import { hapticHeavyImpact, hapticMediumImpact } from '../utils/haptics';
 import { useConfettiStore } from '../store/confettiStore';
-import EditSummitModal from './EditSummitModal';
+import GoalDetailModal from './GoalDetailModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -323,7 +323,8 @@ export default function AnimatedSummitCard({
   const borderColorCard = isEntertainment ? 'rgba(90,200,250,0.15)' : 'rgba(255,255,255,0.08)';
 
   return (
-    <View
+    <Pressable
+      onPress={() => setEditingGoal(goal)}
       style={{
         backgroundColor: '#1C1C1E',
         borderColor: borderColorCard,
@@ -506,13 +507,15 @@ export default function AnimatedSummitCard({
         </View>
       )}
 
-      <EditSummitModal
+      <GoalDetailModal
         goal={editingGoal}
         visible={!!editingGoal}
         onClose={() => setEditingGoal(null)}
         onSave={(id, updates) => updateSummit(id, updates)}
         onDelete={(id) => deleteSummit(id)}
+        onQuickStart={onQuickStart}
+        onNavigate={(g) => setEditingGoal(g)}
       />
-    </View>
+    </Pressable>
   );
 }

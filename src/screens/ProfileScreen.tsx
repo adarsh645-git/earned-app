@@ -9,7 +9,7 @@ import { useTaskStore } from '../store/taskStore';
 import { useSummitStore, Summit, getMilestoneDollars } from '../store/summitStore';
 import { useAuthStore } from '../store/authStore';
 import { useSyncStatusStore, isSyncUnhealthy } from '../store/syncStatusStore';
-import EditSummitModal from '../components/EditSummitModal';
+import GoalDetailModal from '../components/GoalDetailModal';
 
 const PremiumInput = (props: React.ComponentProps<typeof TextInput>) => (
   <TextInput
@@ -434,8 +434,9 @@ export default function ProfileScreen() {
               const milestones = [25, 50, 75, 100];
               const isLast = index === summits.length - 1;
               return (
-                <View
+                <Pressable
                   key={goal.id}
+                  onPress={() => setEditingGoal(goal)}
                   style={{
                     borderBottomWidth: isLast ? 0 : 0.5,
                     borderBottomColor: 'rgba(255,255,255,0.08)',
@@ -494,7 +495,7 @@ export default function ProfileScreen() {
                       );
                     })}
                   </View>
-                </View>
+                </Pressable>
               );
             })}
           </View>
@@ -502,12 +503,13 @@ export default function ProfileScreen() {
 
       </ScrollView>
 
-      <EditSummitModal
+      <GoalDetailModal
         goal={editingGoal}
         visible={!!editingGoal}
         onClose={() => setEditingGoal(null)}
         onSave={(id, updates) => updateSummit(id, updates)}
         onDelete={(id) => deleteSummit(id)}
+        onNavigate={(g) => setEditingGoal(g)}
       />
     </SafeAreaView>
   );
