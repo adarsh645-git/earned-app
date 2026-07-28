@@ -28,6 +28,11 @@ interface QuickAddBarProps {
    * like a subtask's own add-bar, which shouldn't read as large as the
    * top-level "Add a task..." bar it sits underneath. */
   compact?: boolean;
+  /** Focus the input the moment this bar mounts — only safe for bars that
+   * mount fresh on some user action (e.g. just expanded a task to add its
+   * first subtask), never for a bar that's already on-screen alongside
+   * other inputs (native TextInput autoFocus fires once, on mount). */
+  autoFocus?: boolean;
 }
 
 /**
@@ -46,6 +51,7 @@ export default function QuickAddBar({
   trailingAccessory,
   expandable,
   compact = false,
+  autoFocus = false,
 }: QuickAddBarProps) {
   const canSubmit = !disabled && value.trim().length > 0;
   const isMobile = useIsMobile();
@@ -91,6 +97,7 @@ export default function QuickAddBar({
           onSubmitEditing={handleSubmit}
           blurOnSubmit={false}
           returnKeyType="done"
+          autoFocus={autoFocus}
         />
         {trailingAccessory}
         {expandable && (

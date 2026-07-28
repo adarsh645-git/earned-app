@@ -416,12 +416,17 @@ export default function AnimatedTaskRow({
               hoverClass: 'hover:bg-[#2C2C2E]',
               onPress: () => onStartTimer(task.id, task.estimatedMinutes),
             } : null,
-            // Edit (pencil) and Add-subtask (+) buttons were retired — tapping
-            // the row itself opens the Task Detail screen, which now owns
-            // both editing and subtask creation. Icebox and Delete moved to
-            // SwipeableRow (swipe-reveal + right-click) — see the wrapping
-            // component at the call sites in TasksScreen.tsx.
-            subtaskCount > 0 && onToggleExpand ? {
+            // Edit (pencil) button was retired — tapping the row itself opens
+            // the Task Detail screen, which owns editing. Icebox and Delete
+            // moved to SwipeableRow (swipe-reveal + right-click) — see the
+            // wrapping component at the call sites in TasksScreen.tsx.
+            //
+            // The expand chevron shows regardless of subtaskCount (not just
+            // once subtasks already exist) — expanding a childless task
+            // reveals its subtask quick-add bar (auto-focused) immediately,
+            // so adding a task's *first* subtask no longer requires opening
+            // the full Task Detail screen.
+            onToggleExpand ? {
               key: 'expand',
               icon: isExpanded ? 'chevron-up' : 'chevron-down',
               color: '#8E8E93',

@@ -476,6 +476,7 @@ export default function TasksScreen() {
                                   <View style={{ marginTop: 8 }}>
                                     <QuickAddBar
                                       compact
+                                      autoFocus
                                       placeholder="Add subtask..."
                                       value={subtaskTitleByParent[task.id] || ''}
                                       onChangeText={(t) => setSubtaskTitleByParent(prev => ({ ...prev, [task.id]: t }))}
