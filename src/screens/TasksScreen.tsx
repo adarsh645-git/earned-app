@@ -401,7 +401,7 @@ export default function TasksScreen() {
                         activeCount={dateTasks.filter(t => !t.completed).length}
                         onReorder={reorderTasks}
                         onDragActiveChange={(dragging) => setDraggingDate(dragging ? date : null)}
-                        renderRow={(task, { leadingAccessory }) => {
+                        renderRow={(task, { dragAccessory }) => {
                           const tag = tags.find(t => t.id === task.tagId);
                           const isLast = task.id === dateTasks[dateTasks.length - 1]?.id;
 
@@ -440,7 +440,7 @@ export default function TasksScreen() {
                                   completedSubtaskCount={completedSubtasks.length}
                                   isExpanded={isExpanded}
                                   onToggleExpand={() => toggleParentExpanded(task.id)}
-                                  leadingAccessory={leadingAccessory}
+                                  dragAccessory={dragAccessory}
                                 />
                               </SwipeableRow>
                               {isExpanded && (

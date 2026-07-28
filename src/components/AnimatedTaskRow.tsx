@@ -56,10 +56,10 @@ interface AnimatedTaskRowProps {
   completedSubtaskCount?: number;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
-  /** Rendered at the start of the left cluster, before the checkbox — used
-   * for the drag-reorder grip so its gesture claims the touch before the
-   * row's own onPress (toggle-expand) or any other tap target reacts. */
-  leadingAccessory?: React.ReactNode;
+  /** Rendered in the trailing actions cluster, after Start/Expand — the
+   * drag-reorder grip. Passed through (not owned by this component) so its
+   * gesture claims the touch before the row's own onPress reacts. */
+  dragAccessory?: React.ReactNode;
   /** 'subtask' renders a quieter, more compact row — smaller checkbox/title/
    * icons, plain-text metadata instead of pill-chips, no confetti/glow on
    * completion — so a parent's children don't compete visually with
@@ -87,7 +87,7 @@ export default function AnimatedTaskRow({
   completedSubtaskCount = 0,
   isExpanded = false,
   onToggleExpand,
-  leadingAccessory,
+  dragAccessory,
   variant = 'default',
   parentPillarId,
 }: AnimatedTaskRowProps) {
@@ -227,7 +227,15 @@ export default function AnimatedTaskRow({
         style={{ minHeight: isSubtask ? 44 : 72 }}
       >
         <View className="flex-row items-center flex-1" style={{ paddingVertical: ROW_PADDING_V, paddingLeft: isMobile ? 10 : 16, paddingRight: isMobile ? 4 : 8 }}>
-          {leadingAccessory}
+          {/* Expand chevron — forward (>) means "tap to expand", down means
+              "expanded" (matches the Journeys screen's tree chevrons). Shown
+              for every row that supports it, not just ones with existing
+              subtasks — see the Actions block below for why. */}
+          {onToggleExpand && (
+            <Pressable onPress={onToggleExpand} hitSlop={8} style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center', marginRight: 4 }}>
+              <Ionicons name={isExpanded ? 'chevron-down' : 'chevron-forward'} size={16} color="#8E8E93" />
+            </Pressable>
+          )}
           {/* Checkbox with glow ring + confetti burst */}
           <Pressable onPress={subtaskCount > 0 ? undefined : handleToggle} style={{ position: 'relative' }}>
             {/* Accent glow ring (behind checkbox) — subtask rows never fire it (see handleToggle) */}
@@ -406,47 +414,49 @@ export default function AnimatedTaskRow({
             than each button conditionally rendering the *next* button's
             divider) so the separators are always correct regardless of which
             combination of actions is present. Icebox and Delete live in
-            SwipeableRow now (swipe-reveal + right-click), not here. */}
+            SwipeableRow now (swipe-reveal + right-click), not here. The drag
+            grip (dragAccessory) renders last, after this map, since it's a
+            passed-through node rather than an {icon,onPress} entry. */}
         <View className="flex-row items-stretch">
-          {([
-            showStartButton && !localCompleted && onStartTimer ? {
-              key: 'start',
-              icon: 'play',
-              color: '#BF5AF2',
-              hoverClass: 'hover:bg-[#2C2C2E]',
-              onPress: () => onStartTimer(task.id, task.estimatedMinutes),
-            } : null,
-            // Edit (pencil) button was retired — tapping the row itself opens
-            // the Task Detail screen, which owns editing. Icebox and Delete
-            // moved to SwipeableRow (swipe-reveal + right-click) — see the
-            // wrapping component at the call sites in TasksScreen.tsx.
-            //
-            // The expand chevron shows regardless of subtaskCount (not just
-            // once subtasks already exist) — expanding a childless task
-            // reveals its subtask quick-add bar (auto-focused) immediately,
-            // so adding a task's *first* subtask no longer requires opening
-            // the full Task Detail screen.
-            onToggleExpand ? {
-              key: 'expand',
-              icon: isExpanded ? 'chevron-up' : 'chevron-down',
-              color: '#8E8E93',
-              hoverClass: 'hover:bg-[#2C2C2E]',
-              onPress: onToggleExpand,
-            } : null,
-          ] as Array<{ key: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string; hoverClass: string; onPress: () => void } | null>)
-            .filter((btn): btn is NonNullable<typeof btn> => btn !== null)
-            .map((btn, i) => (
-              <React.Fragment key={btn.key}>
-                {i > 0 && <View className="self-center" style={{ width: 1, height: ACTION_DIVIDER_HEIGHT, backgroundColor: '#3A3A3C' }} />}
-                <Pressable
-                  onPress={btn.onPress}
-                  className={`${ACTION_PADDING_CLASS} justify-center items-center bg-transparent ${btn.hoverClass}`}
-                  style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
-                >
-                  <Ionicons name={btn.icon} size={ACTION_ICON_SIZE} color={btn.color} />
-                </Pressable>
-              </React.Fragment>
-            ))}
+          {(() => {
+            const actionButtons = ([
+              showStartButton && !localCompleted && onStartTimer ? {
+                key: 'start',
+                icon: 'play',
+                color: '#BF5AF2',
+                hoverClass: 'hover:bg-[#2C2C2E]',
+                onPress: () => onStartTimer(task.id, task.estimatedMinutes),
+              } : null,
+              // Edit (pencil) button was retired — tapping the row itself
+              // opens the Task Detail screen, which owns editing.
+            ] as Array<{ key: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string; hoverClass: string; onPress: () => void } | null>)
+              .filter((btn): btn is NonNullable<typeof btn> => btn !== null);
+
+            return (
+              <>
+                {actionButtons.map((btn, i) => (
+                  <React.Fragment key={btn.key}>
+                    {i > 0 && <View className="self-center" style={{ width: 1, height: ACTION_DIVIDER_HEIGHT, backgroundColor: '#3A3A3C' }} />}
+                    <Pressable
+                      onPress={btn.onPress}
+                      className={`${ACTION_PADDING_CLASS} justify-center items-center bg-transparent ${btn.hoverClass}`}
+                      style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                    >
+                      <Ionicons name={btn.icon} size={ACTION_ICON_SIZE} color={btn.color} />
+                    </Pressable>
+                  </React.Fragment>
+                ))}
+                {dragAccessory && (
+                  <>
+                    {actionButtons.length > 0 && <View className="self-center" style={{ width: 1, height: ACTION_DIVIDER_HEIGHT, backgroundColor: '#3A3A3C' }} />}
+                    <View className={`${ACTION_PADDING_CLASS} justify-center items-center`}>
+                      {dragAccessory}
+                    </View>
+                  </>
+                )}
+              </>
+            );
+          })()}
         </View>
       </Pressable>
     </Animated.View>

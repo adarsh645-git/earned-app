@@ -77,12 +77,19 @@ function CelebrationVectorIcon({ type, category }: { type: CelebrationInfo['icon
 
 // ─── Inline progress: a compact bar + percentage, rendered beside a row's
 // title instead of as a full-width bar underneath — shared shape used by
-// GoalRow, JourneyRow, and WaypointRow so the whole tree reads consistently. ───
+// GoalRow, JourneyRow, and WaypointRow so the whole tree reads consistently.
+// Fixed width (not flex/min/max) and paired with `flex:1` on each row's own
+// title — that's what makes every bar line up into a clean column
+// regardless of a row's indent level or title length: indentation only ever
+// eats space from the left, so every row's true right edge (where this
+// fixed-width cluster pins) is the same x-position all the way down the tree. ───
+const INLINE_PROGRESS_WIDTH = 150;
+
 function InlineProgress({ pct, color }: { pct: number; color: string }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 90, maxWidth: 220, marginLeft: 12 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', width: INLINE_PROGRESS_WIDTH, flexShrink: 0, marginLeft: 12 }}>
       <AnimatedProgressBar progress={pct} color={color} height={5} style={{ flex: 1 }} />
-      <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600', marginLeft: 8, minWidth: 36, textAlign: 'right' }}>
+      <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600', marginLeft: 8, width: 36, textAlign: 'right' }}>
         {pct}%
       </Text>
     </View>
@@ -130,11 +137,13 @@ function GoalRow({
       {(showIcon || iconName) && (
         <Ionicons name={(iconName || 'flag') as any} size={15} color={accentColor} style={{ marginRight: 6 }} />
       )}
-      <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 16, flexShrink: 1 }} numberOfLines={1}>
+      <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 16, flex: 1 }} numberOfLines={1}>
         {goal.title}
       </Text>
       {isOpenEnded ? (
-        <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600', marginLeft: 12 }}>{(completed / 60).toFixed(1)}h</Text>
+        <View style={{ width: INLINE_PROGRESS_WIDTH, flexShrink: 0, marginLeft: 12, alignItems: 'flex-end' }}>
+          <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600' }}>{(completed / 60).toFixed(1)}h</Text>
+        </View>
       ) : (
         <InlineProgress pct={pct} color={accentColor} />
       )}
@@ -187,7 +196,7 @@ function JourneyRow({
         <EditableText
           value={collection.title}
           onSave={(title) => updateCollection(collection.id, { title })}
-          containerStyle={{ flexShrink: 1 }}
+          containerStyle={{ flex: 1 }}
           textStyle={{ color: '#FFF', fontSize: 15, fontWeight: '500' }}
         />
         <InlineProgress pct={progress} color="#BF5AF2" />
@@ -220,7 +229,7 @@ function WaypointRow({ waypoint, pct, onOpen }: { waypoint: Waypoint; pct: numbe
   return (
     <Pressable onPress={onOpen} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
       <Ionicons name="flag-outline" size={12} color="#8E8E93" style={{ marginRight: 8 }} />
-      <Text style={{ color: '#EBEBF5', fontSize: 14, fontWeight: '500', flexShrink: 1 }} numberOfLines={1}>
+      <Text style={{ color: '#EBEBF5', fontSize: 14, fontWeight: '500', flex: 1 }} numberOfLines={1}>
         {waypoint.title}
       </Text>
       <InlineProgress pct={pct} color="#8E8E93" />
