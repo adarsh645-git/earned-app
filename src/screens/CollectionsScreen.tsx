@@ -4,14 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useCollectionStore, CollectionCategory, Collection, CollectionItem } from '../store/collectionStore';
+import { useCollectionStore, CollectionCategory, Collection, CollectionItem, Waypoint } from '../store/collectionStore';
 import { useGoalStore, Goal, getChainTrail, getEligibleParents } from '../store/goalStore';
-import { useTaskStore } from '../store/taskStore';
+import { useTaskStore, Task } from '../store/taskStore';
 import { useConfettiStore } from '../store/confettiStore';
 import { getPillarColor, FALLBACK_COLOR } from '../utils/pillarColor';
 import { PrimaryButton } from '../components/PrimaryButton';
 import AnimatedProgressBar from '../components/AnimatedProgressBar';
-import AnimatedGoalCard from '../components/AnimatedGoalCard';
+import GoalDetailModal from '../components/GoalDetailModal';
 import QuickStartModal from '../components/QuickStartModal';
 import RewardToast from '../components/RewardToast';
 import PillPicker from '../components/PillPicker';
@@ -75,97 +75,156 @@ function CelebrationVectorIcon({ type, category }: { type: CelebrationInfo['icon
   }
 }
 
-// A single Journey card — title, category badge, linked-Goal progress mirror
-// (if any), and item-completion count. Extracted so it can render both
-// nested under its Goal's Pillar section and, for goal-less Journeys, in the
-// standalone "Other Journeys" section, without duplicating the ~45 lines.
+// ─── Inline progress: a compact bar + percentage, rendered beside a row's
+// title instead of as a full-width bar underneath — shared shape used by
+// GoalRow, JourneyRow, and WaypointRow so the whole tree reads consistently. ───
+function InlineProgress({ pct, color }: { pct: number; color: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0, marginLeft: 8 }}>
+      <AnimatedProgressBar progress={pct} color={color} height={4} style={{ width: 44 }} />
+      <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '600', marginLeft: 6, width: 30, textAlign: 'right' }}>
+        {pct}%
+      </Text>
+    </View>
+  );
+}
+
+// ─── Goal row — flat, single line: chevron (if it has Journeys) + title +
+// inline progress. Tapping the row opens GoalDetailModal; the chevron only
+// toggles its nested Journeys. No card chrome, no Milestones — Milestones
+// live only in GoalDetailModal now. ───
+function GoalRow({
+  goal,
+  accentColor,
+  showIcon = false,
+  iconName,
+  journeyCount,
+  isExpanded,
+  onToggleExpand,
+  onOpen,
+}: {
+  goal: Goal;
+  accentColor: string;
+  showIcon?: boolean;
+  iconName?: string;
+  journeyCount: number;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onOpen: () => void;
+}) {
+  const isUnits = goal.metricType === 'units';
+  const target = isUnits ? (goal.targetMetric || 1) : goal.targetMinutes;
+  const completed = isUnits ? (goal.completedMetric || 0) : goal.completedMinutes;
+  const isOpenEnded = target === 0;
+  const pct = target > 0 ? Math.min(100, Math.round((completed / target) * 100)) : 0;
+
+  return (
+    <Pressable onPress={onOpen} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}>
+      {journeyCount > 0 ? (
+        <Pressable onPress={onToggleExpand} hitSlop={8} style={{ padding: 4, marginRight: 2 }}>
+          <Ionicons name={isExpanded ? 'chevron-down' : 'chevron-forward'} size={16} color="#8E8E93" />
+        </Pressable>
+      ) : (
+        <View style={{ width: 24 }} />
+      )}
+      {(showIcon || iconName) && (
+        <Ionicons name={(iconName || 'flag') as any} size={15} color={accentColor} style={{ marginRight: 6 }} />
+      )}
+      <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 15, flexShrink: 1 }} numberOfLines={1}>
+        {goal.title}
+      </Text>
+      <View style={{ flex: 1 }} />
+      {isOpenEnded ? (
+        <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '600', marginLeft: 8 }}>{(completed / 60).toFixed(1)}h</Text>
+      ) : (
+        <InlineProgress pct={pct} color={accentColor} />
+      )}
+    </Pressable>
+  );
+}
+
+// ─── Journey row — flat, single line: chevron (if it has Waypoints) +
+// category icon + title + inline progress. Tapping opens JourneyDetailModal;
+// expanding reveals its Waypoints indented one level deeper. Used both
+// nested under a Goal and standalone (the "Other Journeys" section) — same
+// row either way, only the surrounding indentation differs at the call site. ───
 function JourneyRow({
   collection,
   items,
-  goals,
+  waypoints,
+  tasks,
   updateCollection,
   onOpen,
-  nested = false,
+  isExpanded,
+  onToggleExpand,
 }: {
   collection: Collection;
   items: CollectionItem[];
-  goals: Goal[];
+  waypoints: Waypoint[];
+  tasks: Task[];
   updateCollection: (id: string, updates: { title?: string }) => void;
   onOpen: (id: string) => void;
-  // True when rendered directly under its Goal's own card — that card
-  // already shows the goal name + full progress, so the pill/mirror below
-  // would just repeat it. Standalone Journeys (no goal link) keep both.
-  nested?: boolean;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
 }) {
   const collectionItems = items.filter(i => i.collectionId === collection.id);
   const completedCount = collectionItems.filter(i => i.completed).length;
   const progress = collectionItems.length > 0 ? Math.round((completedCount / collectionItems.length) * 100) : 0;
-  const linkedGoal = goals.find(g => g.id === collection.goalId);
-  const isFullyComplete = progress === 100 && collectionItems.length > 0;
-
-  // Mirrors the linked Goal's own progress (from Tasks/subtasks cascading up
-  // via goalId) — a Journey has no progress of its own, so this surfaces the
-  // Goal it actually feeds right where tasks get created.
-  const isGoalUnits = linkedGoal?.metricType === 'units';
-  const goalCompleted = linkedGoal ? (isGoalUnits ? (linkedGoal.completedMetric || 0) : linkedGoal.completedMinutes) : 0;
-  const goalTarget = linkedGoal ? (isGoalUnits ? (linkedGoal.targetMetric || 0) : linkedGoal.targetMinutes) : 0;
-  const goalPct = goalTarget > 0 ? Math.min(100, Math.round((goalCompleted / goalTarget) * 100)) : 0;
-  const goalProgressLabel = isGoalUnits
-    ? `${goalCompleted}/${goalTarget}${linkedGoal?.unitLabel ? ` ${linkedGoal.unitLabel}` : ''}`
-    : `${(goalCompleted / 60).toFixed(1)}/${(goalTarget / 60).toFixed(1)}h`;
-
-  const iconBoxSize = nested ? 22 : 30;
-  const iconSize = nested ? 12 : 15;
-  const titleFontSize = nested ? 14 : 16;
-  const titleFontWeight = nested ? ('500' as const) : ('700' as const);
+  const collectionWaypoints = waypoints.filter(w => w.collectionId === collection.id);
 
   return (
-    <Pressable
-      onPress={() => onOpen(collection.id)}
-      style={
-        nested
-          ? { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }
-          : { marginBottom: 10, backgroundColor: '#1C1C1E', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: isFullyComplete ? '#BF5AF255' : '#2C2C2E', shadowColor: isFullyComplete ? '#BF5AF2' : '#000', shadowRadius: 6, shadowOpacity: isFullyComplete ? 0.2 : 0.08, flexDirection: 'row', alignItems: 'center' }
-      }
-    >
-      <View style={{ backgroundColor: '#BF5AF215', width: iconBoxSize, height: iconBoxSize, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 10, borderWidth: 1, borderColor: '#BF5AF233' }}>
-        <CategoryVectorIcon category={collection.category} size={iconSize} color="#BF5AF2" />
-      </View>
-
-      <View style={{ flex: 1, marginRight: 8 }}>
+    <View>
+      <Pressable onPress={() => onOpen(collection.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
+        {collectionWaypoints.length > 0 ? (
+          <Pressable onPress={onToggleExpand} hitSlop={8} style={{ padding: 4, marginRight: 2 }}>
+            <Ionicons name={isExpanded ? 'chevron-down' : 'chevron-forward'} size={14} color="#8E8E93" />
+          </Pressable>
+        ) : (
+          <View style={{ width: 22 }} />
+        )}
+        <View style={{ backgroundColor: '#BF5AF215', width: 22, height: 22, borderRadius: 6, justifyContent: 'center', alignItems: 'center', marginRight: 8, borderWidth: 1, borderColor: '#BF5AF233' }}>
+          <CategoryVectorIcon category={collection.category} size={12} color="#BF5AF2" />
+        </View>
         <EditableText
           value={collection.title}
           onSave={(title) => updateCollection(collection.id, { title })}
-          textStyle={{ color: '#FFF', fontSize: titleFontSize, fontWeight: titleFontWeight }}
+          containerStyle={{ flex: 1 }}
+          textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '500' }}
         />
-        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 3 }}>
-          <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginRight: 6 }}>
-            <Text style={{ color: '#BF5AF2', fontSize: 10, textTransform: 'uppercase', fontWeight: '700' }}>
-              {collection.category}
-            </Text>
-          </View>
-          {linkedGoal && !nested && (
-            <View style={{ backgroundColor: '#5AC8FA15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, borderWidth: 1, borderColor: '#5AC8FA44', flexDirection: 'row', alignItems: 'center' }}>
-              <FontAwesome5 name="bullseye" size={9} color="#5AC8FA" style={{ marginRight: 4 }} />
-              <Text style={{ color: '#5AC8FA', fontSize: 10, fontWeight: '700' }}>{linkedGoal.title}</Text>
-            </View>
-          )}
-        </View>
-        {linkedGoal && !nested && (
-          <View style={{ marginTop: 6 }}>
-            <AnimatedProgressBar progress={goalPct} color="#5AC8FA" height={4} />
-            <Text style={{ color: '#8E8E93', fontSize: 10, marginTop: 3 }}>{goalProgressLabel} toward goal · {goalPct}%</Text>
-          </View>
-        )}
-      </View>
-
-      <Text style={{ color: isFullyComplete ? '#30D158' : '#FFF', fontSize: 13, fontWeight: '700', marginRight: 10 }}>
-        {completedCount}/{collectionItems.length} ({progress}%)
-      </Text>
-
-      <Pressable onPress={() => onOpen(collection.id)} style={{ padding: 6, backgroundColor: nested ? 'transparent' : '#2C2C2E', borderRadius: 8 }}>
-        <Ionicons name="pencil" size={nested ? 12 : 14} color="#8E8E93" />
+        <InlineProgress pct={progress} color="#BF5AF2" />
       </Pressable>
+
+      {isExpanded && collectionWaypoints.length > 0 && (
+        <View style={{ marginLeft: 20, paddingLeft: 8 }}>
+          {collectionWaypoints.map((wp) => {
+            const wpItems = items.filter(i => i.waypointId === wp.id);
+            const wpTasks = tasks.filter(t => t.waypointId === wp.id);
+            const wpCompleted = wpItems.filter(i => i.completed).length + wpTasks.filter(t => t.completed).length;
+            const wpTotal = wpItems.length + wpTasks.length;
+            const wpTarget = wp.targetMetric || wpTotal || 1;
+            const wpPct = Math.min(100, Math.round((wpCompleted / wpTarget) * 100));
+            return (
+              <WaypointRow key={wp.id} waypoint={wp} pct={wpPct} onOpen={() => onOpen(collection.id)} />
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ─── Waypoint row — leaf, read-only: icon + title + inline progress. No
+// chevron (Waypoints don't expand further in this tree — Items/Tasks stay
+// exclusively inside JourneyDetailModal). Tapping opens the parent Journey's
+// detail view (no waypoint-specific deep link yet). ───
+function WaypointRow({ waypoint, pct, onOpen }: { waypoint: Waypoint; pct: number; onOpen: () => void }) {
+  return (
+    <Pressable onPress={onOpen} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
+      <Ionicons name="flag-outline" size={11} color="#8E8E93" style={{ marginRight: 8 }} />
+      <Text style={{ color: '#EBEBF5', fontSize: 13, fontWeight: '500', flex: 1 }} numberOfLines={1}>
+        {waypoint.title}
+      </Text>
+      <InlineProgress pct={pct} color="#8E8E93" />
     </Pressable>
   );
 }
@@ -180,8 +239,8 @@ export default function CollectionsScreen() {
     toggleItemCompletion,
   } = useCollectionStore();
 
-  const { goals, addGoal, deleteGoal } = useGoalStore();
-  const { pillars, addTask } = useTaskStore();
+  const { goals, addGoal, updateGoal, deleteGoal } = useGoalStore();
+  const { pillars, addTask, tasks } = useTaskStore();
   const activePillars = pillars.filter(p => !p.isArchived);
   const { triggerConfetti } = useConfettiStore();
   const { launchTimer, blockedTimerModal } = useTimerLauncher();
@@ -237,6 +296,17 @@ export default function CollectionsScreen() {
   // Task subtasks which default collapsed as secondary detail.
   const [expandedGoals, setExpandedGoals] = useState<Record<string, boolean>>({});
   const isGoalExpanded = (goalId: string) => expandedGoals[goalId] !== false;
+
+  // Per-Journey expand/collapse for its Waypoints — defaults collapsed
+  // (opposite of Goals) since Waypoints are a newly-added, deeper, more
+  // secondary layer, same reasoning TasksScreen uses for subtasks.
+  const [expandedJourneys, setExpandedJourneys] = useState<Record<string, boolean>>({});
+  const isJourneyExpanded = (journeyId: string) => expandedJourneys[journeyId] === true;
+
+  // Goal Detail — hosted here (not inside a card component anymore) since
+  // GoalRow is a plain row with no embedded modal, mirroring how
+  // detailJourneyId + JourneyDetailModal already work in this file.
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
 
   // New Journey — collapsible inline form (no modal). Shares all the state
   // above (journeyTitle, journeyCategory, journeyLinkMode, newGoal*) and
@@ -774,26 +844,35 @@ export default function CollectionsScreen() {
               const unassignedGoals = productiveRootGoals.filter(g => !g.pillarId);
               const standaloneJourneys = collections.filter(c => !c.goalId || !goals.find(g => g.id === c.goalId));
 
-              const renderGoalWithJourneys = (goal: Goal, accentColor: string, extraProps: Partial<React.ComponentProps<typeof AnimatedGoalCard>> = {}) => {
+              const renderGoalWithJourneys = (goal: Goal, accentColor: string, extraProps: Partial<React.ComponentProps<typeof GoalRow>> = {}) => {
                 const subGoals = goals.filter(g => g.parentId === goal.id);
                 const feedingIds = new Set([goal.id, ...subGoals.map(sg => sg.id)]);
                 const linkedJourneys = collections.filter(c => c.goalId && feedingIds.has(c.goalId));
                 return (
-                  <View key={goal.id} style={{ marginBottom: 16 }}>
-                    <AnimatedGoalCard
+                  <View key={goal.id} style={{ marginBottom: 4 }}>
+                    <GoalRow
                       goal={goal}
-                      subGoals={subGoals}
                       accentColor={accentColor}
-                      onQuickStart={setQuickStartGoal}
                       journeyCount={linkedJourneys.length}
                       isExpanded={isGoalExpanded(goal.id)}
                       onToggleExpand={() => setExpandedGoals(prev => ({ ...prev, [goal.id]: !isGoalExpanded(goal.id) }))}
+                      onOpen={() => setEditingGoalId(goal.id)}
                       {...extraProps}
                     />
                     {linkedJourneys.length > 0 && isGoalExpanded(goal.id) && (
-                      <View style={{ marginTop: 4, marginLeft: 32, paddingLeft: 16 }}>
+                      <View style={{ marginLeft: 32, paddingLeft: 16 }}>
                         {linkedJourneys.map(c => (
-                          <JourneyRow key={c.id} collection={c} items={items} goals={goals} updateCollection={updateCollection} onOpen={setDetailJourneyId} nested />
+                          <JourneyRow
+                            key={c.id}
+                            collection={c}
+                            items={items}
+                            waypoints={waypoints}
+                            tasks={tasks}
+                            updateCollection={updateCollection}
+                            onOpen={setDetailJourneyId}
+                            isExpanded={isJourneyExpanded(c.id)}
+                            onToggleExpand={() => setExpandedJourneys(prev => ({ ...prev, [c.id]: !isJourneyExpanded(c.id) }))}
+                          />
                         ))}
                       </View>
                     )}
@@ -840,7 +919,17 @@ export default function CollectionsScreen() {
                     <View style={{ marginBottom: 8 }}>
                       <Text style={{ color: '#8E8E93', fontSize: 16, fontWeight: '800', marginBottom: 12 }}>Other Journeys</Text>
                       {standaloneJourneys.map(c => (
-                        <JourneyRow key={c.id} collection={c} items={items} goals={goals} updateCollection={updateCollection} onOpen={setDetailJourneyId} />
+                        <JourneyRow
+                          key={c.id}
+                          collection={c}
+                          items={items}
+                          waypoints={waypoints}
+                          tasks={tasks}
+                          updateCollection={updateCollection}
+                          onOpen={setDetailJourneyId}
+                          isExpanded={isJourneyExpanded(c.id)}
+                          onToggleExpand={() => setExpandedJourneys(prev => ({ ...prev, [c.id]: !isJourneyExpanded(c.id) }))}
+                        />
                       ))}
                     </View>
                   )}
@@ -966,6 +1055,16 @@ export default function CollectionsScreen() {
         visible={!!detailJourneyId}
         onClose={() => setDetailJourneyId(null)}
         onToggleItem={handleToggleItem}
+      />
+
+      <GoalDetailModal
+        goal={goals.find(g => g.id === editingGoalId) || null}
+        visible={!!editingGoalId}
+        onClose={() => setEditingGoalId(null)}
+        onSave={updateGoal}
+        onDelete={deleteGoal}
+        onQuickStart={setQuickStartGoal}
+        onNavigate={(g) => setEditingGoalId(g.id)}
       />
 
       {quickStartGoal && (
