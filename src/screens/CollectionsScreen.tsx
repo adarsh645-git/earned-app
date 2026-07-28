@@ -80,9 +80,9 @@ function CelebrationVectorIcon({ type, category }: { type: CelebrationInfo['icon
 // GoalRow, JourneyRow, and WaypointRow so the whole tree reads consistently. ───
 function InlineProgress({ pct, color }: { pct: number; color: string }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0, marginLeft: 8 }}>
-      <AnimatedProgressBar progress={pct} color={color} height={4} style={{ width: 44 }} />
-      <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '600', marginLeft: 6, width: 30, textAlign: 'right' }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 90, maxWidth: 220, marginLeft: 12 }}>
+      <AnimatedProgressBar progress={pct} color={color} height={5} style={{ flex: 1 }} />
+      <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600', marginLeft: 8, minWidth: 36, textAlign: 'right' }}>
         {pct}%
       </Text>
     </View>
@@ -130,12 +130,11 @@ function GoalRow({
       {(showIcon || iconName) && (
         <Ionicons name={(iconName || 'flag') as any} size={15} color={accentColor} style={{ marginRight: 6 }} />
       )}
-      <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 15, flexShrink: 1 }} numberOfLines={1}>
+      <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 16, flexShrink: 1 }} numberOfLines={1}>
         {goal.title}
       </Text>
-      <View style={{ flex: 1 }} />
       {isOpenEnded ? (
-        <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '600', marginLeft: 8 }}>{(completed / 60).toFixed(1)}h</Text>
+        <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600', marginLeft: 12 }}>{(completed / 60).toFixed(1)}h</Text>
       ) : (
         <InlineProgress pct={pct} color={accentColor} />
       )}
@@ -188,8 +187,8 @@ function JourneyRow({
         <EditableText
           value={collection.title}
           onSave={(title) => updateCollection(collection.id, { title })}
-          containerStyle={{ flex: 1 }}
-          textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '500' }}
+          containerStyle={{ flexShrink: 1 }}
+          textStyle={{ color: '#FFF', fontSize: 15, fontWeight: '500' }}
         />
         <InlineProgress pct={progress} color="#BF5AF2" />
       </Pressable>
@@ -220,8 +219,8 @@ function JourneyRow({
 function WaypointRow({ waypoint, pct, onOpen }: { waypoint: Waypoint; pct: number; onOpen: () => void }) {
   return (
     <Pressable onPress={onOpen} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
-      <Ionicons name="flag-outline" size={11} color="#8E8E93" style={{ marginRight: 8 }} />
-      <Text style={{ color: '#EBEBF5', fontSize: 13, fontWeight: '500', flex: 1 }} numberOfLines={1}>
+      <Ionicons name="flag-outline" size={12} color="#8E8E93" style={{ marginRight: 8 }} />
+      <Text style={{ color: '#EBEBF5', fontSize: 14, fontWeight: '500', flexShrink: 1 }} numberOfLines={1}>
         {waypoint.title}
       </Text>
       <InlineProgress pct={pct} color="#8E8E93" />
@@ -502,7 +501,7 @@ export default function CollectionsScreen() {
           below can grow tall enough on its own (once its "new goal"
           sub-fields appear) to exceed the viewport, so it can't live in a
           static, non-scrolling header the way it did before. */}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40, maxWidth: 900, width: '100%', alignSelf: 'center' }}>
 
       {/* Executive Summary Header Stats Bar (Shadcn-inspired) */}
       <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 }}>
