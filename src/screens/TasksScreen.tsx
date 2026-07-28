@@ -468,6 +468,7 @@ export default function TasksScreen() {
                                           onStartTimer={subtask.completed ? undefined : handleStartTimer}
                                           showStartButton={!subtask.completed}
                                           variant="subtask"
+                                          parentPillarId={tag?.pillarId}
                                         />
                                       </SwipeableRow>
                                     );

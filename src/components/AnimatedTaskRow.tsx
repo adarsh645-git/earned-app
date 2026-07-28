@@ -65,6 +65,10 @@ interface AnimatedTaskRowProps {
    * completion — so a parent's children don't compete visually with
    * top-level tasks. Purely cosmetic; behavior/props are unchanged. */
   variant?: 'default' | 'subtask';
+  /** Subtask rows only: the parent task's Pillar. A subtask always belongs
+   * to its parent's Pillar — its Tag pill only offers Categories within
+   * this Pillar, so it can never drift onto a different one. */
+  parentPillarId?: string;
 }
 
 export default function AnimatedTaskRow({
@@ -85,6 +89,7 @@ export default function AnimatedTaskRow({
   onToggleExpand,
   leadingAccessory,
   variant = 'default',
+  parentPillarId,
 }: AnimatedTaskRowProps) {
   const accent = tagType === 'burner' ? '#5AC8FA' : '#30D158';
   const isSubtask = variant === 'subtask';
@@ -299,7 +304,9 @@ export default function AnimatedTaskRow({
                 <PillPicker
                   variant="plain"
                   label={tagName || 'Tag'}
-                  options={tags.filter(t => !t.isArchived).map(t => ({ id: t.id, label: t.name }))}
+                  options={tags
+                    .filter(t => !t.isArchived && (!parentPillarId || t.pillarId === parentPillarId))
+                    .map(t => ({ id: t.id, label: t.name }))}
                   selectedId={task.tagId}
                   onSelect={(id) => { feedback('select'); onUpdate(task.id, { tagId: id }); setOpenPill(null); }}
                   open={openPill === 'tag'}

@@ -117,10 +117,11 @@ export const useTaskStore = create<TaskState>()(
 
       addTask: (task) => {
         const id = uuidv4();
-        
+        let parent: Task | undefined;
+
         if (task.parentId) {
           const state = get();
-          const parent = state.tasks.find(t => t.id === task.parentId);
+          parent = state.tasks.find(t => t.id === task.parentId);
           const siblings = state.tasks.filter(t => t.parentId === task.parentId);
           if (parent && parent.completed) {
             if (siblings.length === 0) {
@@ -136,9 +137,13 @@ export const useTaskStore = create<TaskState>()(
         const updatedState = get();
 
         // Safe default-fill so any caller (quick-add included) can create a
-        // task from just a title — last-used tag, then first non-archived
-        // tag, then '' as a last resort.
+        // task from just a title. A subtask always inherits its parent's own
+        // Category (and therefore Pillar) rather than the app-wide
+        // last-used tag — a subtask belongs to the same Pillar/Category as
+        // its parent, full stop (see TaskDetailModal's locked Pillar pill
+        // and pillar-scoped Tag options for the editing-time half of this).
         const tagId = task.tagId
+          || parent?.tagId
           || (updatedState.tags.find(t => t.id === updatedState.lastUsedTagId && !t.isArchived)?.id)
           || updatedState.tags.find(t => !t.isArchived)?.id
           || '';

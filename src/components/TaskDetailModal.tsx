@@ -76,7 +76,14 @@ export default function TaskDetailModal({
   const eligibleJourneys = getEligibleJourneys(collections, goals, tagType);
   const linkedJourney = task.collectionId ? collections.find(c => c.id === task.collectionId) : undefined;
   const activePillars = pillars.filter(p => !p.isArchived);
-  const currentPillarId = tag?.pillarId || activePillars[0]?.id || '';
+  // A subtask always belongs to its parent's Pillar — locked, not just
+  // defaulted, so it can never drift onto a different Pillar than the task
+  // it lives under (its Category can still change, but only among that
+  // Pillar's own tags, via the Tag picker's options below).
+  const parentTask = task.parentId ? tasks.find(t => t.id === task.parentId) : undefined;
+  const parentTag = parentTask ? tags.find(t => t.id === parentTask.tagId) : undefined;
+  const isSubtask = !!task.parentId;
+  const currentPillarId = (isSubtask ? parentTag?.pillarId : tag?.pillarId) || activePillars[0]?.id || '';
   const pillarColor = getPillarColor(currentPillarId, pillars);
   const eligibleWaypoints = task.collectionId ? waypoints.filter(w => w.collectionId === task.collectionId) : [];
   // Progress quantity (e.g. "10 pages") only matters when the linked Goal
@@ -153,22 +160,35 @@ export default function TaskDetailModal({
 
             {/* Metadata pills */}
             <View className="flex-row items-center" style={{ flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
-              <PillPicker
-                label={activePillars.find(p => p.id === currentPillarId)?.name || 'Pillar'}
-                options={activePillars.map(p => ({ id: p.id, label: p.name }))}
-                selectedId={currentPillarId}
-                onSelect={(id) => {
-                  feedback('select');
-                  // Category must always resolve to a valid tag — jump to
-                  // the newly-picked Pillar's first Category immediately.
-                  const pillarTags = tags.filter(t => t.pillarId === id && !t.isArchived);
-                  onUpdate(task.id, { tagId: pillarTags[0]?.id || '' });
-                  setOpenPill(null);
-                }}
-                open={openPill === 'pillar'}
-                onToggle={() => setOpenPill(p => (p === 'pillar' ? null : 'pillar'))}
-                accentColor={pillarColor}
-              />
+              {isSubtask ? (
+                // Locked, not pickable — a subtask always inherits its
+                // parent's Pillar. Plain label (no chevron/border) rather
+                // than a picker, so it doesn't invite a tap that can't do
+                // anything.
+                <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: pillarColor, marginRight: 6 }} />
+                  <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600' }}>
+                    {activePillars.find(p => p.id === currentPillarId)?.name || 'Pillar'}
+                  </Text>
+                </View>
+              ) : (
+                <PillPicker
+                  label={activePillars.find(p => p.id === currentPillarId)?.name || 'Pillar'}
+                  options={activePillars.map(p => ({ id: p.id, label: p.name }))}
+                  selectedId={currentPillarId}
+                  onSelect={(id) => {
+                    feedback('select');
+                    // Category must always resolve to a valid tag — jump to
+                    // the newly-picked Pillar's first Category immediately.
+                    const pillarTags = tags.filter(t => t.pillarId === id && !t.isArchived);
+                    onUpdate(task.id, { tagId: pillarTags[0]?.id || '' });
+                    setOpenPill(null);
+                  }}
+                  open={openPill === 'pillar'}
+                  onToggle={() => setOpenPill(p => (p === 'pillar' ? null : 'pillar'))}
+                  accentColor={pillarColor}
+                />
+              )}
 
               <PillPicker
                 label={tag?.name || 'Tag'}
@@ -294,6 +314,7 @@ export default function TaskDetailModal({
                     onStartTimer={subtask.completed ? undefined : onStartTimer}
                     showStartButton={!subtask.completed}
                     variant="subtask"
+                    parentPillarId={currentPillarId}
                   />
                 );
               })}
