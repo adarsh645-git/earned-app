@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS public.waypoints (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   target_metric INTEGER,
+  completed_metric NUMERIC DEFAULT 0,
   year INTEGER,
   month INTEGER,
   date_created TIMESTAMPTZ DEFAULT NOW()

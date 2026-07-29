@@ -238,6 +238,10 @@ export const useTaskStore = create<TaskState>()(
               if (task.goalId) {
                 goalState.applyLeafProgress(task.goalId, task.estimatedMinutes, task.metricProgress);
               }
+              if (task.waypointId) {
+                const { useCollectionStore } = require('./collectionStore');
+                useCollectionStore.getState().applyWaypointProgress(task.waypointId, task.estimatedMinutes, task.metricProgress);
+              }
             } else if (tag?.type === 'burner') {
               economyState.spendHours(task.estimatedMinutes);
             }
@@ -251,6 +255,10 @@ export const useTaskStore = create<TaskState>()(
 
               if (task.goalId) {
                 goalState.revokeLeafProgress(task.goalId, task.estimatedMinutes, task.metricProgress);
+              }
+              if (task.waypointId) {
+                const { useCollectionStore } = require('./collectionStore');
+                useCollectionStore.getState().revokeWaypointProgress(task.waypointId, task.estimatedMinutes, task.metricProgress);
               }
             } else if (tag?.type === 'burner') {
               economyState.addHours(task.estimatedMinutes);

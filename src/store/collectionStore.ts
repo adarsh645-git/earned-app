@@ -12,6 +12,7 @@ export type Waypoint = {
   collectionId: string;
   title: string; // e.g. "Fiction", "Economics", "Hikes", "Running"
   targetMetric?: number;
+  completedMetric: number;
   year?: number;
   month?: number; // 1-12
   dateCreated: string;
@@ -46,9 +47,11 @@ interface CollectionState {
   addCollection: (collection: { title: string; category?: CollectionCategory; goalId?: string }) => string;
   updateCollection: (id: string, updates: Partial<Collection>) => void;
   deleteCollection: (id: string) => void;
-  addWaypoint: (waypoint: Omit<Waypoint, 'id' | 'dateCreated'>) => string;
+  addWaypoint: (waypoint: Omit<Waypoint, 'id' | 'dateCreated' | 'completedMetric'>) => string;
   updateWaypoint: (id: string, updates: Partial<Waypoint>) => void;
   deleteWaypoint: (id: string) => void;
+  applyWaypointProgress: (id: string, minutes: number, metricProgress?: number) => void;
+  revokeWaypointProgress: (id: string, minutes: number, metricProgress?: number) => void;
   addItem: (item: Omit<CollectionItem, 'id' | 'completed' | 'dateCreated'>) => string;
   updateItem: (id: string, updates: Partial<CollectionItem>) => void;
   toggleItemCompletion: (id: string) => void;
@@ -104,7 +107,7 @@ export const useCollectionStore = create<CollectionState>()(
         set((state) => ({
           waypoints: [
             ...(state.waypoints || []),
-            { ...waypointData, id, dateCreated: new Date().toISOString() },
+            { ...waypointData, id, completedMetric: 0, dateCreated: new Date().toISOString() },
           ],
         }));
         return id;
@@ -131,6 +134,54 @@ export const useCollectionStore = create<CollectionState>()(
         }));
       },
 
+      applyWaypointProgress: (id, minutes, metricProgress) => {
+        set((state) => {
+          const wp = state.waypoints?.find((w) => w.id === id);
+          if (!wp) return state;
+          
+          const collection = state.collections.find(c => c.id === wp.collectionId);
+          let addedValue = minutes;
+          if (collection?.goalId) {
+            const goal = useGoalStore.getState().goals.find(g => g.id === collection.goalId);
+            if (goal?.metricType === 'units') {
+              addedValue = metricProgress || 1;
+            }
+          }
+          
+          return {
+            waypoints: state.waypoints.map((w) =>
+              w.id === id
+                ? { ...w, completedMetric: w.completedMetric + addedValue }
+                : w
+            ),
+          };
+        });
+      },
+
+      revokeWaypointProgress: (id, minutes, metricProgress) => {
+        set((state) => {
+          const wp = state.waypoints?.find((w) => w.id === id);
+          if (!wp) return state;
+          
+          const collection = state.collections.find(c => c.id === wp.collectionId);
+          let removedValue = minutes;
+          if (collection?.goalId) {
+            const goal = useGoalStore.getState().goals.find(g => g.id === collection.goalId);
+            if (goal?.metricType === 'units') {
+              removedValue = metricProgress || 1;
+            }
+          }
+          
+          return {
+            waypoints: state.waypoints.map((w) =>
+              w.id === id
+                ? { ...w, completedMetric: Math.max(0, w.completedMetric - removedValue) }
+                : w
+            ),
+          };
+        });
+      },
+
       addItem: (itemData) => {
         const id = uuidv4();
         set((state) => ({
@@ -153,7 +204,6 @@ export const useCollectionStore = create<CollectionState>()(
         if (!item) return;
 
         const isCurrentlyCompleted = item.completed;
-        // Only trigger progress logic if we are completing it (not un-completing)
         if (!isCurrentlyCompleted) {
           const collection = get().collections.find((c) => c.id === item.collectionId);
           if (collection && collection.goalId) {
@@ -162,8 +212,23 @@ export const useCollectionStore = create<CollectionState>()(
             if (goal) {
               // Routes to +1 for a count chain or the item's minutes for a time
               // chain; cascades up the chain from there.
-              useGoalStore.getState().applyLeafProgress(goal.id, item.estimatedMinutes || 60);
+              useGoalStore.getState().applyLeafProgress(goal.id, item.estimatedMinutes || 60, 1);
             }
+          }
+          if (item.waypointId) {
+            get().applyWaypointProgress(item.waypointId, item.estimatedMinutes || 60, 1);
+          }
+        } else {
+          // Un-completing
+          const collection = get().collections.find((c) => c.id === item.collectionId);
+          if (collection && collection.goalId) {
+            const goal = useGoalStore.getState().goals.find(g => g.id === collection.goalId);
+            if (goal) {
+              useGoalStore.getState().revokeLeafProgress(goal.id, item.estimatedMinutes || 60, 1);
+            }
+          }
+          if (item.waypointId) {
+            get().revokeWaypointProgress(item.waypointId, item.estimatedMinutes || 60, 1);
           }
         }
 

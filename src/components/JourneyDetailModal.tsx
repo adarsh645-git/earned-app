@@ -174,14 +174,14 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
               {collectionWaypoints.map(wp => {
                 const wpItems = collectionItems.filter(i => i.waypointId === wp.id);
                 const wpTasks = linkedTasks.filter(t => t.waypointId === wp.id);
-                // A Waypoint's progress counts completed Tasks alongside its
-                // CollectionItem checklist — both are "things that live under
-                // this Waypoint," just created from different surfaces.
-                const wpCompleted = wpItems.filter(i => i.completed).length + wpTasks.filter(t => t.completed).length;
-                const wpTotalCount = wpItems.length + wpTasks.length;
-                const targetMetric = wp.targetMetric || wpTotalCount || 1;
-                const wpPct = Math.min(100, Math.round((wpCompleted / targetMetric) * 100));
-                const isWpComplete = wpPct === 100;
+                
+                const unitLabel = linkedGoal?.unitLabel || (linkedGoal?.metricType === 'units' ? 'units' : 'min');
+                const hasTarget = wp.targetMetric != null;
+                const targetMetric = wp.targetMetric || 1;
+                const wpCompleted = wp.completedMetric || 0;
+                const wpPct = hasTarget ? Math.min(100, Math.round((wpCompleted / targetMetric) * 100)) : 0;
+                const isWpComplete = hasTarget && wpPct === 100;
+                
                 const timeframeLabel = wp.month && wp.year
                   ? `${MONTH_NAMES[wp.month - 1]} ${wp.year}`
                   : wp.year ? `${wp.year}` : 'Ongoing';
@@ -197,7 +197,7 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '500', marginRight: 10 }}>
-                            {wpCompleted} / {wp.targetMetric ? wp.targetMetric : wpTotalCount} ({wpPct}%)
+                            {hasTarget ? `${wpCompleted} / ${targetMetric} ${unitLabel} (${wpPct}%)` : `${wpCompleted} ${unitLabel}`}
                           </Text>
                           <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                             <Text style={{ color: '#5AC8FA', fontSize: 10, fontWeight: '600' }}>{timeframeLabel}</Text>
