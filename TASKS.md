@@ -1,19 +1,41 @@
-# Earned App - Development Tasks & Roadmap
+# Next Work Items
 
-## Completed Milestones
+## Meta
+### Rename App: "Earned" → "Krushi" [DONE — display name only]
+- ✅ Display name updated: app.json, web/manifest.json, web/index.html, README.md, AGENTS.md/CLAUDE.md, ARCHITECTURE.md, supabase docs
+- ⏸️ package.json name, app.json slug, iOS bundleIdentifier, Android package left as `earned-app` / `com.adarshreddy.earnedapp` — deferred (breaks TestFlight/Play store identity, needs new provisioning if ever done)
+- No splash/icon asset files exist to rename (app.json has no splash key under SDK 57)
 
-### Long-Term Goal Milestone Rewards
-- [x] Update `macroGoalStore.ts` to add `unlockedMilestones` state and milestone key credit calculation
-- [x] Update `timerStore.ts` to capture and pass milestone unlocked metadata during `completeSession()`
-- [x] Create `MilestoneModal.tsx` celebration component
-- [x] Update `DashboardScreen.tsx` Pyramid Targets progress bar with milestone tick marks
-- [x] Update `ProfileScreen.tsx` Pyramid Goal cards with milestone reward breakdown badges
-- [x] Verify end-to-end milestone progression and key crediting in app
+---
 
-### Core App Foundation
-- [x] Fix navigation context & screen rendering issues
-- [x] Implement Focus Lock timer with key rewards
-- [x] Set up Zustand state persistence with `safeStorage`
-- [x] Create Context Bucket toggles (Office, Health, Personal)
-- [x] Build Icebox distraction deferral system
-- [x] Build Reward Store indulgence redemption system
+## High Priority
+
+### 1. Units & Waypoint Progress System
+- Add units to waypoints
+- Link task completion to waypoint progress updates
+- Propagate completed task units up to waypoint progress tracking
+- Ensure progress visibility across hierarchy
+
+### 2. Journey Detailed Section — UX Review
+- Rethink current options/UI
+- Clarify user workflows
+- Define what "detailed" section should expose vs. hide
+
+### 3. Streak & Rewards System
+- Fix streak not being added/tracked
+- Expand rewards system implementation
+- Integrate streaks with reward triggers
+- Define reward unlock/progression logic
+
+### 4. Daily Goals — Fitness Model
+- Implement Apple-style fitness rings/progress for daily goals
+- Visual feedback for daily goal completion
+- Ring/circular progress representation
+- Integration with existing goal tracking
+
+---
+
+## Notes
+- Items 1 & 4 likely depend on architecture decisions (units propagation may affect daily goals display)
+- Item 3 may require UI changes to display streak/rewards prominently
+- Consider sequencing: foundation (units/propagation) before display layer (fitness rings)

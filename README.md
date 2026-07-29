@@ -1,4 +1,4 @@
-# ⚡ Earned — Discipline Economy & Focus Tracker
+# ⚡ Krushi — Discipline Economy & Focus Tracker
 
 > **Work hard. Spend guilt-free.**  
 > *A gamified, behavioral-economy productivity web & mobile application built with React Native (Expo Web), Zustand, and Supabase.*
@@ -7,7 +7,7 @@
 
 ## 🎯 Intention & Philosophy
 
-**Earned** shifts focus tracking from a chore into a self-sustaining **Discipline Economy**. It operates on principles of behavioral psychology and economic reinforcement:
+**Krushi** shifts focus tracking from a chore into a self-sustaining **Discipline Economy**. It operates on principles of behavioral psychology and economic reinforcement:
 
 1. **Dual-Currency Model**:
    - **Cash Balance ($)**: Earned through focused work (e.g., $0.02 per key/focus minute). Used to redeem custom real-life rewards or clear debt.
@@ -23,7 +23,7 @@
 
 ## 🏗️ Architecture & Tech Stack
 
-Earned is designed as a **Local-First, Cloud-Synced Application**:
+Krushi is designed as a **Local-First, Cloud-Synced Application**:
 
 ```
  ┌─────────────────────────────────────────────────────────┐
@@ -100,7 +100,7 @@ Earned is designed as a **Local-First, Cloud-Synced Application**:
 
 ## 🛠️ How You Can Deploy Your Own Instance
 
-Follow these 4 steps to deploy your own instance of Earned for free.
+Follow these 4 steps to deploy your own instance of Krushi for free.
 
 ### Step 1: Set Up Supabase Backend
 1. Create a free account at [supabase.com](https://supabase.com) and start a new project.

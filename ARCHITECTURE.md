@@ -1,4 +1,4 @@
-# ARCHITECTURE.md - Earned App Codebase Map
+# ARCHITECTURE.md - Krushi App Codebase Map
 
 > High-level guide mapping major directories, core stores, screens, components, and backend contracts to help AI agents navigate without broad codebase sweeps.
 

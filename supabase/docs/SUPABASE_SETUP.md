@@ -1,6 +1,6 @@
 # Supabase PostgreSQL Database Setup Guide
 
-This step-by-step guide will help you connect a **100% Free Supabase PostgreSQL Database** to **Earned** so your stats, streak, cash balance, tasks, and store items automatically sync across all your devices in real-time.
+This step-by-step guide will help you connect a **100% Free Supabase PostgreSQL Database** to **Krushi** so your stats, streak, cash balance, tasks, and store items automatically sync across all your devices in real-time.
 
 ---
 
@@ -8,7 +8,7 @@ This step-by-step guide will help you connect a **100% Free Supabase PostgreSQL 
 1. Go to [supabase.com](https://supabase.com) and click **Start your project** (or Sign In with GitHub).
 2. Click **New project**.
 3. Fill in:
-   - **Name**: `Earned`
+   - **Name**: `Krushi`
    - **Database Password**: Pick any secure password.
    - **Region**: Choose a region near you (e.g. `us-east-1`).
 4. Click **Create new project** (takes ~1 minute to spin up your PostgreSQL instance).

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Earned",
+    "name": "Krushi",
     "slug": "earned-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -28,7 +28,7 @@
       "favicon": "./assets/favicon.png",
       "themeColor": "#000000",
       "backgroundColor": "#000000",
-      "description": "Earn dollars by finishing focus sessions and spend them on guilt-free indulgences."
+      "description": "Krushi — earn dollars by finishing focus sessions and spend them on guilt-free indulgences."
     }
   }
 }

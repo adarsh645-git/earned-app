@@ -1,6 +1,6 @@
 # Google OAuth Authentication Setup Guide
 
-Google OAuth is integrated into **Earned**. Follow these steps to enable Google Sign-In in your Supabase Project Dashboard.
+Google OAuth is integrated into **Krushi**. Follow these steps to enable Google Sign-In in your Supabase Project Dashboard.
 
 ---
 
@@ -20,4 +20,4 @@ Google OAuth is integrated into **Earned**. Follow these steps to enable Google 
    ```
 2. Open `http://localhost:8081` -> click **Sync Devices**.
 3. Tap **Continue with Google**.
-4. Log in with your Gmail account — Google will authenticate you and redirect back to Earned, syncing your focus streak, cash balance, tasks, and store across all your devices!
+4. Log in with your Gmail account — Google will authenticate you and redirect back to Krushi, syncing your focus streak, cash balance, tasks, and store across all your devices!

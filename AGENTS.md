@@ -1,4 +1,4 @@
-# AGENTS.md - Earned App Development Guide
+# AGENTS.md - Krushi App Development Guide
 
 > This file serves as the unified instruction guide for all AI coding agents (Gemini, Claude, Cursor, Copilot, Codex, etc.). It loads on every turn — keep it to things every agent needs on every turn. Feature-design workflow lives in a skill, not here (see "Feature Work" below).
 
@@ -8,8 +8,14 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before 
 
 ---
 
+## Git Workflow
+
+Never commit or push without explicit user approval. Delegated agents with Bash access must not run git commit/push autonomously.
+
+---
+
 ## Project Overview
-**Earned** is a personal "Discipline Economy" web & mobile application built using **Expo (React Native for Web)** and **Supabase**. The core vision is a gamified productivity system rooted in behavioural psychology and economic incentives:
+**Krushi** is a personal "Discipline Economy" web & mobile application built using **Expo (React Native for Web)** and **Supabase**. The core vision is a gamified productivity system rooted in behavioural psychology and economic incentives:
 - **Productive Focus** earns **Cash Balance ($)** and progresses **Macro Goals / Journeys**.
 - **Guilt-Free Consumption / Indulgence** costs **Hours Balance (or creates Debt)**.
 - **Local-First Architecture**: App works fully offline with `Zustand` + `AsyncStorage`, syncing to `Supabase PostgreSQL` in the background when authenticated.
@@ -62,6 +68,24 @@ npx expo export -p web
    - All tables MUST enforce Row Level Security (RLS) checked against `auth.uid()`.
 4. **Browser Caching Strategy**:
    - Static web deployments use aggressive cache revalidation configured in `vercel.json` (`Cache-Control: public, max-age=0, must-revalidate`) to prevent stale PWA states.
+
+---
+
+## Framework Conventions (React Native Web)
+
+This is a React Native Web project. For DOM interactions (right-click, focus, etc.), always use RN-Web props like `onContextMenu` instead of raw DOM refs or `addEventListener` hacks.
+
+---
+
+## UI Work / Verification
+
+After UI/styling changes, verify visually in a real browser before committing.
+
+---
+
+## Refactoring
+
+When doing naming/refactor work, check for related but easy-to-miss files (e.g. `sound.ts`) and database schema dependencies (e.g. missing tables like `journey_sub_goals`) before finishing.
 
 ---
 
