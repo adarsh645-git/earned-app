@@ -4,8 +4,43 @@ import { useAuthStore } from './authStore';
 import { useEconomyStore } from './economyStore';
 import { useTaskStore, Task, Pillar, Tag } from './taskStore';
 import { useRewardStore, Reward } from './rewardStore';
-import { useSummitStore, Summit } from './summitStore';
+import { useGoalStore, Goal } from './goalStore';
 import { useCollectionStore, Collection, CollectionItem } from './collectionStore';
+import { useSyncStatusStore } from './syncStatusStore';
+
+// Supabase/Postgrest errors are plain objects ({ message, code, details,
+// hint }), not `Error` instances, so `err instanceof Error` is false for
+// them and `String(err)` falls through to the useless "[object Object]" —
+// this pulls the actual message (plus the Postgres error code, when present,
+// since that's what actually identifies a schema-drift issue like the
+// sort_order incident) instead.
+function stringifyError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object') {
+    const anyErr = err as { message?: unknown; code?: unknown };
+    if (typeof anyErr.message === 'string') {
+      return anyErr.code ? `${anyErr.message} (${anyErr.code})` : anyErr.message;
+    }
+    try {
+      return JSON.stringify(err);
+    } catch {
+      // fall through to String(err) below
+    }
+  }
+  return String(err);
+}
+
+// Records a push/pull outcome against the shared sync-health signal (see
+// syncStatusStore.ts) — only called around an actual network attempt, never
+// on the early-return no-op guards each function below already has.
+function reportResult(channel: string, ok: boolean, err?: unknown) {
+  const { recordSuccess, recordFailure } = useSyncStatusStore.getState();
+  if (ok) {
+    recordSuccess(channel);
+  } else {
+    recordFailure(channel, stringifyError(err));
+  }
+}
 
 /**
  * Merges cloud rows into a local array by id instead of replacing it outright.
@@ -52,8 +87,15 @@ export function useCloudSync() {
         deleteTasksFromCloud(user.id, removedTaskIds);
       }
       pushAllTasksToCloud(user.id, state.tasks);
-      pushAllPillarsToCloud(user.id, state.pillars);
-      pushAllTagsToCloud(user.id, state.tags);
+      // Tags FK-reference pillars (tags.pillar_id -> pillars.id), so pillars
+      // must land in the cloud first - firing both in parallel let a
+      // brand-new pillar's tags reach the tags upsert before that pillar's
+      // own row had committed, tripping the FK constraint. Both functions
+      // already catch their own errors internally, so this await never
+      // blocks tags from at least being attempted.
+      pushAllPillarsToCloud(user.id, state.pillars).then(() => {
+        pushAllTagsToCloud(user.id, state.tags);
+      });
     });
 
     const unsubRewards = useRewardStore.subscribe((state, prevState) => {
@@ -64,12 +106,12 @@ export function useCloudSync() {
       pushAllRewardsToCloud(user.id, state.rewards);
     });
 
-    const unsubSummits = useSummitStore.subscribe((state, prevState) => {
-      const removedIds = diffRemovedIds(prevState.summits, state.summits);
+    const unsubGoals = useGoalStore.subscribe((state, prevState) => {
+      const removedIds = diffRemovedIds(prevState.goals, state.goals);
       if (removedIds.length > 0) {
-        deleteSummitsFromCloud(user.id, removedIds);
+        deleteGoalsFromCloud(user.id, removedIds);
       }
-      pushAllSummitsToCloud(user.id, state.summits);
+      pushAllGoalsToCloud(user.id, state.goals);
     });
 
     const unsubCollections = useCollectionStore.subscribe((state, prevState) => {
@@ -106,7 +148,7 @@ export function useCloudSync() {
       unsubEconomy();
       unsubTasks();
       unsubRewards();
-      unsubSummits();
+      unsubGoals();
       unsubCollections();
       supabase.removeChannel(channel);
     };
@@ -116,11 +158,14 @@ export function useCloudSync() {
 export async function pullCloudData(userId: string) {
   try {
     // Fetch Profile Economy Data
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
+    // PGRST116 = no row found, expected for a brand-new user who hasn't
+    // pushed a profile yet — not a real failure.
+    if (profileError && profileError.code !== 'PGRST116') throw profileError;
 
     if (profile) {
       const localLastCheckIn = useEconomyStore.getState().lastCheckInDate;
@@ -142,39 +187,45 @@ export async function pullCloudData(userId: string) {
     }
 
     // Fetch Tasks
-    const { data: tasks } = await supabase
+    const { data: tasks, error: tasksError } = await supabase
       .from('tasks')
       .select('*')
       .eq('user_id', userId);
+    if (tasksError) throw tasksError;
 
     if (tasks && tasks.length > 0) {
       const formattedTasks = tasks.map((t: any) => ({
         id: t.id,
         title: t.title,
         tagId: t.tag_id,
-        summitId: t.summit_id,
+        goalId: t.goal_id,
         collectionId: t.collection_id || undefined,
+        waypointId: t.waypoint_id || undefined,
         parentId: t.parent_id || undefined,
         estimatedMinutes: t.estimated_minutes,
         completed: t.completed,
         isIcebox: t.is_icebox,
         dateCreated: t.date_created,
         sortOrder: t.sort_order ?? undefined,
+        description: t.description ?? undefined,
+        metricProgress: t.metric_progress ?? undefined,
       }));
       useTaskStore.setState((s) => ({ ...s, tasks: mergeById(s.tasks, formattedTasks) }));
     }
 
     // Fetch Pillars
-    const { data: pillars } = await supabase
+    const { data: pillars, error: pillarsError } = await supabase
       .from('pillars')
       .select('*')
       .eq('user_id', userId);
+    if (pillarsError) throw pillarsError;
 
     // Fetch Tags
-    const { data: tags } = await supabase
+    const { data: tags, error: tagsError } = await supabase
       .from('tags')
       .select('*')
       .eq('user_id', userId);
+    if (tagsError) throw tagsError;
 
     if ((pillars && pillars.length > 0) || (tags && tags.length > 0)) {
       useTaskStore.setState((s) => ({
@@ -195,10 +246,11 @@ export async function pullCloudData(userId: string) {
     }
 
     // Fetch Rewards
-    const { data: rewards } = await supabase
+    const { data: rewards, error: rewardsError } = await supabase
       .from('rewards')
       .select('*')
       .eq('user_id', userId);
+    if (rewardsError) throw rewardsError;
 
     if (rewards && rewards.length > 0) {
       const formattedRewards = rewards.map((r: any) => ({
@@ -210,20 +262,21 @@ export async function pullCloudData(userId: string) {
       useRewardStore.setState((s) => ({ rewards: mergeById(s.rewards, formattedRewards) }));
     }
 
-    // Fetch Summits
-    const { data: summits } = await supabase
-      .from('summits')
+    // Fetch Goals
+    const { data: goals, error: goalsError } = await supabase
+      .from('goals')
       .select('*')
       .eq('user_id', userId);
+    if (goalsError) throw goalsError;
 
-    if (summits && summits.length > 0) {
-      const formattedSummits = summits.map((g: any) => ({
+    if (goals && goals.length > 0) {
+      const formattedGoals = goals.map((g: any) => ({
         id: g.id,
         title: g.title,
         horizon: (g.horizon || 'monthly') as 'monthly' | 'yearly',
         targetMinutes: g.target_minutes || 0,
         completedMinutes: g.completed_minutes || 0,
-        type: g.summit_type || 'productive',
+        type: g.goal_type || 'productive',
         metricType: g.metric_type || 'minutes',
         targetMetric: g.target_metric || 0,
         completedMetric: g.completed_metric || 0,
@@ -231,31 +284,35 @@ export async function pullCloudData(userId: string) {
         parentId: g.parent_id || undefined,
         paysCurrency: g.pays_currency !== false,
         category: g.category || undefined,
+        unitLabel: g.unit_label || undefined,
+        pillarId: g.pillar_id || undefined,
       }));
-      useSummitStore.setState((s) => ({ summits: mergeById(s.summits, formattedSummits) }));
+      useGoalStore.setState((s) => ({ goals: mergeById(s.goals, formattedGoals) }));
     }
 
     // Fetch Collections
-    const { data: collections } = await supabase
+    const { data: collections, error: collectionsError } = await supabase
       .from('collections')
       .select('*')
       .eq('user_id', userId);
+    if (collectionsError) throw collectionsError;
 
     if (collections && collections.length > 0) {
       const formattedCollections = collections.map((c: any) => ({
         id: c.id,
         title: c.title,
         category: c.category,
-        summitId: c.summit_id,
+        goalId: c.goal_id,
         dateCreated: c.date_created,
       }));
       useCollectionStore.setState((s) => ({ ...s, collections: mergeById(s.collections, formattedCollections) }));
 
       // Fetch Waypoints
-      const { data: waypoints } = await supabase
+      const { data: waypoints, error: waypointsError } = await supabase
         .from('waypoints')
         .select('*')
         .in('collection_id', collections.map(c => c.id));
+      if (waypointsError) throw waypointsError;
 
       if (waypoints && waypoints.length > 0) {
         const formattedWaypoints = waypoints.map((w: any) => ({
@@ -273,10 +330,11 @@ export async function pullCloudData(userId: string) {
 
     // Fetch Collection Items
     if (collections && collections.length > 0) {
-      const { data: items } = await supabase
+      const { data: items, error: itemsError } = await supabase
         .from('collection_items')
         .select('*')
         .in('collection_id', collections.map(c => c.id));
+      if (itemsError) throw itemsError;
 
       if (items && items.length > 0) {
         const formattedItems = items.map((i: any) => ({
@@ -292,7 +350,10 @@ export async function pullCloudData(userId: string) {
         useCollectionStore.setState((s) => ({ ...s, items: mergeById(s.items, formattedItems) }));
       }
     }
+
+    reportResult('pull', true);
   } catch (err) {
+    reportResult('pull', false, err);
     console.log('Cloud sync info:', err);
   }
 }
@@ -310,7 +371,9 @@ export async function pushEconomyToCloud(userId: string, state: any) {
       last_check_in_date: state.lastCheckInDate,
       updated_at: new Date().toISOString(),
     });
+    reportResult('economy', true);
   } catch (err) {
+    reportResult('economy', false, err);
     console.log('Error pushing economy to cloud:', err);
   }
 }
@@ -319,7 +382,9 @@ export async function deleteTasksFromCloud(userId: string, ids: string[]) {
   if (!isSupabaseConfigured() || ids.length === 0) return;
   try {
     await supabase.from('tasks').delete().eq('user_id', userId).in('id', ids);
+    reportResult('tasks', true);
   } catch (err) {
+    reportResult('tasks', false, err);
     console.log('Error deleting tasks from cloud:', err);
   }
 }
@@ -332,8 +397,9 @@ export async function pushAllTasksToCloud(userId: string, tasks: Task[]) {
       user_id: userId,
       title: t.title,
       tag_id: t.tagId,
-      summit_id: t.summitId || null,
+      goal_id: t.goalId || null,
       collection_id: t.collectionId || null,
+      waypoint_id: t.waypointId || null,
       parent_id: t.parentId || null,
       estimated_minutes: t.estimatedMinutes,
       completed: t.completed,
@@ -342,9 +408,14 @@ export async function pushAllTasksToCloud(userId: string, tasks: Task[]) {
       // Push the resolved fallback (not just t.sortOrder) so even a legacy
       // local row that predates this field writes a usable value.
       sort_order: t.sortOrder ?? Date.parse(t.dateCreated),
+      description: t.description || null,
+      metric_progress: t.metricProgress ?? null,
     }));
-    await supabase.from('tasks').upsert(payload, { onConflict: 'id' });
+    const { error } = await supabase.from('tasks').upsert(payload, { onConflict: 'id' });
+    if (error) throw error;
+    reportResult('tasks', true);
   } catch (err) {
+    reportResult('tasks', false, err);
     console.log('Error pushing tasks to cloud:', err);
   }
 }
@@ -358,8 +429,11 @@ export async function pushAllPillarsToCloud(userId: string, pillars: Pillar[]) {
       name: p.name,
       is_archived: p.isArchived || false,
     }));
-    await supabase.from('pillars').upsert(payload, { onConflict: 'id' });
+    const { error } = await supabase.from('pillars').upsert(payload, { onConflict: 'id' });
+    if (error) throw error;
+    reportResult('pillars', true);
   } catch (err) {
+    reportResult('pillars', false, err);
     console.log('Error pushing pillars to cloud:', err);
   }
 }
@@ -375,8 +449,11 @@ export async function pushAllTagsToCloud(userId: string, tags: Tag[]) {
       type: t.type,
       is_archived: t.isArchived || false,
     }));
-    await supabase.from('tags').upsert(payload, { onConflict: 'id' });
+    const { error } = await supabase.from('tags').upsert(payload, { onConflict: 'id' });
+    if (error) throw error;
+    reportResult('tags', true);
   } catch (err) {
+    reportResult('tags', false, err);
     console.log('Error pushing tags to cloud:', err);
   }
 }
@@ -385,7 +462,9 @@ export async function deleteRewardsFromCloud(userId: string, ids: string[]) {
   if (!isSupabaseConfigured() || ids.length === 0) return;
   try {
     await supabase.from('rewards').delete().eq('user_id', userId).in('id', ids);
+    reportResult('rewards', true);
   } catch (err) {
+    reportResult('rewards', false, err);
     console.log('Error deleting rewards from cloud:', err);
   }
 }
@@ -400,32 +479,37 @@ export async function pushAllRewardsToCloud(userId: string, rewards: Reward[]) {
       cost: r.cost,
       date_created: new Date().toISOString(),
     }));
-    await supabase.from('rewards').upsert(payload, { onConflict: 'id' });
+    const { error } = await supabase.from('rewards').upsert(payload, { onConflict: 'id' });
+    if (error) throw error;
+    reportResult('rewards', true);
   } catch (err) {
+    reportResult('rewards', false, err);
     console.log('Error pushing rewards to cloud:', err);
   }
 }
 
-export async function deleteSummitsFromCloud(userId: string, ids: string[]) {
+export async function deleteGoalsFromCloud(userId: string, ids: string[]) {
   if (!isSupabaseConfigured() || ids.length === 0) return;
   try {
-    await supabase.from('summits').delete().eq('user_id', userId).in('id', ids);
+    await supabase.from('goals').delete().eq('user_id', userId).in('id', ids);
+    reportResult('goals', true);
   } catch (err) {
-    console.log('Error deleting summits from cloud:', err);
+    reportResult('goals', false, err);
+    console.log('Error deleting goals from cloud:', err);
   }
 }
 
-export async function pushAllSummitsToCloud(userId: string, summits: Summit[]) {
-  if (!isSupabaseConfigured() || summits.length === 0) return;
+export async function pushAllGoalsToCloud(userId: string, goals: Goal[]) {
+  if (!isSupabaseConfigured() || goals.length === 0) return;
   try {
-    const payload = summits.map((g) => ({
+    const payload = goals.map((g) => ({
       id: g.id,
       user_id: userId,
       title: g.title,
       horizon: g.horizon || 'monthly',
       target_minutes: g.targetMinutes || 0,
       completed_minutes: g.completedMinutes || 0,
-      summit_type: g.type || 'productive',
+      goal_type: g.type || 'productive',
       metric_type: g.metricType || 'minutes',
       target_metric: g.targetMetric || 0,
       completed_metric: g.completedMetric || 0,
@@ -433,10 +517,15 @@ export async function pushAllSummitsToCloud(userId: string, summits: Summit[]) {
       parent_id: g.parentId || null,
       pays_currency: g.paysCurrency !== false,
       category: g.category || null,
+      unit_label: g.unitLabel || null,
+      pillar_id: g.pillarId || null,
     }));
-    await supabase.from('summits').upsert(payload, { onConflict: 'id' });
+    const { error } = await supabase.from('goals').upsert(payload, { onConflict: 'id' });
+    if (error) throw error;
+    reportResult('goals', true);
   } catch (err) {
-    console.log('Error pushing summits to cloud:', err);
+    reportResult('goals', false, err);
+    console.log('Error pushing goals to cloud:', err);
   }
 }
 
@@ -444,7 +533,9 @@ export async function deleteCollectionsFromCloud(userId: string, ids: string[]) 
   if (!isSupabaseConfigured() || ids.length === 0) return;
   try {
     await supabase.from('collections').delete().eq('user_id', userId).in('id', ids);
+    reportResult('collections', true);
   } catch (err) {
+    reportResult('collections', false, err);
     console.log('Error deleting collections from cloud:', err);
   }
 }
@@ -453,7 +544,9 @@ export async function deleteWaypointsFromCloud(userId: string, ids: string[]) {
   if (!isSupabaseConfigured() || ids.length === 0) return;
   try {
     await supabase.from('waypoints').delete().eq('user_id', userId).in('id', ids);
+    reportResult('collections', true);
   } catch (err) {
+    reportResult('collections', false, err);
     console.log('Error deleting waypoints from cloud:', err);
   }
 }
@@ -464,7 +557,9 @@ export async function deleteItemsFromCloud(ids: string[]) {
   if (!isSupabaseConfigured() || ids.length === 0) return;
   try {
     await supabase.from('collection_items').delete().in('id', ids);
+    reportResult('collections', true);
   } catch (err) {
+    reportResult('collections', false, err);
     console.log('Error deleting collection items from cloud:', err);
   }
 }
@@ -478,10 +573,11 @@ export async function pushAllCollectionsToCloud(userId: string, collections: Col
         user_id: userId,
         title: c.title,
         category: c.category,
-        summit_id: c.summitId || null,
+        goal_id: c.goalId || null,
         date_created: c.dateCreated,
       }));
-      await supabase.from('collections').upsert(cPayload, { onConflict: 'id' });
+      const { error } = await supabase.from('collections').upsert(cPayload, { onConflict: 'id' });
+      if (error) throw error;
     }
 
     if (waypoints && waypoints.length > 0) {
@@ -495,7 +591,8 @@ export async function pushAllCollectionsToCloud(userId: string, collections: Col
         month: w.month || null,
         date_created: w.dateCreated,
       }));
-      await supabase.from('waypoints').upsert(wPayload, { onConflict: 'id' });
+      const { error } = await supabase.from('waypoints').upsert(wPayload, { onConflict: 'id' });
+      if (error) throw error;
     }
 
     if (items.length > 0) {
@@ -509,9 +606,33 @@ export async function pushAllCollectionsToCloud(userId: string, collections: Col
         is_added_later: i.isAddedLater,
         date_created: i.dateCreated,
       }));
-      await supabase.from('collection_items').upsert(iPayload, { onConflict: 'id' });
+      const { error } = await supabase.from('collection_items').upsert(iPayload, { onConflict: 'id' });
+      if (error) throw error;
     }
+    reportResult('collections', true);
   } catch (err) {
+    reportResult('collections', false, err);
     console.log('Error pushing collections to cloud:', err);
   }
+}
+
+// Manual "Retry Sync" entry point (AuthModal) for when sync has gone
+// unhealthy and the user doesn't want to wait for the next passive
+// retry-on-state-change / retry-on-realtime-event. Re-pulls, then re-pushes
+// every store's current snapshot exactly like the subscribe callbacks in
+// useCloudSync already do on every local change.
+export async function retrySync(userId: string) {
+  await pullCloudData(userId);
+
+  const taskState = useTaskStore.getState();
+  await pushAllTasksToCloud(userId, taskState.tasks);
+  await pushAllPillarsToCloud(userId, taskState.pillars);
+  await pushAllTagsToCloud(userId, taskState.tags);
+
+  await pushEconomyToCloud(userId, useEconomyStore.getState());
+  await pushAllRewardsToCloud(userId, useRewardStore.getState().rewards);
+  await pushAllGoalsToCloud(userId, useGoalStore.getState().goals);
+
+  const collectionState = useCollectionStore.getState();
+  await pushAllCollectionsToCloud(userId, collectionState.collections, collectionState.items, collectionState.waypoints);
 }

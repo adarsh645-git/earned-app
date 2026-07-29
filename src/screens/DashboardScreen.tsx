@@ -3,19 +3,16 @@ import { View, Text, ScrollView, Pressable, useWindowDimensions } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEconomyStore } from '../store/economyStore';
-import { useTaskStore, Task } from '../store/taskStore';
-import { useSummitStore, Summit } from '../store/summitStore';
-import { useTimerStore } from '../store/timerStore';
+import { useTaskStore } from '../store/taskStore';
 import { feedback } from '../utils/feedback';
 import { useConfettiStore } from '../store/confettiStore';
-import ConfirmModal from '../components/ConfirmModal';
 import AnimatedTaskRow from '../components/AnimatedTaskRow';
 import SwipeableRow from '../components/SwipeableRow';
-import AnimatedSummitCard from '../components/AnimatedSummitCard';
 import AnimatedProgressRing from '../components/AnimatedProgressRing';
 import CurrencyPill from '../components/CurrencyPill';
-import EditTaskModal from '../components/EditTaskModal';
-import QuickStartModal from '../components/QuickStartModal';
+import TaskDetailModal from '../components/TaskDetailModal';
+import { getPillarColor } from '../utils/pillarColor';
+import useTimerLauncher from '../hooks/useTimerLauncher';
 
 export default function DashboardScreen() {
   const { width } = useWindowDimensions();
@@ -24,23 +21,27 @@ export default function DashboardScreen() {
   const strokeWidth = isDesktop ? 14 : 11;
 
   const [activePillarId, setActivePillarId] = useState<string>('');
-  const [blockedModal, setBlockedModal] = useState<{ title: string; message: string } | null>(null);
-  const [editTask, setEditTask] = useState<Task | null>(null);
-  const [quickStartGoal, setQuickStartGoal] = useState<Summit | null>(null);
-  
+  // Id-based (not a snapshot) so the detail screen reflects live edits while open.
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+
   const { dollarBalance, hoursBalanceMinutes, debt, streak, lastCheckInDate } = useEconomyStore();
   const { tasks, tags, pillars, toggleTask, moveToIcebox, deleteTask, updateTask, addTask } = useTaskStore();
+  const detailTask = tasks.find(t => t.id === detailTaskId) || null;
   const activePillars = pillars.filter(p => !p.isArchived);
   const currentPillarId = activePillarId || activePillars[0]?.id;
-  const { summits } = useSummitStore();
-  const { startTimer } = useTimerStore();
+  const { launchTimer, blockedTimerModal } = useTimerLauncher();
 
   const today = new Date().toISOString().split('T')[0];
   const isCheckedInToday = lastCheckInDate === today;
 
+  // Today's Focus / Daily Goal only ever means tasks created today (same
+  // creation-date convention TasksScreen's day-grouping uses) — without this,
+  // every completed task ever created for the pillar kept inflating the ring
+  // and leaking into "Completed Today". Subtasks are excluded too, matching
+  // TasksScreen's top-level day buckets (they're not independent daily items).
   const activeBucketTasks = tasks.filter(t => {
     const tag = tags.find(tag => tag.id === t.tagId);
-    return tag?.pillarId === currentPillarId && !t.isIcebox;
+    return tag?.pillarId === currentPillarId && !t.isIcebox && !t.parentId && t.dateCreated.split('T')[0] === today;
   });
 
   const incompleteTasks = activeBucketTasks.filter(t => !t.completed);
@@ -50,37 +51,11 @@ export default function DashboardScreen() {
   const completedMinutes = activeBucketTasks.reduce((acc, t) => acc + (t.completed ? t.estimatedMinutes : 0), 0);
   const progressPercent = totalMinutes > 0 ? Math.min(100, Math.round((completedMinutes / totalMinutes) * 100)) : 0;
 
-  const rootGoals = summits.filter((g) => !g.parentId);
-  const productiveGoals = rootGoals.filter(g => !g.type || g.type === 'productive');
-  const entertainmentGoals = rootGoals.filter(g => g.type === 'entertainment');
-
   const formattedDate = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'short',
     day: 'numeric',
   }).toUpperCase();
-
-  const handleStartTimer = (taskId: string, mins: number) => {
-    const res = startTimer(taskId, mins);
-    if (res && res.success === false && res.reason === 'insufficient_hours') {
-      const missingHours = ((res.missingMinutes || 0) / 60).toFixed(1);
-      setBlockedModal({
-        title: 'Not Enough Time Earned',
-        message: `You need ${missingHours} more hours of focus to earn this entertainment session. Focus on productive tasks to earn leisure time!`,
-      });
-    }
-  };
-
-  const handleQuickStart = (title: string, tagId: string, targetId: string, minutes: number) => {
-    const newTaskId = addTask({
-      title,
-      tagId,
-      estimatedMinutes: minutes,
-      summitId: targetId,
-      isIcebox: false,
-    });
-    handleStartTimer(newTaskId, minutes);
-  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }}>
@@ -173,6 +148,7 @@ export default function DashboardScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 4 }}>
             {activePillars.map((pillar) => {
               const isActive = currentPillarId === pillar.id;
+              const pillarColor = getPillarColor(pillar.id, pillars);
               return (
                 <Pressable
                   key={pillar.id}
@@ -184,7 +160,7 @@ export default function DashboardScreen() {
                     alignItems: 'center',
                     backgroundColor: isActive ? '#2C2C2E' : 'transparent',
                     borderWidth: isActive ? 1 : 0,
-                    borderColor: isActive ? 'rgba(255,255,255,0.15)' : 'transparent',
+                    borderColor: isActive ? pillarColor : 'transparent',
                   }}
                 >
                   <Text
@@ -214,7 +190,7 @@ export default function DashboardScreen() {
           />
         </View>
 
-        <View className="flex-row justify-between items-center mt-3 mb-3">
+        <View className="flex-row justify-between items-center mt-5 mb-3">
           <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px]">
             Today's Focus
           </Text>
@@ -241,10 +217,11 @@ export default function DashboardScreen() {
                   <AnimatedTaskRow
                     task={task}
                     tagName={tag?.name}
+                    pillarColor={getPillarColor(tag?.pillarId, pillars)}
                     isLast={isLast}
                     onToggle={toggleTask}
-                    onStartTimer={handleStartTimer}
-                    onEdit={setEditTask}
+                    onStartTimer={launchTimer}
+                    onEdit={(t) => setDetailTaskId(t.id)}
                     showStartButton
                   />
                 </SwipeableRow>
@@ -268,9 +245,10 @@ export default function DashboardScreen() {
                     <AnimatedTaskRow
                       task={task}
                       tagName={tag?.name}
+                      pillarColor={getPillarColor(tag?.pillarId, pillars)}
                       isLast={isLast}
                       onToggle={toggleTask}
-                      onEdit={setEditTask}
+                      onEdit={(t) => setDetailTaskId(t.id)}
                       showStartButton={false}
                     />
                   </SwipeableRow>
@@ -280,81 +258,24 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Summit Progress (Productive Summits) */}
-        {productiveGoals.length > 0 && (
-          <View className="mt-5">
-            <Text className="text-[#8E8E93] font-bold text-xs uppercase tracking-[1.5px] mb-3">
-              Summits
-            </Text>
-            {productiveGoals.map((goal) => (
-              <AnimatedSummitCard
-                key={goal.id}
-                goal={goal}
-                subGoals={summits.filter(g => g.parentId === goal.id)}
-                accentColor="#BF5AF2"
-                onQuickStart={setQuickStartGoal}
-              />
-            ))}
-          </View>
-        )}
-
-        {/* Entertainment Projects (Burner Summits) */}
-        {entertainmentGoals.length > 0 && (
-          <View className="mt-5">
-            <Text className="text-[#5AC8FA] font-bold text-xs uppercase tracking-[1.5px] mb-3">
-              Entertainment Projects
-            </Text>
-            {entertainmentGoals.map((goal) => (
-              <AnimatedSummitCard
-                key={goal.id}
-                goal={goal}
-                subGoals={summits.filter(g => g.parentId === goal.id)}
-                accentColor="#5AC8FA"
-                showIcon
-                iconName="game-controller"
-                onQuickStart={setQuickStartGoal}
-              />
-            ))}
-          </View>
-        )}
-        
       </ScrollView>
 
-      {/* Blocked Timer Modal */}
-      {blockedModal && (
-        <ConfirmModal
-          visible={!!blockedModal}
-          onClose={() => setBlockedModal(null)}
-          icon="time-outline"
-          iconColor="#FF9F0A"
-          accentColor="#FF9F0A"
-          title={blockedModal.title}
-          message={blockedModal.message}
-          actions={[
-            { label: 'Got it', onPress: () => setBlockedModal(null), style: 'default' },
-          ]}
-        />
-      )}
+      {blockedTimerModal}
 
-      <EditTaskModal 
-        pillars={pillars} 
-        task={editTask}
-        visible={!!editTask}
+      <TaskDetailModal
+        task={detailTask}
+        visible={!!detailTaskId}
+        tasks={tasks}
         tags={tags}
-        onClose={() => setEditTask(null)}
-        onSave={(id, updates) => updateTask(id, updates)}
-        onDelete={(id) => deleteTask(id)}
+        pillars={pillars}
+        onClose={() => setDetailTaskId(null)}
+        onUpdate={updateTask}
+        onToggle={toggleTask}
+        onDelete={(id) => { deleteTask(id); setDetailTaskId(null); }}
+        onStartTimer={launchTimer}
+        onMoveToIcebox={moveToIcebox}
+        addTask={addTask}
       />
-
-      {quickStartGoal && (
-        <QuickStartModal
-          visible={!!quickStartGoal}
-          onClose={() => setQuickStartGoal(null)}
-          goal={quickStartGoal}
-          subGoals={summits.filter(g => g.parentId === quickStartGoal.id)}
-          onStart={handleQuickStart}
-        />
-      )}
     </SafeAreaView>
   );
 }

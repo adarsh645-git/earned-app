@@ -1,21 +1,28 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { View, Text, Animated, Dimensions, Pressable, TextInput } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Summit, getMilestoneDollars, useSummitStore } from '../store/summitStore';
+import { Goal, useGoalStore } from '../store/goalStore';
 import { hapticHeavyImpact, hapticMediumImpact } from '../utils/haptics';
 import { useConfettiStore } from '../store/confettiStore';
-import EditSummitModal from './EditSummitModal';
+import GoalDetailModal from './GoalDetailModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-interface AnimatedSummitCardProps {
-  goal: Summit;
-  subGoals?: Summit[];
+interface AnimatedGoalCardProps {
+  goal: Goal;
+  subGoals?: Goal[];
   accentColor: string; // '#BF5AF2' for productive, '#5AC8FA' for entertainment
   showIcon?: boolean;
   iconName?: string;
-  onQuickStart?: (goal: Summit) => void;
+  onQuickStart?: (goal: Goal) => void;
   onAddSubGoal?: (parentId: string) => void;
+  // Journeys nested under this Goal (owned by the caller, e.g.
+  // CollectionsScreen) — mirrors AnimatedTaskRow's subtaskCount/isExpanded/
+  // onToggleExpand so a Goal's Journeys read as the same parent/child
+  // pattern as a Task's subtasks.
+  journeyCount?: number;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 // ─── Mini Confetti Burst (localized to a milestone badge) ────────────────────
@@ -80,76 +87,6 @@ function MiniBurst({ color, trigger }: { color: string; trigger: boolean }) {
         />
       ))}
     </View>
-  );
-}
-
-// ─── Animated Milestone Badge ────────────────────────────────────────────────
-function MilestoneBadge({
-  milestone,
-  isUnlocked,
-  justUnlocked,
-  dollars,
-  accentColor,
-}: {
-  milestone: number;
-  isUnlocked: boolean;
-  justUnlocked: boolean;
-  dollars: number;
-  accentColor: string;
-}) {
-  const badgeScale = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (justUnlocked) {
-      hapticMediumImpact();
-      Animated.sequence([
-        Animated.spring(badgeScale, {
-          toValue: 1.4,
-          useNativeDriver: true,
-          speed: 60,
-          bounciness: 18,
-        }),
-        Animated.spring(badgeScale, {
-          toValue: 1,
-          useNativeDriver: true,
-          speed: 30,
-          bounciness: 8,
-        }),
-      ]).start();
-    }
-  }, [justUnlocked]);
-
-  const bgColor = isUnlocked ? `${accentColor}26` : '#2C2C2E'; // 26 = ~15% opacity hex
-  const borderColor = isUnlocked ? `${accentColor}66` : 'rgba(255,255,255,0.05)'; // 66 = ~40% opacity hex
-
-  return (
-    <Animated.View
-      style={{
-        backgroundColor: bgColor,
-        borderColor: borderColor,
-        borderWidth: 1,
-        borderRadius: 99,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        flexDirection: 'row',
-        alignItems: 'center',
-        transform: [{ scale: badgeScale }],
-        position: 'relative',
-        overflow: 'visible',
-      }}
-    >
-      <MiniBurst color={accentColor} trigger={justUnlocked} />
-      <Ionicons
-        name={isUnlocked ? 'checkmark-circle' : 'lock-closed'}
-        size={10}
-        color={isUnlocked ? accentColor : '#8E8E93'}
-      />
-      <Text
-        style={{ color: isUnlocked ? accentColor : '#8E8E93', fontSize: 9, fontWeight: '700', marginLeft: 4 }}
-      >
-        {milestone}% (+${dollars.toFixed(2)})
-      </Text>
-    </Animated.View>
   );
 }
 
@@ -240,7 +177,7 @@ function InlineEditableText({
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
-export default function AnimatedSummitCard({
+export default function AnimatedGoalCard({
   goal,
   subGoals = [],
   accentColor,
@@ -248,9 +185,12 @@ export default function AnimatedSummitCard({
   iconName,
   onQuickStart,
   onAddSubGoal,
-}: AnimatedSummitCardProps) {
-  const { updateSummit, deleteSummit } = useSummitStore();
-  const [editingGoal, setEditingGoal] = useState<Summit | null>(null);
+  journeyCount = 0,
+  isExpanded = false,
+  onToggleExpand,
+}: AnimatedGoalCardProps) {
+  const { updateGoal, deleteGoal } = useGoalStore();
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const isUnits = goal.metricType === 'units';
   const isEntertainment = goal.type === 'entertainment';
   const target = isUnits ? (goal.targetMetric || 1) : goal.targetMinutes;
@@ -290,11 +230,15 @@ export default function AnimatedSummitCard({
     }
   });
 
-  // If 100% just unlocked, trigger full-screen confetti + heavy haptic
+  // 100% just unlocked -> full-screen confetti + heavy haptic; any other
+  // milestone just unlocked -> a lighter medium haptic (the summary chip's
+  // own MiniBurst handles the visual flourish for both cases).
   useEffect(() => {
     if (justUnlockedSet.has(100)) {
       hapticHeavyImpact();
       useConfettiStore.getState().triggerConfetti();
+    } else if (justUnlockedSet.size > 0) {
+      hapticMediumImpact();
     }
     // Update ref after rendering
     prevUnlocked.current = [...unlocked];
@@ -306,7 +250,7 @@ export default function AnimatedSummitCard({
   if (isOpenEnded) {
     completedLabel = `${(completed / 60).toFixed(1)}h Logged`;
   } else if (isUnits) {
-    completedLabel = `${completed}/${target}`;
+    completedLabel = `${completed}/${target}${goal.unitLabel ? ` ${goal.unitLabel}` : ''}`;
   } else if (isEntertainment) {
     completedLabel = `${(completed / 60).toFixed(1)}/${(target / 60).toFixed(0)}h`;
   } else {
@@ -323,7 +267,8 @@ export default function AnimatedSummitCard({
   const borderColorCard = isEntertainment ? 'rgba(90,200,250,0.15)' : 'rgba(255,255,255,0.08)';
 
   return (
-    <View
+    <Pressable
+      onPress={() => setEditingGoal(goal)}
       style={{
         backgroundColor: '#1C1C1E',
         borderColor: borderColorCard,
@@ -342,7 +287,7 @@ export default function AnimatedSummitCard({
           <InlineEditableText
             initialValue={goal.title}
             textStyle={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14 }}
-            onSave={(newTitle) => updateSummit(goal.id, { title: newTitle })}
+            onSave={(newTitle) => updateGoal(goal.id, { title: newTitle })}
           />
           {displayCategory !== '' && (
             <View style={{ backgroundColor: '#2C2C2E', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 4 }}>
@@ -380,25 +325,65 @@ export default function AnimatedSummitCard({
         </View>
       )}
 
-      {/* Milestone Badges Row (Hide if open ended) */}
+      {/* Milestone Summary Chip (Hide if open ended) — full 25/50/75/100%
+          breakdown lives in GoalDetailModal (tap the card); the list view
+          only needs the count so it doesn't dominate a scrolling list. */}
       {!isOpenEnded && (
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }}>
-        {milestones.map((m) => {
-          const isUnlocked = unlocked.includes(m);
-          const justNowUnlocked = justUnlockedSet.has(m);
-          const dollars = getMilestoneDollars(goal.targetMinutes, m, goal.type || 'productive');
-          return (
-            <MilestoneBadge
-              key={m}
-              milestone={m}
-              isUnlocked={isUnlocked}
-              justUnlocked={justNowUnlocked}
-              dollars={dollars}
-              accentColor={accentColor}
+          <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '600' }}>Milestones</Text>
+          <View
+            style={{
+              backgroundColor: unlocked.length > 0 ? `${accentColor}26` : '#2C2C2E',
+              borderColor: unlocked.length > 0 ? `${accentColor}66` : 'rgba(255,255,255,0.05)',
+              borderWidth: 1,
+              borderRadius: 99,
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              flexDirection: 'row',
+              alignItems: 'center',
+              position: 'relative',
+              overflow: 'visible',
+            }}
+          >
+            <MiniBurst color={accentColor} trigger={justUnlockedSet.size > 0} />
+            <Ionicons
+              name={unlocked.length === milestones.length ? 'checkmark-circle' : 'lock-closed'}
+              size={10}
+              color={unlocked.length > 0 ? accentColor : '#8E8E93'}
             />
-          );
-        })}
+            <Text style={{ color: unlocked.length > 0 ? accentColor : '#8E8E93', fontSize: 9, fontWeight: '700', marginLeft: 4 }}>
+              {unlocked.length}/{milestones.length} Milestones
+            </Text>
+          </View>
         </View>
+      )}
+
+      {/* Journeys count + expand/collapse — same parent/child language as a
+          Task's subtaskCount/chevron in AnimatedTaskRow. */}
+      {journeyCount > 0 && onToggleExpand && (
+        <Pressable
+          onPress={onToggleExpand}
+          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 }}
+        >
+          <Text style={{ color: '#8E8E93', fontSize: 11, fontWeight: '600' }}>Journeys</Text>
+          <View
+            style={{
+              backgroundColor: '#2C2C2E',
+              borderColor: 'rgba(255,255,255,0.05)',
+              borderWidth: 1,
+              borderRadius: 99,
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ color: '#8E8E93', fontSize: 9, fontWeight: '700', marginRight: 4 }}>
+              {journeyCount}
+            </Text>
+            <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={10} color="#8E8E93" />
+          </View>
+        </Pressable>
       )}
 
       {/* Header for Sub-Projects (shown if we have subgoals OR if we can add them) */}
@@ -447,7 +432,7 @@ export default function AnimatedSummitCard({
                     <InlineEditableText
                       initialValue={subGoal.title}
                       textStyle={{ color: '#EBEBF5', fontSize: 13, fontWeight: '500' }}
-                      onSave={(newTitle) => updateSummit(subGoal.id, { title: newTitle })}
+                      onSave={(newTitle) => updateGoal(subGoal.id, { title: newTitle })}
                       numberOfLines={1}
                     />
                     <Pressable onPress={() => setEditingGoal(subGoal)} style={{ padding: 4 }}>
@@ -486,33 +471,15 @@ export default function AnimatedSummitCard({
         </View>
       )}
 
-      {/* Quick Start Button (Only show if no subGoals) */}
-      {onQuickStart && (!subGoals || subGoals.length === 0) && (
-        <View style={{ marginTop: 16 }}>
-          <Pressable
-            onPress={() => onQuickStart(goal)}
-            style={({ pressed, hovered }: any) => ({
-              backgroundColor: hovered ? (isEntertainment ? '#47A3D1' : '#A442D6') : (isEntertainment ? '#5AC8FA' : '#BF5AF2'),
-              paddingVertical: 10,
-              borderRadius: 12,
-              alignItems: 'center',
-              opacity: pressed ? 0.9 : 1,
-            })}
-          >
-            <Text style={{ color: isEntertainment ? '#000000' : '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
-              {isEntertainment ? 'Indulge' : 'Focus'}
-            </Text>
-          </Pressable>
-        </View>
-      )}
-
-      <EditSummitModal
+      <GoalDetailModal
         goal={editingGoal}
         visible={!!editingGoal}
         onClose={() => setEditingGoal(null)}
-        onSave={(id, updates) => updateSummit(id, updates)}
-        onDelete={(id) => deleteSummit(id)}
+        onSave={(id, updates) => updateGoal(id, updates)}
+        onDelete={(id) => deleteGoal(id)}
+        onQuickStart={onQuickStart}
+        onNavigate={(g) => setEditingGoal(g)}
       />
-    </View>
+    </Pressable>
   );
 }

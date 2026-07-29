@@ -21,7 +21,7 @@ const CARD_STYLE = {
   shadowRadius: 12,
   elevation: 3,
 } as const;
-import { useSummitStore, getChainTrail } from '../store/summitStore';
+import { useGoalStore, getChainTrail } from '../store/goalStore';
 import { useCollectionStore } from '../store/collectionStore';
 import { useEconomyStore } from '../store/economyStore';
 import { useTimerStore } from '../store/timerStore';
@@ -29,12 +29,14 @@ import RewardToast from '../components/RewardToast';
 import AnimatedTaskRow from '../components/AnimatedTaskRow';
 import SwipeableRow from '../components/SwipeableRow';
 import ReorderableTaskGroup from '../components/ReorderableTaskGroup';
-import EditTaskModal from '../components/EditTaskModal';
+import TaskDetailModal from '../components/TaskDetailModal';
 import TimeSelectorModal from '../components/TimeSelectorModal';
 import ConfirmModal from '../components/ConfirmModal';
 import QuickAddBar from '../components/QuickAddBar';
 import PillPicker from '../components/PillPicker';
 import { getEligibleJourneys } from '../components/LinkProgressPicker';
+import { getPillarColor } from '../utils/pillarColor';
+import useIsMobile from '../hooks/useIsMobile';
 
 // "Today's Focus List — Friday, July 25" / "Yesterday" / "Wed, Jul 23"
 function formatDateLabel(dateStr: string, isToday: boolean): string {
@@ -51,10 +53,11 @@ function formatDateLabel(dateStr: string, isToday: boolean): string {
 }
 
 export default function TasksScreen() {
-  const { tasks, tags, pillars, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox, reorderTasks } = useTaskStore();
-  const { summits } = useSummitStore();
-  const { collections } = useCollectionStore();
+  const { tasks, tags, pillars, lastUsedTagId, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox, reorderTasks } = useTaskStore();
+  const { goals } = useGoalStore();
+  const { collections, waypoints } = useCollectionStore();
   const { startTimer } = useTimerStore();
+  const isMobile = useIsMobile();
 
   // Quick-add bar state — title + the one economy-critical field (Duration)
   // that stays visible in the bar itself; everything else (Tag, Journey)
@@ -68,16 +71,30 @@ export default function TasksScreen() {
   // Chevron-expand draft state for the quick-add bar. Empty/false means "let
   // the store apply its normal default" — only an explicit pick overrides it.
   const [quickAddExpanded, setQuickAddExpanded] = useState(false);
-  const [quickAddOpenPill, setQuickAddOpenPill] = useState<'tag' | 'journey' | null>(null);
+  const [quickAddOpenPill, setQuickAddOpenPill] = useState<'pillar' | 'tag' | 'journey' | 'waypoint' | null>(null);
+  const [quickAddPillarId, setQuickAddPillarId] = useState('');
   const [quickAddTagId, setQuickAddTagId] = useState('');
   const [quickAddCollectionId, setQuickAddCollectionId] = useState('');
-  const [quickAddSummitId, setQuickAddSummitId] = useState('');
+  const [quickAddGoalId, setQuickAddGoalId] = useState('');
+  const [quickAddWaypointId, setQuickAddWaypointId] = useState('');
   const [quickAddIsIcebox, setQuickAddIsIcebox] = useState(false);
+
+  const activePillars = pillars.filter(p => !p.isArchived);
+  // Which Pillar the Category dropdown is currently scoped to — an explicit
+  // pick wins, otherwise fall back to the last-used tag's pillar (continuity
+  // with the pre-existing "Tag (last used)" default) or the first Pillar.
+  const currentPillarId = quickAddPillarId
+    || tags.find(t => t.id === lastUsedTagId)?.pillarId
+    || activePillars[0]?.id
+    || '';
 
   const quickAddTagType: 'earner' | 'burner' = quickAddTagId
     ? (tags.find(t => t.id === quickAddTagId)?.type ?? 'earner')
     : 'earner';
-  const quickAddEligibleJourneys = getEligibleJourneys(collections, summits, quickAddTagType);
+  const quickAddEligibleJourneys = getEligibleJourneys(collections, goals, quickAddTagType);
+  const quickAddEligibleWaypoints = quickAddCollectionId
+    ? waypoints.filter(w => w.collectionId === quickAddCollectionId)
+    : [];
 
   const handleStartTimer = (taskId: string, mins: number) => {
     const res = startTimer(taskId, mins);
@@ -112,7 +129,7 @@ export default function TasksScreen() {
         setToastMessage(`-${(task.estimatedMinutes / 60).toFixed(1)}h leisure spent`);
         setToastSubtext(`Enjoyed "${task.title}" guilt-free`);
       }
-      setToastChainTrail(task.summitId ? getChainTrail(summits, task.summitId) : []);
+      setToastChainTrail(task.goalId ? getChainTrail(goals, task.goalId) : []);
       setToastVisible(true);
     }
     toggleTask(id);
@@ -130,8 +147,10 @@ export default function TasksScreen() {
     activateFromIcebox(id);
   };
 
-  // Modals state
-  const [editTask, setEditTask] = useState<Task | null>(null);
+  // Modals state — id-based (not a snapshot) so the detail screen reflects
+  // live edits (tag/duration/journey autosave) while it's still open.
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const detailTask = tasks.find(t => t.id === detailTaskId) || null;
 
   const iceboxTasks = tasks.filter(t => t.isIcebox);
 
@@ -205,15 +224,18 @@ export default function TasksScreen() {
       estimatedMinutes,
       tagId: quickAddTagId || undefined,
       collectionId: quickAddCollectionId || undefined,
-      summitId: quickAddSummitId || undefined,
+      goalId: quickAddGoalId || undefined,
+      waypointId: quickAddWaypointId || undefined,
       isIcebox: quickAddIsIcebox,
     });
 
     feedback('taskComplete');
     setTitle('');
+    setQuickAddPillarId('');
     setQuickAddTagId('');
     setQuickAddCollectionId('');
-    setQuickAddSummitId('');
+    setQuickAddGoalId('');
+    setQuickAddWaypointId('');
     setQuickAddIsIcebox(false);
     setQuickAddOpenPill(null);
     // Duration is intentionally NOT reset — the next quick-add inherits it,
@@ -248,10 +270,10 @@ export default function TasksScreen() {
             trailingAccessory={
               <Pressable
                 onPress={() => setShowAddTimeSelector(true)}
-                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginLeft: 8 }}
+                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', paddingHorizontal: isMobile ? 8 : 10, paddingVertical: isMobile ? 4 : 6, borderRadius: 8, marginLeft: isMobile ? 4 : 8 }}
               >
-                <Ionicons name="time-outline" size={14} color="#A1A1AA" style={{ marginRight: 4 }} />
-                <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>
+                <Ionicons name="time-outline" size={isMobile ? 12 : 14} color="#A1A1AA" style={{ marginRight: isMobile ? 2 : 4 }} />
+                <Text style={{ color: '#FFF', fontSize: isMobile ? 11 : 12, fontWeight: '600' }}>
                   {estimatedMinutes}m
                 </Text>
               </Pressable>
@@ -262,8 +284,25 @@ export default function TasksScreen() {
               content: (
                 <View className="flex-row items-center" style={{ flexWrap: 'wrap', gap: 6 }}>
                   <PillPicker
+                    label={activePillars.find(p => p.id === currentPillarId)?.name || 'Pillar'}
+                    options={activePillars.map(p => ({ id: p.id, label: p.name }))}
+                    selectedId={currentPillarId}
+                    onSelect={(id) => {
+                      feedback('select');
+                      setQuickAddPillarId(id);
+                      // Category must always resolve to a valid tag — jump to
+                      // the newly-picked Pillar's first Category immediately.
+                      const pillarTags = tags.filter(t => t.pillarId === id && !t.isArchived);
+                      setQuickAddTagId(pillarTags[0]?.id || '');
+                      setQuickAddOpenPill(null);
+                    }}
+                    open={quickAddOpenPill === 'pillar'}
+                    onToggle={() => setQuickAddOpenPill(p => (p === 'pillar' ? null : 'pillar'))}
+                  />
+
+                  <PillPicker
                     label={quickAddTagId ? (tags.find(t => t.id === quickAddTagId)?.name || 'Tag') : 'Tag (last used)'}
-                    options={tags.filter(t => !t.isArchived).map(t => ({ id: t.id, label: t.name }))}
+                    options={tags.filter(t => t.pillarId === currentPillarId && !t.isArchived).map(t => ({ id: t.id, label: t.name }))}
                     selectedId={quickAddTagId}
                     onSelect={(id) => { feedback('select'); setQuickAddTagId(id); setQuickAddOpenPill(null); }}
                     open={quickAddOpenPill === 'tag'}
@@ -279,11 +318,25 @@ export default function TasksScreen() {
                         feedback('select');
                         const linked = quickAddEligibleJourneys.find(c => c.id === id);
                         setQuickAddCollectionId(id);
-                        setQuickAddSummitId(linked?.summitId || '');
+                        setQuickAddGoalId(linked?.goalId || '');
+                        // Waypoint belongs to the old Journey — clear it too.
+                        setQuickAddWaypointId('');
                         setQuickAddOpenPill(null);
                       }}
                       open={quickAddOpenPill === 'journey'}
                       onToggle={() => setQuickAddOpenPill(p => (p === 'journey' ? null : 'journey'))}
+                    />
+                  )}
+
+                  {quickAddEligibleWaypoints.length > 0 && (
+                    <PillPicker
+                      label={quickAddWaypointId ? (quickAddEligibleWaypoints.find(w => w.id === quickAddWaypointId)?.title || 'Waypoint') : 'No Waypoint'}
+                      options={[{ id: '', label: 'No Waypoint' }, ...quickAddEligibleWaypoints.map(w => ({ id: w.id, label: w.title }))]}
+                      selectedId={quickAddWaypointId}
+                      onSelect={(id) => { feedback('select'); setQuickAddWaypointId(id); setQuickAddOpenPill(null); }}
+                      open={quickAddOpenPill === 'waypoint'}
+                      onToggle={() => setQuickAddOpenPill(p => (p === 'waypoint' ? null : 'waypoint'))}
+                      accentColor="#5AC8FA"
                     />
                   )}
 
@@ -348,7 +401,7 @@ export default function TasksScreen() {
                         activeCount={dateTasks.filter(t => !t.completed).length}
                         onReorder={reorderTasks}
                         onDragActiveChange={(dragging) => setDraggingDate(dragging ? date : null)}
-                        renderRow={(task, { leadingAccessory }) => {
+                        renderRow={(task, { dragAccessory }) => {
                           const tag = tags.find(t => t.id === task.tagId);
                           const isLast = task.id === dateTasks[dateTasks.length - 1]?.id;
 
@@ -376,20 +429,18 @@ export default function TasksScreen() {
                                   tagName={tag?.name}
                                   tagType={tag?.type}
                                   tags={tags}
+                                  pillarColor={getPillarColor(tag?.pillarId, pillars)}
                                   onUpdate={updateTask}
                                   isLast={true} // Handle bottom border in the wrapper View
                                   onToggle={handleToggle}
-                                  onEdit={setEditTask}
+                                  onEdit={(t) => setDetailTaskId(t.id)}
                                   onStartTimer={task.completed ? undefined : handleStartTimer}
                                   showStartButton={!task.completed}
                                   subtaskCount={subtasks.length}
                                   completedSubtaskCount={completedSubtasks.length}
                                   isExpanded={isExpanded}
                                   onToggleExpand={() => toggleParentExpanded(task.id)}
-                                  onAddSubtask={() => {
-                                    if (!isExpanded) toggleParentExpanded(task.id);
-                                  }}
-                                  leadingAccessory={leadingAccessory}
+                                  dragAccessory={dragAccessory}
                                 />
                               </SwipeableRow>
                               {isExpanded && (
@@ -409,13 +460,15 @@ export default function TasksScreen() {
                                           tagName={subTag?.name}
                                           tagType={subTag?.type}
                                           tags={tags}
+                                          pillarColor={getPillarColor(subTag?.pillarId, pillars)}
                                           onUpdate={updateTask}
                                           isLast={true} // no divider line between subtasks — spacing alone separates them
                                           onToggle={handleToggle}
-                                          onEdit={setEditTask}
+                                          onEdit={(t) => setDetailTaskId(t.id)}
                                           onStartTimer={subtask.completed ? undefined : handleStartTimer}
                                           showStartButton={!subtask.completed}
                                           variant="subtask"
+                                          parentPillarId={tag?.pillarId}
                                         />
                                       </SwipeableRow>
                                     );
@@ -423,6 +476,7 @@ export default function TasksScreen() {
                                   <View style={{ marginTop: 8 }}>
                                     <QuickAddBar
                                       compact
+                                      autoFocus
                                       placeholder="Add subtask..."
                                       value={subtaskTitleByParent[task.id] || ''}
                                       onChangeText={(t) => setSubtaskTitleByParent(prev => ({ ...prev, [task.id]: t }))}
@@ -475,6 +529,8 @@ export default function TasksScreen() {
                       style={{
                         borderBottomWidth: isLast ? 0 : 0.5,
                         borderBottomColor: 'rgba(255,255,255,0.05)',
+                        borderLeftWidth: 3,
+                        borderLeftColor: getPillarColor(tag?.pillarId, pillars),
                       }}
                       className="p-4 flex-row items-center justify-between"
                     >
@@ -513,13 +569,20 @@ export default function TasksScreen() {
         </ScrollView>
       </View>
 
-      <EditTaskModal pillars={pillars} 
-        task={editTask}
-        visible={!!editTask}
+      <TaskDetailModal
+        task={detailTask}
+        visible={!!detailTaskId}
+        tasks={tasks}
         tags={tags}
-        onClose={() => setEditTask(null)}
-        onSave={(id, updates) => updateTask(id, updates)}
-        onDelete={(id) => deleteTask(id)}
+        pillars={pillars}
+        onClose={() => setDetailTaskId(null)}
+        onUpdate={updateTask}
+        onToggle={handleToggle}
+        onDelete={(id) => { deleteTask(id); setDetailTaskId(null); }}
+        onStartTimer={handleStartTimer}
+        onMoveToIcebox={handleMoveToIcebox}
+        onActivateFromIcebox={handleActivate}
+        addTask={addTask}
       />
 
       {/* Blocked Timer Modal */}

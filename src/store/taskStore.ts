@@ -22,13 +22,20 @@ export type Task = {
   id: string;
   title: string;
   tagId: string;
-  summitId?: string;
+  goalId?: string;
   collectionId?: string; // Journey this task belongs to
+  waypointId?: string; // Sub-bucket of collectionId's Journey, if any
   parentId?: string; // ID of the parent task if this is a subtask
   estimatedMinutes: number;
   completed: boolean;
   isIcebox: boolean;
   dateCreated: string;
+  description?: string;
+  // Quantity this task contributes to its linked Goal's 'units' metric
+  // (e.g. 10 for "10 pages") — purely a Goal-progress input, never the
+  // economy payout, which always stays keyed to estimatedMinutes. Only
+  // meaningful when goalId points at a metricType:'units' Goal.
+  metricProgress?: number;
   // Manual ordering key — larger sorts lower within its group (a day's active
   // tasks, or a parent's subtasks). Optional so persisted/cloud rows that
   // predate this field still typecheck; sortKey() below covers the gap by
@@ -55,11 +62,13 @@ interface TaskState {
   // Remembers the last tag used on a quick-added task, so the next quick-add
   // defaults to it instead of forcing a choice every time.
   lastUsedTagId: string;
+  // Guards the one-time repair below so it only ever runs once per device.
+  tagPillarIdBackfillApplied: boolean;
 
   // Task Actions
   // title is the only required field — quick-add can create a task from just
   // a title; tagId/estimatedMinutes/isIcebox get safe defaults filled in below.
-  addTask: (task: { title: string; tagId?: string; estimatedMinutes?: number; isIcebox?: boolean; summitId?: string; collectionId?: string; parentId?: string; }) => string;
+  addTask: (task: { title: string; tagId?: string; estimatedMinutes?: number; isIcebox?: boolean; goalId?: string; collectionId?: string; waypointId?: string; parentId?: string; }) => string;
   setLastUsedTagId: (id: string) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
@@ -81,6 +90,12 @@ interface TaskState {
   addTag: (tag: Omit<Tag, 'id'>) => void;
   updateTag: (id: string, updates: Partial<Tag>) => void;
   archiveTag: (id: string) => void;
+  // Repairs tags persisted before the `bucket` -> `pillarId` rename (commit
+  // 79ffeb8) that never got migrated, so they still carry the old `bucket`
+  // field with `pillarId` left undefined. Pushing that straight to Supabase
+  // violates tags.pillar_id's NOT NULL constraint on every sync attempt —
+  // see docs/sdd/018-sync-health-indicator.md's "Journeys/Tags" failure.
+  backfillTagPillarIds: () => void;
 }
 
 export const useTaskStore = create<TaskState>()(
@@ -98,13 +113,15 @@ export const useTaskStore = create<TaskState>()(
         { id: uuidv4(), pillarId: 'personal', name: 'Gaming', type: 'burner' }
       ],
       lastUsedTagId: '',
+      tagPillarIdBackfillApplied: false,
 
       addTask: (task) => {
         const id = uuidv4();
-        
+        let parent: Task | undefined;
+
         if (task.parentId) {
           const state = get();
-          const parent = state.tasks.find(t => t.id === task.parentId);
+          parent = state.tasks.find(t => t.id === task.parentId);
           const siblings = state.tasks.filter(t => t.parentId === task.parentId);
           if (parent && parent.completed) {
             if (siblings.length === 0) {
@@ -120,9 +137,13 @@ export const useTaskStore = create<TaskState>()(
         const updatedState = get();
 
         // Safe default-fill so any caller (quick-add included) can create a
-        // task from just a title — last-used tag, then first non-archived
-        // tag, then '' as a last resort.
+        // task from just a title. A subtask always inherits its parent's own
+        // Category (and therefore Pillar) rather than the app-wide
+        // last-used tag — a subtask belongs to the same Pillar/Category as
+        // its parent, full stop (see TaskDetailModal's locked Pillar pill
+        // and pillar-scoped Tag options for the editing-time half of this).
         const tagId = task.tagId
+          || parent?.tagId
           || (updatedState.tags.find(t => t.id === updatedState.lastUsedTagId && !t.isArchived)?.id)
           || updatedState.tags.find(t => !t.isArchived)?.id
           || '';
@@ -135,8 +156,9 @@ export const useTaskStore = create<TaskState>()(
             tagId,
             estimatedMinutes,
             isIcebox,
-            summitId: task.summitId,
+            goalId: task.goalId,
             collectionId: task.collectionId,
+            waypointId: task.waypointId,
             parentId: task.parentId,
             id,
             completed: false,
@@ -199,10 +221,10 @@ export const useTaskStore = create<TaskState>()(
           
           // Require stores dynamically inside to avoid circular dependencies if any
           const { useEconomyStore } = require('./economyStore');
-          const { useSummitStore } = require('./summitStore');
+          const { useGoalStore } = require('./goalStore');
 
           const economyState = useEconomyStore.getState();
-          const summitState = useSummitStore.getState();
+          const goalState = useGoalStore.getState();
 
           if (isCompleting) {
             // Payout
@@ -213,8 +235,8 @@ export const useTaskStore = create<TaskState>()(
               economyState.incrementStreak();
               economyState.incrementCompletedTasks();
 
-              if (task.summitId) {
-                summitState.applyLeafProgress(task.summitId, task.estimatedMinutes);
+              if (task.goalId) {
+                goalState.applyLeafProgress(task.goalId, task.estimatedMinutes, task.metricProgress);
               }
             } else if (tag?.type === 'burner') {
               economyState.spendHours(task.estimatedMinutes);
@@ -227,8 +249,8 @@ export const useTaskStore = create<TaskState>()(
               economyState.removeHours(hoursEarned);
               economyState.decrementCompletedTasks();
 
-              if (task.summitId) {
-                summitState.revokeLeafProgress(task.summitId, task.estimatedMinutes);
+              if (task.goalId) {
+                goalState.revokeLeafProgress(task.goalId, task.estimatedMinutes, task.metricProgress);
               }
             } else if (tag?.type === 'burner') {
               economyState.addHours(task.estimatedMinutes);
@@ -302,11 +324,45 @@ export const useTaskStore = create<TaskState>()(
       })),
       archiveTag: (id) => set((state) => ({
         tags: state.tags.map(t => t.id === id ? { ...t, isArchived: true } : t)
-      }))
+      })),
+      backfillTagPillarIds: () => {
+        if (get().tagPillarIdBackfillApplied) return;
+
+        set((state) => {
+          const fallbackPillarId = state.pillars.find(p => !p.isArchived)?.id || state.pillars[0]?.id || 'office';
+          return {
+            tags: state.tags.map(t => {
+              if (t.pillarId) return t;
+              // Pre-rename rows persisted the pillar under `bucket` (see
+              // commit 79ffeb8); fall back to the first pillar if even that's gone.
+              const legacyBucket = (t as unknown as { bucket?: string }).bucket;
+              return { ...t, pillarId: legacyBucket || fallbackPillarId };
+            }),
+          };
+        });
+
+        set({ tagPillarIdBackfillApplied: true });
+      },
     }),
     {
       name: 'earned-task-storage',
       storage: createJSONStorage(() => safeStorage),
+      // v0 persisted tasks have `summitId` per-task (pre-spec-022 field
+      // name). Carry it forward into `goalId` so existing tasks don't lose
+      // their linked-goal association on next load.
+      version: 1,
+      migrate: (persistedState: any, version) => {
+        if (version < 1 && persistedState?.tasks) {
+          persistedState.tasks = persistedState.tasks.map((t: any) => {
+            if ('summitId' in t) {
+              const { summitId, ...rest } = t;
+              return { ...rest, goalId: summitId };
+            }
+            return t;
+          });
+        }
+        return persistedState;
+      },
     }
   )
 );

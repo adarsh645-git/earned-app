@@ -7,8 +7,9 @@ import PillPicker from './PillPicker';
 import EditableText from './EditableText';
 import TimeSelectorModal from './TimeSelectorModal';
 import { useCollectionStore } from '../store/collectionStore';
-import { useSummitStore } from '../store/summitStore';
+import { useGoalStore } from '../store/goalStore';
 import { getEligibleJourneys } from './LinkProgressPicker';
+import useIsMobile from '../hooks/useIsMobile';
 
 if (
   Platform.OS === 'android' &&
@@ -40,6 +41,10 @@ interface AnimatedTaskRowProps {
   tagType?: 'earner' | 'burner';
   /** All non-archived tags — powers the row's Tag pill. */
   tags?: Tag[];
+  /** Stable per-Pillar color (see src/utils/pillarColor.ts) — rendered as a
+   * left-edge accent bar, structurally separate from the checkbox's
+   * earner/burner accent so the two signals never compete. */
+  pillarColor?: string;
   /** Fixes a single field in place (Tag/Duration/Journey pills) without opening the full edit modal. */
   onUpdate?: (id: string, updates: Partial<Task>) => void;
   isLast: boolean;
@@ -51,16 +56,19 @@ interface AnimatedTaskRowProps {
   completedSubtaskCount?: number;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
-  onAddSubtask?: () => void;
-  /** Rendered at the start of the left cluster, before the checkbox — used
-   * for the drag-reorder grip so its gesture claims the touch before the
-   * row's own onPress (toggle-expand) or any other tap target reacts. */
-  leadingAccessory?: React.ReactNode;
+  /** Rendered in the trailing actions cluster, after Start/Expand — the
+   * drag-reorder grip. Passed through (not owned by this component) so its
+   * gesture claims the touch before the row's own onPress reacts. */
+  dragAccessory?: React.ReactNode;
   /** 'subtask' renders a quieter, more compact row — smaller checkbox/title/
    * icons, plain-text metadata instead of pill-chips, no confetti/glow on
    * completion — so a parent's children don't compete visually with
    * top-level tasks. Purely cosmetic; behavior/props are unchanged. */
   variant?: 'default' | 'subtask';
+  /** Subtask rows only: the parent task's Pillar. A subtask always belongs
+   * to its parent's Pillar — its Tag pill only offers Categories within
+   * this Pillar, so it can never drift onto a different one. */
+  parentPillarId?: string;
 }
 
 export default function AnimatedTaskRow({
@@ -68,6 +76,7 @@ export default function AnimatedTaskRow({
   tagName,
   tagType,
   tags = [],
+  pillarColor,
   onUpdate,
   isLast,
   onToggle,
@@ -78,12 +87,13 @@ export default function AnimatedTaskRow({
   completedSubtaskCount = 0,
   isExpanded = false,
   onToggleExpand,
-  onAddSubtask,
-  leadingAccessory,
+  dragAccessory,
   variant = 'default',
+  parentPillarId,
 }: AnimatedTaskRowProps) {
   const accent = tagType === 'burner' ? '#5AC8FA' : '#30D158';
   const isSubtask = variant === 'subtask';
+  const isMobile = useIsMobile();
 
   // Derived sizes — a subtask row is the same component, just quieter and
   // more compact, so top-level tasks (the default) are pixel-identical to
@@ -105,8 +115,8 @@ export default function AnimatedTaskRow({
   const ACTION_DIVIDER_HEIGHT = isSubtask ? 14 : 16;
 
   const { collections } = useCollectionStore();
-  const { summits } = useSummitStore();
-  const eligibleJourneys = onUpdate ? getEligibleJourneys(collections, summits, tagType === 'burner' ? 'burner' : 'earner') : [];
+  const { goals } = useGoalStore();
+  const eligibleJourneys = onUpdate ? getEligibleJourneys(collections, goals, tagType === 'burner' ? 'burner' : 'earner') : [];
   const linkedJourney = task.collectionId ? collections.find(c => c.id === task.collectionId) : undefined;
   const createdTime = formatCreatedTime(task.dateCreated);
 
@@ -205,17 +215,27 @@ export default function AnimatedTaskRow({
       style={{
         borderBottomWidth: isLast ? 0 : 0.5,
         borderBottomColor: 'rgba(255,255,255,0.08)',
+        borderLeftWidth: 3,
+        borderLeftColor: pillarColor ?? 'transparent',
         opacity: rowOpacity,
         transform: [{ translateX: rowTranslateX }],
       }}
     >
       <Pressable
-        onPress={onToggleExpand}
+        onPress={() => onEdit?.(task)}
         className="flex-row items-stretch justify-between hover:bg-[#1F1F22]"
         style={{ minHeight: isSubtask ? 44 : 72 }}
       >
-        <View className="flex-row items-center flex-1" style={{ paddingVertical: ROW_PADDING_V, paddingLeft: 16, paddingRight: 8 }}>
-          {leadingAccessory}
+        <View className="flex-row items-center flex-1" style={{ paddingVertical: ROW_PADDING_V, paddingLeft: isMobile ? 10 : 16, paddingRight: isMobile ? 4 : 8 }}>
+          {/* Expand chevron — forward (>) means "tap to expand", down means
+              "expanded" (matches the Journeys screen's tree chevrons). Shown
+              for every row that supports it, not just ones with existing
+              subtasks — see the Actions block below for why. */}
+          {onToggleExpand && (
+            <Pressable onPress={onToggleExpand} hitSlop={8} style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center', marginRight: 4 }}>
+              <Ionicons name={isExpanded ? 'chevron-down' : 'chevron-forward'} size={16} color="#8E8E93" />
+            </Pressable>
+          )}
           {/* Checkbox with glow ring + confetti burst */}
           <Pressable onPress={subtaskCount > 0 ? undefined : handleToggle} style={{ position: 'relative' }}>
             {/* Accent glow ring (behind checkbox) — subtask rows never fire it (see handleToggle) */}
@@ -245,7 +265,7 @@ export default function AnimatedTaskRow({
                   borderWidth: 2,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginRight: isSubtask ? 8 : 12,
+                  marginRight: isSubtask ? 8 : (isMobile ? 8 : 12),
                   transform: [{ scale: checkScale }],
                 },
                 localCompleted
@@ -292,7 +312,9 @@ export default function AnimatedTaskRow({
                 <PillPicker
                   variant="plain"
                   label={tagName || 'Tag'}
-                  options={tags.filter(t => !t.isArchived).map(t => ({ id: t.id, label: t.name }))}
+                  options={tags
+                    .filter(t => !t.isArchived && (!parentPillarId || t.pillarId === parentPillarId))
+                    .map(t => ({ id: t.id, label: t.name }))}
                   selectedId={task.tagId}
                   onSelect={(id) => { feedback('select'); onUpdate(task.id, { tagId: id }); setOpenPill(null); }}
                   open={openPill === 'tag'}
@@ -306,7 +328,7 @@ export default function AnimatedTaskRow({
                   </Text>
                 </Pressable>
               </View>
-            ) : onUpdate ? (
+            ) : onUpdate && !isMobile ? (
               <View className="flex-row items-center mt-1.5" style={{ flexWrap: 'wrap', gap: 6 }}>
                 <PillPicker
                   label={tagName || 'Tag'}
@@ -335,7 +357,7 @@ export default function AnimatedTaskRow({
                     onSelect={(id) => {
                       feedback('select');
                       const linked = eligibleJourneys.find(c => c.id === id);
-                      onUpdate(task.id, { collectionId: id || undefined, summitId: linked?.summitId || undefined });
+                      onUpdate(task.id, { collectionId: id || undefined, goalId: linked?.goalId || undefined });
                       setOpenPill(null);
                     }}
                     open={openPill === 'journey'}
@@ -350,6 +372,16 @@ export default function AnimatedTaskRow({
                     <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600' }}>{createdTime}</Text>
                   </View>
                 )}
+              </View>
+            ) : onUpdate ? (
+              // Mobile: no interactive pills — a quiet, non-interactive caption
+              // (same style as the subtask metadata line above) so the row stays
+              // scannable without chip clutter. Tag/Duration/Journey/time are one
+              // tap away in the Task Detail screen instead.
+              <View className="flex-row items-center mt-1" style={{ flexWrap: 'wrap', gap: 4 }}>
+                <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600' }}>{tagName || 'Tag'}</Text>
+                <Text style={{ color: '#5C5C5E', fontSize: 12 }}>·</Text>
+                <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '600' }}>{task.estimatedMinutes}m</Text>
               </View>
             ) : (
               <View className="flex-row items-center mt-1 gap-1.5">
@@ -382,53 +414,49 @@ export default function AnimatedTaskRow({
             than each button conditionally rendering the *next* button's
             divider) so the separators are always correct regardless of which
             combination of actions is present. Icebox and Delete live in
-            SwipeableRow now (swipe-reveal + right-click), not here. */}
+            SwipeableRow now (swipe-reveal + right-click), not here. The drag
+            grip (dragAccessory) renders last, after this map, since it's a
+            passed-through node rather than an {icon,onPress} entry. */}
         <View className="flex-row items-stretch">
-          {([
-            showStartButton && !localCompleted && onStartTimer ? {
-              key: 'start',
-              icon: 'play',
-              color: '#BF5AF2',
-              hoverClass: 'hover:bg-[#2C2C2E]',
-              onPress: () => onStartTimer(task.id, task.estimatedMinutes),
-            } : null,
-            onEdit ? {
-              key: 'edit',
-              icon: 'pencil',
-              color: '#8E8E93',
-              hoverClass: 'hover:bg-[#2C2C2E]',
-              onPress: () => onEdit(task),
-            } : null,
-            // Icebox and Delete moved to SwipeableRow (swipe-reveal + right-click) —
-            // see the wrapping component at the call sites in TasksScreen.tsx.
-            onAddSubtask ? {
-              key: 'add',
-              icon: 'add',
-              color: '#8E8E93',
-              hoverClass: 'hover:bg-[#2C2C2E]',
-              onPress: onAddSubtask,
-            } : null,
-            subtaskCount > 0 && onToggleExpand ? {
-              key: 'expand',
-              icon: isExpanded ? 'chevron-up' : 'chevron-down',
-              color: '#8E8E93',
-              hoverClass: 'hover:bg-[#2C2C2E]',
-              onPress: onToggleExpand,
-            } : null,
-          ] as Array<{ key: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string; hoverClass: string; onPress: () => void } | null>)
-            .filter((btn): btn is NonNullable<typeof btn> => btn !== null)
-            .map((btn, i) => (
-              <React.Fragment key={btn.key}>
-                {i > 0 && <View className="self-center" style={{ width: 1, height: ACTION_DIVIDER_HEIGHT, backgroundColor: '#3A3A3C' }} />}
-                <Pressable
-                  onPress={btn.onPress}
-                  className={`${ACTION_PADDING_CLASS} justify-center items-center bg-transparent ${btn.hoverClass}`}
-                  style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
-                >
-                  <Ionicons name={btn.icon} size={ACTION_ICON_SIZE} color={btn.color} />
-                </Pressable>
-              </React.Fragment>
-            ))}
+          {(() => {
+            const actionButtons = ([
+              showStartButton && !localCompleted && onStartTimer ? {
+                key: 'start',
+                icon: 'play',
+                color: '#BF5AF2',
+                hoverClass: 'hover:bg-[#2C2C2E]',
+                onPress: () => onStartTimer(task.id, task.estimatedMinutes),
+              } : null,
+              // Edit (pencil) button was retired — tapping the row itself
+              // opens the Task Detail screen, which owns editing.
+            ] as Array<{ key: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string; hoverClass: string; onPress: () => void } | null>)
+              .filter((btn): btn is NonNullable<typeof btn> => btn !== null);
+
+            return (
+              <>
+                {actionButtons.map((btn, i) => (
+                  <React.Fragment key={btn.key}>
+                    {i > 0 && <View className="self-center" style={{ width: 1, height: ACTION_DIVIDER_HEIGHT, backgroundColor: '#3A3A3C' }} />}
+                    <Pressable
+                      onPress={btn.onPress}
+                      className={`${ACTION_PADDING_CLASS} justify-center items-center bg-transparent ${btn.hoverClass}`}
+                      style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                    >
+                      <Ionicons name={btn.icon} size={ACTION_ICON_SIZE} color={btn.color} />
+                    </Pressable>
+                  </React.Fragment>
+                ))}
+                {dragAccessory && (
+                  <>
+                    {actionButtons.length > 0 && <View className="self-center" style={{ width: 1, height: ACTION_DIVIDER_HEIGHT, backgroundColor: '#3A3A3C' }} />}
+                    <View className={`${ACTION_PADDING_CLASS} justify-center items-center`}>
+                      {dragAccessory}
+                    </View>
+                  </>
+                )}
+              </>
+            );
+          })()}
         </View>
       </Pressable>
     </Animated.View>

@@ -17,7 +17,7 @@ interface DraggableRowProps {
   onGrant: (id: string) => void;
   onMove: (id: string, dy: number) => void;
   onRelease: () => void;
-  renderRow: (task: Task, extra: { leadingAccessory?: React.ReactNode }) => React.ReactNode;
+  renderRow: (task: Task, extra: { dragAccessory?: React.ReactNode }) => React.ReactNode;
 }
 
 // One active row's drag surface. Its PanResponder lives only on the grip
@@ -83,7 +83,7 @@ function DraggableRow({
           : null),
       }}
     >
-      {renderRow(task, { leadingAccessory: grip })}
+      {renderRow(task, { dragAccessory: grip })}
     </Animated.View>
   );
 }
@@ -98,7 +98,7 @@ interface ReorderableTaskGroupProps {
   onDragActiveChange: (dragging: boolean) => void;
   /** Builds the actual row content (border wrapper, AnimatedTaskRow, nested
    * subtask block) — this component only owns drag physics, not row look. */
-  renderRow: (task: Task, extra: { leadingAccessory?: React.ReactNode }) => React.ReactNode;
+  renderRow: (task: Task, extra: { dragAccessory?: React.ReactNode }) => React.ReactNode;
 }
 
 export default function ReorderableTaskGroup({
