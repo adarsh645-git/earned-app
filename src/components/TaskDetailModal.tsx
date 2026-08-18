@@ -14,6 +14,7 @@ import { useGoalStore } from '../store/goalStore';
 import { getEligibleJourneys } from './LinkProgressPicker';
 import { getPillarColor } from '../utils/pillarColor';
 import { feedback } from '../utils/feedback';
+import { resolveWaypointUnit } from '../utils/waypointUnit';
 
 interface TaskDetailModalProps {
   task: Task | null;
@@ -24,6 +25,10 @@ interface TaskDetailModalProps {
   onClose: () => void;
   onUpdate: (id: string, updates: Partial<Task>) => void;
   onToggle: (id: string) => void;
+  // Passed through to subtask rows (AnimatedTaskRow) — see that component's
+  // canComplete prop. This screen's own checkbox above has no optimistic
+  // animation, so it doesn't need this; only the subtask rows do.
+  canComplete?: (task: Task) => boolean;
   onDelete: (id: string) => void;
   onStartTimer?: (id: string, mins: number) => void;
   onMoveToIcebox?: (id: string) => void;
@@ -48,6 +53,7 @@ export default function TaskDetailModal({
   onClose,
   onUpdate,
   onToggle,
+  canComplete,
   onDelete,
   onStartTimer,
   onMoveToIcebox,
@@ -86,11 +92,19 @@ export default function TaskDetailModal({
   const currentPillarId = (isSubtask ? parentTag?.pillarId : tag?.pillarId) || activePillars[0]?.id || '';
   const pillarColor = getPillarColor(currentPillarId, pillars);
   const eligibleWaypoints = task.collectionId ? waypoints.filter(w => w.collectionId === task.collectionId) : [];
-  // Progress quantity (e.g. "10 pages") only matters when the linked Goal
-  // is a units-mode goal — hidden entirely for time-based/unlinked tasks.
+  // Progress quantity (e.g. "10 pages") matters whenever either the linked
+  // Waypoint or its governing Goal defines a unit — resolveWaypointUnit is
+  // the single source of truth for which one wins (Goal, when units-mode).
+  // Hidden entirely when neither defines one.
   const linkedGoal = task.goalId ? goals.find(s => s.id === task.goalId) : undefined;
-  const isUnitsGoal = linkedGoal?.metricType === 'units';
-  const unitLabel = linkedGoal?.unitLabel || 'units';
+  const linkedWaypoint = task.waypointId ? waypoints.find(w => w.id === task.waypointId) : undefined;
+  const resolvedUnit = resolveWaypointUnit(linkedWaypoint, linkedJourney, goals);
+  const showProgressField = !!resolvedUnit;
+  const unitLabel = resolvedUnit || 'units';
+  // Completing is blocked (see TasksScreen/DashboardScreen's shared gate)
+  // only when a Waypoint itself enforces a unit — a bare Goal-level unit
+  // stays optional, matching pre-existing (doc 020) behavior.
+  const isProgressRequired = !!(task.waypointId && resolvedUnit && task.metricProgress == null);
 
   const subtasks = tasks.filter(t => t.parentId === task.id);
   const completedSubtasks = subtasks.filter(t => t.completed);
@@ -240,11 +254,12 @@ export default function TaskDetailModal({
               )}
             </View>
 
-            {/* Progress toward goal — only for a units-mode linked Goal */}
-            {isUnitsGoal && (
+            {/* Progress — shown whenever the linked Waypoint or its
+                governing Goal defines a unit (see resolveWaypointUnit) */}
+            {showProgressField && (
               <View style={{ marginBottom: 24 }}>
                 <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-                  Progress ({unitLabel})
+                  Progress ({unitLabel}){isProgressRequired ? ' — required to complete' : ''}
                 </Text>
                 <TextInput
                   value={metricProgressInput}
@@ -254,7 +269,7 @@ export default function TaskDetailModal({
                   placeholderTextColor="#5C5C5E"
                   keyboardType="numeric"
                   style={[
-                    { backgroundColor: '#18181B', color: '#FFFFFF', padding: 16, borderRadius: 12, fontSize: 15, borderWidth: 1, borderColor: '#2C2C2E' },
+                    { backgroundColor: '#18181B', color: '#FFFFFF', padding: 16, borderRadius: 12, fontSize: 15, borderWidth: 1, borderColor: isProgressRequired ? '#FF9F0A' : '#2C2C2E' },
                     { outlineStyle: 'none' } as any,
                   ]}
                 />
@@ -311,6 +326,7 @@ export default function TaskDetailModal({
                     onUpdate={onUpdate}
                     isLast={i === subtasks.length - 1}
                     onToggle={onToggle}
+                    canComplete={canComplete}
                     onStartTimer={subtask.completed ? undefined : onStartTimer}
                     showStartButton={!subtask.completed}
                     variant="subtask"

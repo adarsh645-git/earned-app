@@ -32,10 +32,13 @@ import ReorderableTaskGroup from '../components/ReorderableTaskGroup';
 import TaskDetailModal from '../components/TaskDetailModal';
 import TimeSelectorModal from '../components/TimeSelectorModal';
 import ConfirmModal from '../components/ConfirmModal';
+import ProgressPromptModal from '../components/ProgressPromptModal';
 import QuickAddBar from '../components/QuickAddBar';
 import PillPicker from '../components/PillPicker';
 import { getEligibleJourneys } from '../components/LinkProgressPicker';
 import { getPillarColor } from '../utils/pillarColor';
+import { getRequiredUnitLabel } from '../utils/taskCompletionGate';
+import { resolveWaypointUnit } from '../utils/waypointUnit';
 import useIsMobile from '../hooks/useIsMobile';
 
 // "Today's Focus List — Friday, July 25" / "Yesterday" / "Wed, Jul 23"
@@ -79,6 +82,10 @@ export default function TasksScreen() {
   const [quickAddWaypointId, setQuickAddWaypointId] = useState('');
   const [quickAddIsIcebox, setQuickAddIsIcebox] = useState(false);
 
+  // Blocks completing a Waypoint-linked task until its progress quantity is
+  // entered — see src/utils/taskCompletionGate.ts.
+  const [progressPrompt, setProgressPrompt] = useState<{ taskId: string; unitLabel: string; taskTitle: string } | null>(null);
+
   const activePillars = pillars.filter(p => !p.isArchived);
   // Which Pillar the Category dropdown is currently scoped to — an explicit
   // pick wins, otherwise fall back to the last-used tag's pillar (continuity
@@ -95,6 +102,12 @@ export default function TasksScreen() {
   const quickAddEligibleWaypoints = quickAddCollectionId
     ? waypoints.filter(w => w.collectionId === quickAddCollectionId)
     : [];
+
+  // Checked synchronously by AnimatedTaskRow before it plays the optimistic
+  // completion animation — false skips the animation so a blocked
+  // completion (handleToggle opens ProgressPromptModal instead) never shows
+  // a false "done" state.
+  const canCompleteTask = (task: Task) => !getRequiredUnitLabel(task, waypoints, collections, goals);
 
   const handleStartTimer = (taskId: string, mins: number) => {
     const res = startTimer(taskId, mins);
@@ -115,7 +128,7 @@ export default function TasksScreen() {
   const [toastTone, setToastTone] = useState<'earner' | 'burner'>('earner');
 
   // Show a reward toast when completing a task (was previously silent)
-  const handleToggle = (id: string) => {
+  const completeToggle = (id: string) => {
     const task = tasks.find(t => t.id === id);
     const tag = task ? tags.find(t => t.id === task.tagId) : null;
     if (task && !task.completed && tag) {
@@ -133,6 +146,21 @@ export default function TasksScreen() {
       setToastVisible(true);
     }
     toggleTask(id);
+  };
+
+  // Gate: a task linked to a Waypoint with an enforced unit can't be
+  // completed until its quantity is entered — opens ProgressPromptModal
+  // instead of completing immediately. Un-completing is never gated.
+  const handleToggle = (id: string) => {
+    const task = tasks.find(t => t.id === id);
+    if (task && !task.completed) {
+      const requiredUnit = getRequiredUnitLabel(task, waypoints, collections, goals);
+      if (requiredUnit) {
+        setProgressPrompt({ taskId: id, unitLabel: requiredUnit, taskTitle: task.title });
+        return;
+      }
+    }
+    completeToggle(id);
   };
 
   const handleMoveToIcebox = (id: string) => {
@@ -340,6 +368,17 @@ export default function TasksScreen() {
                     />
                   )}
 
+                  {quickAddWaypointId && (() => {
+                    const wp = quickAddEligibleWaypoints.find(w => w.id === quickAddWaypointId);
+                    const collection = collections.find(c => c.id === quickAddCollectionId);
+                    const unit = resolveWaypointUnit(wp, collection, goals);
+                    return unit ? (
+                      <Text style={{ color: '#5AC8FA', fontSize: 11, fontWeight: '600' }}>
+                        Tracks in {unit.toLowerCase()} — you'll be asked for a quantity when you complete it
+                      </Text>
+                    ) : null;
+                  })()}
+
                   <Pressable
                     onPress={() => setQuickAddIsIcebox(v => !v)}
                     style={{
@@ -433,6 +472,7 @@ export default function TasksScreen() {
                                   onUpdate={updateTask}
                                   isLast={true} // Handle bottom border in the wrapper View
                                   onToggle={handleToggle}
+                                  canComplete={canCompleteTask}
                                   onEdit={(t) => setDetailTaskId(t.id)}
                                   onStartTimer={task.completed ? undefined : handleStartTimer}
                                   showStartButton={!task.completed}
@@ -464,6 +504,7 @@ export default function TasksScreen() {
                                           onUpdate={updateTask}
                                           isLast={true} // no divider line between subtasks — spacing alone separates them
                                           onToggle={handleToggle}
+                                  canComplete={canCompleteTask}
                                           onEdit={(t) => setDetailTaskId(t.id)}
                                           onStartTimer={subtask.completed ? undefined : handleStartTimer}
                                           showStartButton={!subtask.completed}
@@ -578,11 +619,26 @@ export default function TasksScreen() {
         onClose={() => setDetailTaskId(null)}
         onUpdate={updateTask}
         onToggle={handleToggle}
+        canComplete={canCompleteTask}
         onDelete={(id) => { deleteTask(id); setDetailTaskId(null); }}
         onStartTimer={handleStartTimer}
         onMoveToIcebox={handleMoveToIcebox}
         onActivateFromIcebox={handleActivate}
         addTask={addTask}
+      />
+
+      <ProgressPromptModal
+        visible={!!progressPrompt}
+        unitLabel={progressPrompt?.unitLabel || ''}
+        taskTitle={progressPrompt?.taskTitle || ''}
+        onCancel={() => setProgressPrompt(null)}
+        onSubmit={(value) => {
+          if (progressPrompt) {
+            updateTask(progressPrompt.taskId, { metricProgress: value });
+            completeToggle(progressPrompt.taskId);
+          }
+          setProgressPrompt(null);
+        }}
       />
 
       {/* Blocked Timer Modal */}

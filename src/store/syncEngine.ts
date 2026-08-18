@@ -324,6 +324,8 @@ export async function pullCloudData(userId: string) {
           year: w.year,
           month: w.month,
           dateCreated: w.date_created,
+          unitType: w.unit_type || undefined,
+          unitLabel: w.unit_label || undefined,
         }));
         useCollectionStore.setState((s) => ({ ...s, waypoints: mergeById(s.waypoints, formattedWaypoints) }));
       }
@@ -592,6 +594,8 @@ export async function pushAllCollectionsToCloud(userId: string, collections: Col
         year: w.year || null,
         month: w.month || null,
         date_created: w.dateCreated,
+        unit_type: w.unitType || null,
+        unit_label: w.unitLabel || null,
       }));
       const { error } = await supabase.from('waypoints').upsert(wPayload, { onConflict: 'id' });
       if (error) throw error;

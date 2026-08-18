@@ -49,6 +49,15 @@ interface AnimatedTaskRowProps {
   onUpdate?: (id: string, updates: Partial<Task>) => void;
   isLast: boolean;
   onToggle: (id: string) => void;
+  /** Gate checked synchronously before the optimistic completion animation
+   * (checkmark/strikethrough/confetti) plays. Returning false skips the
+   * animation entirely and calls onToggle immediately instead — onToggle is
+   * expected to handle the block itself (e.g. opening a prompt). Without
+   * this, a blocked completion would already look "done" a full second
+   * before onToggle fires, stranding the row in a false-complete state if
+   * the block turns the tap away. Omit to always animate (default,
+   * unchanged behavior). Un-completing is never gated. */
+  canComplete?: (task: Task) => boolean;
   onEdit?: (task: Task) => void;
   onStartTimer?: (id: string, mins: number) => void;
   showStartButton?: boolean;
@@ -80,6 +89,7 @@ export default function AnimatedTaskRow({
   onUpdate,
   isLast,
   onToggle,
+  canComplete,
   onEdit,
   onStartTimer,
   showStartButton = false,
@@ -158,6 +168,15 @@ export default function AnimatedTaskRow({
       return;
     }
 
+    // Completing: if a precondition blocks it (e.g. a Waypoint's progress
+    // quantity isn't entered yet), skip the optimistic animation entirely —
+    // let onToggle handle the block (it's expected to open a prompt) without
+    // ever showing a false "done" state.
+    if (canComplete && !canComplete(task)) {
+      onToggle(task.id);
+      return;
+    }
+
     // Completing: trigger multi-layered animation. Subtask rows keep the
     // satisfying checkbox bounce + checkmark pop + strikethrough, but skip
     // the confetti burst and glow-ring pulse — that celebration is reserved
@@ -199,7 +218,7 @@ export default function AnimatedTaskRow({
         onToggle(task.id);
       }, 400);
     }, 600);
-  }, [task.id, task.completed, onToggle, checkScale, checkmarkScale, glowOpacity, glowScale, rowOpacity, strikethrough]);
+  }, [task, onToggle, canComplete, checkScale, checkmarkScale, glowOpacity, glowScale, rowOpacity, strikethrough]);
 
   // Reset glow after animation
   useEffect(() => {
