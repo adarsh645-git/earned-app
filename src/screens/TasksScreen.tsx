@@ -39,19 +39,16 @@ import { getEligibleJourneys } from '../components/LinkProgressPicker';
 import { getPillarColor } from '../utils/pillarColor';
 import { getRequiredUnitLabel } from '../utils/taskCompletionGate';
 import { resolveWaypointUnit } from '../utils/waypointUnit';
+import { localDateKey, parseLocalDateKey, yesterdayDateKey, localDayKeyFromTimestamp } from '../utils/date';
 import useIsMobile from '../hooks/useIsMobile';
 
 // "Today's Focus List — Friday, July 25" / "Yesterday" / "Wed, Jul 23"
 function formatDateLabel(dateStr: string, isToday: boolean): string {
-  const d = new Date(`${dateStr}T00:00:00`); // local-time anchor — avoids the
-                                              // UTC-midnight day-shift bug that
-                                              // plain `new Date(dateStr)` has
+  const d = parseLocalDateKey(dateStr);
   if (isToday) {
     return `Today's Focus List — ${d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`;
   }
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (dateStr === yesterday.toISOString().split('T')[0]) return 'Yesterday';
+  if (dateStr === yesterdayDateKey()) return 'Yesterday';
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
@@ -185,14 +182,15 @@ export default function TasksScreen() {
   // Bundle non-icebox tasks by the day they were created — today's group is
   // expanded by default, every other day collapses, and only the 5 most
   // recent distinct days are shown at all (older tasks simply don't render).
-  const todayStr = new Date().toISOString().split('T')[0]; // matches dateCreated's own format exactly
+  const todayStr = localDateKey();
 
   const tasksByDate: Record<string, Task[]> = {};
   tasks.filter(t => !t.isIcebox && !t.parentId).forEach(t => {
-    // dateCreated is now a full timestamp (for the time-of-day pill below);
-    // grouping only cares about the calendar date. Backward-compatible with
-    // pre-existing tasks whose dateCreated was already date-only (no 'T').
-    const dateKey = t.dateCreated.split('T')[0];
+    // dateCreated is a full UTC-instant timestamp (for the time-of-day pill
+    // below); grouping keys off the device's LOCAL calendar date, not the
+    // UTC one — otherwise tasks jump into "yesterday" every evening once
+    // UTC's date rolls ahead of the local one (see utils/date.ts).
+    const dateKey = localDayKeyFromTimestamp(t.dateCreated);
     (tasksByDate[dateKey] ||= []).push(t);
   });
   // Active tasks sort by the manual reorder key (default = creation time,
