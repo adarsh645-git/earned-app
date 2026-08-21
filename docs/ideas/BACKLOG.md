@@ -61,3 +61,36 @@ Entry template — copy this for each new idea:
   RLS vs. something outside the app entirely), what "formatted nicely"
   looks like (structure/sections vs. just cleanup), and whether this is a
   feature inside Krushi itself or a separate personal tool.
+
+### 002 — Rebuild the task system to strictly follow GTD principles
+- **Date**: 2026-08-21
+- **Status**: 🔍 Exploring
+- **Idea**: Make Krushi's task/journey system strictly follow GTD (Getting
+  Things Done) principles, rather than being a generic to-do list with due
+  dates as the primary axis.
+- **Notes**: Did a first pass comparing how TickTick and Notion each
+  implement GTD's five stages (Capture, Clarify, Organize, Reflect,
+  Engage):
+  - **Capture**: TickTick wins on frictionless global quick-add; Notion is
+    higher-friction. Krushi needs a single global capture affordance that
+    writes to an unsorted inbox with zero required fields.
+  - **Clarify**: Neither app forces this step — both leave inbox triage
+    manual. This is the biggest gap across both apps and a high-leverage
+    spot for Krushi to differentiate (a guided "is it actionable → what's
+    the next action" processing flow, not just a list).
+  - **Organize**: Notion's relational DB (Task → Project rollup) beats
+    TickTick's flat tag/list model. Krushi already has Journeys/Macro
+    Goals as first-class entities — natural fit for Task-relates-to-Journey
+    plus an enforced "one next action per active Journey" view.
+  - **Reflect**: Neither app structurally enforces the Weekly Review;
+    Notion templates at best offer a static checklist page. Krushi's
+    existing debt/streak economy could make the Weekly Review an actual
+    incentivized ritual instead of something that gets skipped.
+  - **Engage**: Notion can model Energy level as an explicit filterable
+    property; TickTick can't. Worth deciding whether Energy becomes a
+    first-class dimension tied into the Cash/Hours economy (e.g. surface
+    low-cost/low-hour tasks when energy is low).
+  - Still needs: a concrete data-model proposal (Task/Project/Context
+    entities, store shape, any new Supabase tables) before this is ready
+    for the SDD loop — non-trivial (store shape + possible schema changes),
+    so it'll go through `.claude/skills/sdd-feature-loop/` once scoped.
