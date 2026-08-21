@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { safeStorage } from './safeStorage';
+import { localDateKey } from '../utils/date';
 
 export interface CheckInResult {
   rewarded: boolean;
@@ -172,7 +173,7 @@ export const useEconomyStore = create<EconomyState>()(
 
       spendBalance: (amount, allowDebt) => {
         const state = get();
-        const today = new Date().toISOString().split('T')[0];
+        const today = localDateKey();
 
         if (!allowDebt) {
           if (state.dollarBalance >= amount) {
@@ -257,7 +258,7 @@ export const useEconomyStore = create<EconomyState>()(
       },
 
       incrementStreak: () => set((state) => {
-        const today = new Date().toISOString().split('T')[0];
+        const today = localDateKey();
         if (state.lastActiveDate === today) return state;
         return {
           streak: state.streak + 1,
@@ -267,7 +268,7 @@ export const useEconomyStore = create<EconomyState>()(
 
       checkInDaily: () => {
         const state = get();
-        const today = new Date().toISOString().split('T')[0];
+        const today = localDateKey();
 
         // Already checked in today
         if (state.lastCheckInDate === today) {

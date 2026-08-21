@@ -16,6 +16,7 @@ import TaskDetailModal from '../components/TaskDetailModal';
 import ProgressPromptModal from '../components/ProgressPromptModal';
 import { getPillarColor } from '../utils/pillarColor';
 import { getRequiredUnitLabel } from '../utils/taskCompletionGate';
+import { localDateKey, localDayKeyFromTimestamp } from '../utils/date';
 import useTimerLauncher from '../hooks/useTimerLauncher';
 
 export default function DashboardScreen() {
@@ -58,17 +59,17 @@ export default function DashboardScreen() {
     toggleTask(id);
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateKey();
   const isCheckedInToday = lastCheckInDate === today;
 
   // Today's Focus / Daily Goal only ever means tasks created today (same
-  // creation-date convention TasksScreen's day-grouping uses) — without this,
-  // every completed task ever created for the pillar kept inflating the ring
-  // and leaking into "Completed Today". Subtasks are excluded too, matching
-  // TasksScreen's top-level day buckets (they're not independent daily items).
+  // local-calendar-day convention TasksScreen's day-grouping uses) — without
+  // this, every completed task ever created for the pillar kept inflating
+  // the ring and leaking into "Completed Today". Subtasks are excluded too,
+  // matching TasksScreen's top-level day buckets (not independent daily items).
   const activeBucketTasks = tasks.filter(t => {
     const tag = tags.find(tag => tag.id === t.tagId);
-    return tag?.pillarId === currentPillarId && !t.isIcebox && !t.parentId && t.dateCreated.split('T')[0] === today;
+    return tag?.pillarId === currentPillarId && !t.isIcebox && !t.parentId && localDayKeyFromTimestamp(t.dateCreated) === today;
   });
 
   const incompleteTasks = activeBucketTasks.filter(t => !t.completed);
