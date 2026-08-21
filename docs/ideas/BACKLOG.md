@@ -50,4 +50,14 @@ Entry template — copy this for each new idea:
 - **Notes**: <anything added during later discussion; leave blank until then>
 -->
 
-_No ideas logged yet — the next one you give me becomes #001._
+### 001 — Journal entry, Claude-formatted, stored securely
+- **Date**: 2026-08-21
+- **Status**: 🆕 New
+- **Idea**: A way to add a daily journal — write it roughly, unstructured,
+  and have Claude run over it, format it nicely, and store it somewhere
+  secure.
+- **Notes**: Open questions to resolve when this gets worked up: where
+  "somewhere secure" means in this app's context (a new Supabase table with
+  RLS vs. something outside the app entirely), what "formatted nicely"
+  looks like (structure/sections vs. just cleanup), and whether this is a
+  feature inside Krushi itself or a separate personal tool.
