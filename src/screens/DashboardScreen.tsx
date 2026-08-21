@@ -3,7 +3,9 @@ import { View, Text, ScrollView, Pressable, useWindowDimensions } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEconomyStore } from '../store/economyStore';
-import { useTaskStore } from '../store/taskStore';
+import { useTaskStore, Task } from '../store/taskStore';
+import { useCollectionStore } from '../store/collectionStore';
+import { useGoalStore } from '../store/goalStore';
 import { feedback } from '../utils/feedback';
 import { useConfettiStore } from '../store/confettiStore';
 import AnimatedTaskRow from '../components/AnimatedTaskRow';
@@ -11,7 +13,9 @@ import SwipeableRow from '../components/SwipeableRow';
 import AnimatedProgressRing from '../components/AnimatedProgressRing';
 import CurrencyPill from '../components/CurrencyPill';
 import TaskDetailModal from '../components/TaskDetailModal';
+import ProgressPromptModal from '../components/ProgressPromptModal';
 import { getPillarColor } from '../utils/pillarColor';
+import { getRequiredUnitLabel } from '../utils/taskCompletionGate';
 import useTimerLauncher from '../hooks/useTimerLauncher';
 
 export default function DashboardScreen() {
@@ -26,10 +30,33 @@ export default function DashboardScreen() {
 
   const { dollarBalance, hoursBalanceMinutes, debt, streak, lastCheckInDate } = useEconomyStore();
   const { tasks, tags, pillars, toggleTask, moveToIcebox, deleteTask, updateTask, addTask } = useTaskStore();
+  const { waypoints, collections } = useCollectionStore();
+  const { goals } = useGoalStore();
   const detailTask = tasks.find(t => t.id === detailTaskId) || null;
   const activePillars = pillars.filter(p => !p.isArchived);
   const currentPillarId = activePillarId || activePillars[0]?.id;
   const { launchTimer, blockedTimerModal } = useTimerLauncher();
+
+  // Blocks completing a Waypoint-linked task until its progress quantity is
+  // entered — see src/utils/taskCompletionGate.ts. Un-completing is never gated.
+  const [progressPrompt, setProgressPrompt] = useState<{ taskId: string; unitLabel: string; taskTitle: string } | null>(null);
+  // Checked synchronously by AnimatedTaskRow before it plays the optimistic
+  // completion animation — false skips the animation so a blocked
+  // completion (gatedToggle opens ProgressPromptModal instead) never shows
+  // a false "done" state.
+  const canCompleteTask = (task: Task) => !getRequiredUnitLabel(task, waypoints, collections, goals);
+
+  const gatedToggle = (id: string) => {
+    const task = tasks.find(t => t.id === id);
+    if (task && !task.completed) {
+      const requiredUnit = getRequiredUnitLabel(task, waypoints, collections, goals);
+      if (requiredUnit) {
+        setProgressPrompt({ taskId: id, unitLabel: requiredUnit, taskTitle: task.title });
+        return;
+      }
+    }
+    toggleTask(id);
+  };
 
   const today = new Date().toISOString().split('T')[0];
   const isCheckedInToday = lastCheckInDate === today;
@@ -219,7 +246,8 @@ export default function DashboardScreen() {
                     tagName={tag?.name}
                     pillarColor={getPillarColor(tag?.pillarId, pillars)}
                     isLast={isLast}
-                    onToggle={toggleTask}
+                    onToggle={gatedToggle}
+                    canComplete={canCompleteTask}
                     onStartTimer={launchTimer}
                     onEdit={(t) => setDetailTaskId(t.id)}
                     showStartButton
@@ -247,7 +275,8 @@ export default function DashboardScreen() {
                       tagName={tag?.name}
                       pillarColor={getPillarColor(tag?.pillarId, pillars)}
                       isLast={isLast}
-                      onToggle={toggleTask}
+                      onToggle={gatedToggle}
+                    canComplete={canCompleteTask}
                       onEdit={(t) => setDetailTaskId(t.id)}
                       showStartButton={false}
                     />
@@ -270,11 +299,26 @@ export default function DashboardScreen() {
         pillars={pillars}
         onClose={() => setDetailTaskId(null)}
         onUpdate={updateTask}
-        onToggle={toggleTask}
+        onToggle={gatedToggle}
+        canComplete={canCompleteTask}
         onDelete={(id) => { deleteTask(id); setDetailTaskId(null); }}
         onStartTimer={launchTimer}
         onMoveToIcebox={moveToIcebox}
         addTask={addTask}
+      />
+
+      <ProgressPromptModal
+        visible={!!progressPrompt}
+        unitLabel={progressPrompt?.unitLabel || ''}
+        taskTitle={progressPrompt?.taskTitle || ''}
+        onCancel={() => setProgressPrompt(null)}
+        onSubmit={(value) => {
+          if (progressPrompt) {
+            updateTask(progressPrompt.taskId, { metricProgress: value });
+            toggleTask(progressPrompt.taskId);
+          }
+          setProgressPrompt(null);
+        }}
       />
     </SafeAreaView>
   );

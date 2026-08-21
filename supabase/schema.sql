@@ -86,7 +86,9 @@ CREATE TABLE IF NOT EXISTS public.waypoints (
   completed_metric NUMERIC DEFAULT 0,
   year INTEGER,
   month INTEGER,
-  date_created TIMESTAMPTZ DEFAULT NOW()
+  date_created TIMESTAMPTZ DEFAULT NOW(),
+  unit_type TEXT, -- preset unit key; only authoritative w/o a units-mode linked Goal; see 20260730000001
+  unit_label TEXT -- resolved display label for unit_type; see 20260730000001
 );
 
 -- 8. Collection Items Table

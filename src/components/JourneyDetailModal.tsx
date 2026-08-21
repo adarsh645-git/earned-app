@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Collection, CollectionCategory, useCollectionStore } from '../store/collectionStore';
@@ -13,6 +13,7 @@ import ConfirmModal from './ConfirmModal';
 import { CategoryVectorIcon } from '../utils/categoryIcons';
 import { getPillarColor } from '../utils/pillarColor';
 import { feedback } from '../utils/feedback';
+import { resolveWaypointUnit, isWaypointUnitGoalGoverned, WAYPOINT_UNIT_TYPES } from '../utils/waypointUnit';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -45,16 +46,24 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
     addItem, updateItem, deleteItem,
   } = useCollectionStore();
   const { goals, deleteGoal } = useGoalStore();
-  const { tasks, tags, pillars } = useTaskStore();
+  const { tasks, tags, pillars, addTask } = useTaskStore();
 
   const [categoryPillOpen, setCategoryPillOpen] = useState(false);
   const [goalPillOpen, setGoalPillOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [expandedWaypoints, setExpandedWaypoints] = useState<Record<string, boolean>>({});
-  const [waypointRowOpenField, setWaypointRowOpenField] = useState<Record<string, 'target' | 'year' | 'month' | null>>({});
+  const [waypointRowOpenField, setWaypointRowOpenField] = useState<Record<string, 'unit' | 'year' | 'month' | null>>({});
   const [waypointQuickAddTitle, setWaypointQuickAddTitle] = useState('');
   const [itemQuickAddTitleByWaypoint, setItemQuickAddTitleByWaypoint] = useState<Record<string, string>>({});
   const [itemQuickAddTitleByJourney, setItemQuickAddTitleByJourney] = useState('');
+  // Target is a free numeric field (not a fixed preset — a page count like
+  // 1125 easily exceeds any reasonable preset list), so it needs its own
+  // per-waypoint draft buffer, same commit-on-blur convention as
+  // GoalDetailModal's targetMetric field.
+  const [waypointTargetDraft, setWaypointTargetDraft] = useState<Record<string, string>>({});
+  // Draft buffer for the free-text label entered after picking "Custom…" in
+  // the Unit picker — only rendered while a waypoint's unitType is 'custom'.
+  const [waypointCustomUnitDraft, setWaypointCustomUnitDraft] = useState<Record<string, string>>({});
 
   if (!collection) return null;
 
@@ -93,6 +102,38 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
     if (!trimmed) return;
     addItem({ collectionId: collection.id, waypointId, title: trimmed, isAddedLater: true });
     feedback('select');
+  };
+
+  // Waypoint-scoped "Add a task" creates a real Task (not a CollectionItem)
+  // so it actually appears on the Tasks page — the Journey-root "Add a
+  // task" box above (no waypointId) is unaffected and still creates a
+  // CollectionItem, unchanged.
+  const handleQuickAddWaypointTask = (waypointId: string, title: string) => {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    addTask({ title: trimmed, collectionId: collection.id, waypointId, goalId: collection.goalId });
+    feedback('select');
+  };
+
+  const commitWaypointTarget = (waypointId: string) => {
+    const draft = waypointTargetDraft[waypointId];
+    if (draft === undefined) return;
+    const parsed = parseInt(draft, 10);
+    const wp = waypoints.find(w => w.id === waypointId);
+    const next = isNaN(parsed) || parsed <= 0 ? undefined : parsed;
+    if (wp && next !== wp.targetMetric) {
+      updateWaypoint(waypointId, { targetMetric: next });
+    }
+  };
+
+  const commitWaypointCustomUnit = (waypointId: string) => {
+    const draft = waypointCustomUnitDraft[waypointId];
+    if (draft === undefined) return;
+    const wp = waypoints.find(w => w.id === waypointId);
+    const trimmed = draft.trim();
+    if (wp && trimmed && trimmed !== wp.unitLabel) {
+      updateWaypoint(waypointId, { unitLabel: trimmed });
+    }
   };
 
   return (
@@ -175,7 +216,8 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                 const wpItems = collectionItems.filter(i => i.waypointId === wp.id);
                 const wpTasks = linkedTasks.filter(t => t.waypointId === wp.id);
                 
-                const unitLabel = linkedGoal?.unitLabel || (linkedGoal?.metricType === 'units' ? 'units' : 'min');
+                const unitLabel = resolveWaypointUnit(wp, collection, goals) || 'min';
+                const unitGoalGoverned = isWaypointUnitGoalGoverned(collection, goals);
                 const hasTarget = wp.targetMetric != null;
                 const targetMetric = wp.targetMetric || 1;
                 const wpCompleted = wp.completedMetric || 0;
@@ -209,16 +251,46 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
 
                     {isExpanded && (
                       <View style={{ paddingHorizontal: 14, paddingBottom: 14, borderTopWidth: 1, borderTopColor: '#2C2C2E' }}>
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10, marginBottom: 4 }}>
-                          <PillPicker
-                            label={wp.targetMetric ? `Target: ${wp.targetMetric}` : 'No Target'}
-                            options={[{ id: '', label: 'No Target' }, ...[5, 10, 15, 20, 25, 30, 50, 100].map(n => ({ id: String(n), label: String(n) }))]}
-                            selectedId={wp.targetMetric ? String(wp.targetMetric) : ''}
-                            onSelect={(id) => { updateWaypoint(wp.id, { targetMetric: id ? parseInt(id, 10) : undefined }); setWaypointRowOpenField(prev => ({ ...prev, [wp.id]: null })); }}
-                            open={waypointRowOpenField[wp.id] === 'target'}
-                            onToggle={() => setWaypointRowOpenField(prev => ({ ...prev, [wp.id]: prev[wp.id] === 'target' ? null : 'target' }))}
-                            accentColor="#5AC8FA"
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 10, marginBottom: 4 }}>
+                          <TextInput
+                            value={waypointTargetDraft[wp.id] ?? (wp.targetMetric ? String(wp.targetMetric) : '')}
+                            onChangeText={(text) => setWaypointTargetDraft(prev => ({ ...prev, [wp.id]: text }))}
+                            onBlur={() => commitWaypointTarget(wp.id)}
+                            placeholder="No Target"
+                            placeholderTextColor="#5C5C5E"
+                            keyboardType="numeric"
+                            style={[
+                              { backgroundColor: '#2C2C2E', color: '#FFF', fontSize: 12, fontWeight: '600', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#3A3A3C', width: 90 },
+                              { outlineStyle: 'none' } as any,
+                            ]}
                           />
+
+                          {unitGoalGoverned ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#3A3A3C', opacity: 0.7 }}>
+                              <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>{unitLabel} (from Goal)</Text>
+                            </View>
+                          ) : (
+                            <PillPicker
+                              label={wp.unitType ? (WAYPOINT_UNIT_TYPES.find(u => u.id === wp.unitType)?.label || wp.unitLabel || 'Unit') : 'No Unit'}
+                              options={[{ id: '', label: 'No Unit' }, ...WAYPOINT_UNIT_TYPES]}
+                              selectedId={wp.unitType || ''}
+                              onSelect={(id) => {
+                                feedback('select');
+                                if (id === 'custom') {
+                                  updateWaypoint(wp.id, { unitType: 'custom' });
+                                } else if (id === '') {
+                                  updateWaypoint(wp.id, { unitType: undefined, unitLabel: undefined });
+                                } else {
+                                  const preset = WAYPOINT_UNIT_TYPES.find(u => u.id === id);
+                                  updateWaypoint(wp.id, { unitType: id, unitLabel: preset?.label });
+                                }
+                                setWaypointRowOpenField(prev => ({ ...prev, [wp.id]: null }));
+                              }}
+                              open={waypointRowOpenField[wp.id] === 'unit'}
+                              onToggle={() => setWaypointRowOpenField(prev => ({ ...prev, [wp.id]: prev[wp.id] === 'unit' ? null : 'unit' }))}
+                              accentColor="#5AC8FA"
+                            />
+                          )}
                           <PillPicker
                             label={wp.year ? String(wp.year) : 'Ongoing'}
                             options={[{ id: '', label: 'Ongoing' }, ...[currentYear, currentYear + 1, currentYear + 2].map(y => ({ id: String(y), label: String(y) }))]}
@@ -238,6 +310,20 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                             accentColor="#5AC8FA"
                           />
                         </View>
+
+                        {!unitGoalGoverned && wp.unitType === 'custom' && (
+                          <TextInput
+                            value={waypointCustomUnitDraft[wp.id] ?? (wp.unitLabel || '')}
+                            onChangeText={(text) => setWaypointCustomUnitDraft(prev => ({ ...prev, [wp.id]: text }))}
+                            onBlur={() => commitWaypointCustomUnit(wp.id)}
+                            placeholder="Unit label (e.g. laps, episodes)"
+                            placeholderTextColor="#5C5C5E"
+                            style={[
+                              { backgroundColor: '#2C2C2E', color: '#FFF', fontSize: 12, fontWeight: '600', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#3A3A3C', marginBottom: 4 },
+                              { outlineStyle: 'none' } as any,
+                            ]}
+                          />
+                        )}
 
                         {wpItems.length > 0 ? (
                           wpItems.map(item => (
@@ -291,7 +377,7 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                             value={itemQuickAddTitleByWaypoint[wp.id] || ''}
                             onChangeText={(t) => setItemQuickAddTitleByWaypoint(prev => ({ ...prev, [wp.id]: t }))}
                             onSubmit={() => {
-                              handleQuickAddItem(wp.id, itemQuickAddTitleByWaypoint[wp.id] || '');
+                              handleQuickAddWaypointTask(wp.id, itemQuickAddTitleByWaypoint[wp.id] || '');
                               setItemQuickAddTitleByWaypoint(prev => ({ ...prev, [wp.id]: '' }));
                             }}
                           />

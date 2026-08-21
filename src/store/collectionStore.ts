@@ -16,6 +16,13 @@ export type Waypoint = {
   year?: number;
   month?: number; // 1-12
   dateCreated: string;
+  // This Waypoint's own unit — only authoritative when its Journey has no
+  // units-mode linked Goal (that Goal's unitLabel governs instead; see
+  // resolveWaypointUnit in utils/waypointUnit.ts). unitType is the preset
+  // key ('pages'/'miles'/.../'custom'); unitLabel is the resolved display
+  // text (free text when unitType === 'custom').
+  unitType?: string;
+  unitLabel?: string;
 };
 
 export type Collection = {
@@ -140,14 +147,17 @@ export const useCollectionStore = create<CollectionState>()(
           if (!wp) return state;
           
           const collection = state.collections.find(c => c.id === wp.collectionId);
-          let addedValue = minutes;
-          if (collection?.goalId) {
-            const goal = useGoalStore.getState().goals.find(g => g.id === collection.goalId);
-            if (goal?.metricType === 'units') {
-              addedValue = metricProgress || 1;
-            }
-          }
-          
+          // A units-mode linked Goal governs; otherwise the Waypoint's own
+          // unitLabel (see waypointUnit.ts's resolveWaypointUnit — mirrored
+          // here rather than imported, since this store's actions run
+          // outside React and duplicating this one boolean check is safer
+          // than risking a load-order issue with a cross-store import) means
+          // it tracks its own quantity too. Only a Waypoint with no unit at
+          // all (the pre-existing behavior) falls back to raw minutes.
+          const goal = collection?.goalId ? useGoalStore.getState().goals.find(g => g.id === collection.goalId) : undefined;
+          const hasUnit = goal?.metricType === 'units' || !!wp.unitLabel;
+          const addedValue = hasUnit ? (metricProgress || 1) : minutes;
+
           return {
             waypoints: state.waypoints.map((w) =>
               w.id === id
@@ -162,15 +172,11 @@ export const useCollectionStore = create<CollectionState>()(
         set((state) => {
           const wp = state.waypoints?.find((w) => w.id === id);
           if (!wp) return state;
-          
+
           const collection = state.collections.find(c => c.id === wp.collectionId);
-          let removedValue = minutes;
-          if (collection?.goalId) {
-            const goal = useGoalStore.getState().goals.find(g => g.id === collection.goalId);
-            if (goal?.metricType === 'units') {
-              removedValue = metricProgress || 1;
-            }
-          }
+          const goal = collection?.goalId ? useGoalStore.getState().goals.find(g => g.id === collection.goalId) : undefined;
+          const hasUnit = goal?.metricType === 'units' || !!wp.unitLabel;
+          const removedValue = hasUnit ? (metricProgress || 1) : minutes;
           
           return {
             waypoints: state.waypoints.map((w) =>
