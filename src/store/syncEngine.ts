@@ -42,21 +42,31 @@ function reportResult(channel: string, ok: boolean, err?: unknown) {
   }
 }
 
+// How long a delete tombstone protects an id from being merged back in,
+// regardless of whether the delete has already confirmed. Time-based, not
+// confirmation-based: an earlier design cleared the tombstone the instant
+// the delete's own request confirmed, which reopened the exact race it was
+// meant to close — a *different*, independently in-flight pull (e.g. one
+// kicked off by the realtime listener, or just a slower request) that
+// started before the delete and is still using pre-delete data can resolve
+// *after* the delete confirms and merge the stale row right back in. A
+// fixed grace period is simple and comfortably covers any realistic
+// in-flight staleness. See docs/sdd/030-delete-tombstones.md.
+export const DELETE_TOMBSTONE_GRACE_MS = 30_000;
+
 /**
  * Merges cloud rows into a local array by id instead of replacing it outright.
  * Cloud wins for ids present in both (it's the confirmed-synced source of
  * truth), but any local-only id (added but not yet reflected in this read)
- * is preserved rather than being wiped out by a stale snapshot.
+ * is preserved rather than being wiped out by a stale snapshot. `pendingDeletes`
+ * excludes any id deleted within the last DELETE_TOMBSTONE_GRACE_MS.
  */
-// pendingDeleteIds excludes ids the local store just deleted but hasn't
-// confirmed removed from Supabase yet — without this, a cloud row whose
-// delete request is still in flight (or silently failed) gets merged right
-// back in on the very next pull, most commonly the one that runs on every
-// app reload. See docs/sdd/030-delete-tombstones.md.
-function mergeById<T extends { id: string }>(local: T[], cloud: T[], pendingDeleteIds?: Set<string>): T[] {
+function mergeById<T extends { id: string }>(local: T[], cloud: T[], pendingDeletes?: Record<string, number>): T[] {
   const merged = new Map(local.map((item) => [item.id, item]));
+  const now = Date.now();
   for (const item of cloud) {
-    if (pendingDeleteIds?.has(item.id)) continue;
+    const deletedAt = pendingDeletes?.[item.id];
+    if (deletedAt !== undefined && now - deletedAt < DELETE_TOMBSTONE_GRACE_MS) continue;
     merged.set(item.id, item);
   }
   return Array.from(merged.values());
@@ -90,9 +100,10 @@ export function useCloudSync() {
     const unsubTasks = useTaskStore.subscribe((state, prevState) => {
       const removedTaskIds = diffRemovedIds(prevState.tasks, state.tasks);
       if (removedTaskIds.length > 0) {
-        deleteTasksFromCloud(user.id, removedTaskIds).then((ok) => {
-          if (ok) useTaskStore.getState().clearPendingDeletes(removedTaskIds);
-        });
+        // Fire-and-forget — the tombstone's time-based expiry (see
+        // DELETE_TOMBSTONE_GRACE_MS above) is what actually protects against
+        // resurrection now, not this call's own confirmation.
+        deleteTasksFromCloud(user.id, removedTaskIds);
       }
       // Reads pendingDeletes live (not this callback's possibly-stale
       // `state` closure) — an older in-flight push captured just before a
@@ -114,9 +125,7 @@ export function useCloudSync() {
     const unsubRewards = useRewardStore.subscribe((state, prevState) => {
       const removedRewardIds = diffRemovedIds(prevState.rewards, state.rewards);
       if (removedRewardIds.length > 0) {
-        deleteRewardsFromCloud(user.id, removedRewardIds).then((ok) => {
-          if (ok) useRewardStore.getState().clearPendingDeletes(removedRewardIds);
-        });
+        deleteRewardsFromCloud(user.id, removedRewardIds);
       }
       const rewardPendingDeletes = useRewardStore.getState().pendingDeletes;
       pushAllRewardsToCloud(user.id, state.rewards.filter((r) => !(r.id in rewardPendingDeletes)));
@@ -125,9 +134,7 @@ export function useCloudSync() {
     const unsubGoals = useGoalStore.subscribe((state, prevState) => {
       const removedIds = diffRemovedIds(prevState.goals, state.goals);
       if (removedIds.length > 0) {
-        deleteGoalsFromCloud(user.id, removedIds).then((ok) => {
-          if (ok) useGoalStore.getState().clearPendingDeletes(removedIds);
-        });
+        deleteGoalsFromCloud(user.id, removedIds);
       }
       const goalPendingDeletes = useGoalStore.getState().pendingDeletes;
       pushAllGoalsToCloud(user.id, state.goals.filter((g) => !(g.id in goalPendingDeletes)));
@@ -139,19 +146,13 @@ export function useCloudSync() {
       const removedItemIds = diffRemovedIds(prevState.items, state.items);
 
       if (removedCollectionIds.length > 0) {
-        deleteCollectionsFromCloud(user.id, removedCollectionIds).then((ok) => {
-          if (ok) useCollectionStore.getState().clearPendingDeletes(removedCollectionIds);
-        });
+        deleteCollectionsFromCloud(user.id, removedCollectionIds);
       }
       if (removedWaypointIds.length > 0) {
-        deleteWaypointsFromCloud(user.id, removedWaypointIds).then((ok) => {
-          if (ok) useCollectionStore.getState().clearPendingDeletes(removedWaypointIds);
-        });
+        deleteWaypointsFromCloud(user.id, removedWaypointIds);
       }
       if (removedItemIds.length > 0) {
-        deleteItemsFromCloud(removedItemIds).then((ok) => {
-          if (ok) useCollectionStore.getState().clearPendingDeletes(removedItemIds);
-        });
+        deleteItemsFromCloud(removedItemIds);
       }
 
       const collectionPendingDeletes = useCollectionStore.getState().pendingDeletes;
@@ -251,7 +252,7 @@ export async function pullCloudData(userId: string) {
         description: t.description ?? undefined,
         metricProgress: t.metric_progress ?? undefined,
       }));
-      useTaskStore.setState((s) => ({ ...s, tasks: mergeById(s.tasks, formattedTasks, new Set(Object.keys(s.pendingDeletes))) }));
+      useTaskStore.setState((s) => ({ ...s, tasks: mergeById(s.tasks, formattedTasks, s.pendingDeletes) }));
     }
 
     // Fetch Pillars
@@ -300,7 +301,7 @@ export async function pullCloudData(userId: string) {
         cost: parseFloat(r.cost) || 0,
         dateCreated: r.date_created,
       }));
-      useRewardStore.setState((s) => ({ rewards: mergeById(s.rewards, formattedRewards, new Set(Object.keys(s.pendingDeletes))) }));
+      useRewardStore.setState((s) => ({ rewards: mergeById(s.rewards, formattedRewards, s.pendingDeletes) }));
     }
 
     // Fetch Goals
@@ -328,7 +329,7 @@ export async function pullCloudData(userId: string) {
         unitLabel: g.unit_label || undefined,
         pillarId: g.pillar_id || undefined,
       }));
-      useGoalStore.setState((s) => ({ goals: mergeById(s.goals, formattedGoals, new Set(Object.keys(s.pendingDeletes))) }));
+      useGoalStore.setState((s) => ({ goals: mergeById(s.goals, formattedGoals, s.pendingDeletes) }));
     }
 
     // Fetch Collections
@@ -349,7 +350,7 @@ export async function pullCloudData(userId: string) {
         unitLabel: c.unit_label || undefined,
         pillarId: c.pillar_id || undefined,
       }));
-      useCollectionStore.setState((s) => ({ ...s, collections: mergeById(s.collections, formattedCollections, new Set(Object.keys(s.pendingDeletes))) }));
+      useCollectionStore.setState((s) => ({ ...s, collections: mergeById(s.collections, formattedCollections, s.pendingDeletes) }));
 
       // Fetch Waypoints
       const { data: waypoints, error: waypointsError } = await supabase
@@ -371,7 +372,7 @@ export async function pullCloudData(userId: string) {
           unitType: w.unit_type || undefined,
           unitLabel: w.unit_label || undefined,
         }));
-        useCollectionStore.setState((s) => ({ ...s, waypoints: mergeById(s.waypoints, formattedWaypoints, new Set(Object.keys(s.pendingDeletes))) }));
+        useCollectionStore.setState((s) => ({ ...s, waypoints: mergeById(s.waypoints, formattedWaypoints, s.pendingDeletes) }));
       }
     }
 
@@ -394,7 +395,7 @@ export async function pullCloudData(userId: string) {
           isAddedLater: i.is_added_later,
           dateCreated: i.date_created,
         }));
-        useCollectionStore.setState((s) => ({ ...s, items: mergeById(s.items, formattedItems, new Set(Object.keys(s.pendingDeletes))) }));
+        useCollectionStore.setState((s) => ({ ...s, items: mergeById(s.items, formattedItems, s.pendingDeletes) }));
       }
     }
 

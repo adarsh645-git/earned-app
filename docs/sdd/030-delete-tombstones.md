@@ -115,12 +115,53 @@ here per AGENTS.md rather than leaving it unrecorded. User was told to run
 the migration; `pushEconomyToCloud`'s unchecked error still needs its own
 fix.
 
-**Status: not fully confirmed closed.** The count-check and push-time
-filtering are both real, verified-correct fixes for what they target, but
-the original resurrection report hasn't been reproduced-then-confirmed-fixed
-end-to-end by the user since these landed. If it recurs, the next diagnostic
-step is the Network tab (not just Console) filtered to `tasks`, watching
-the DELETE request/response and every subsequent POST around a repro.
+### Addendum 3 — root cause found via Network tab trace, confirmation-based clearing was the bug
+
+User captured a full Network tab trace of a repro (delete confirmed working
+per this session's Addendum 1/2 fixes, task still resurrected "after a few
+seconds" — no reload needed). The trace showed the DELETE itself was clean:
+`204 No Content`, `Content-Range: */1` — exactly 1 row removed, confirmed
+server-side. Also confirmed the deployed bundle (user tests against the
+Vercel production site, not local dev) already contained every fix through
+this session — ruled out "not deployed yet."
+
+"A few seconds, no reload required" is the signature of a different race
+than the ones already fixed: **clearing the tombstone the instant the
+delete's own request confirms reopens a window against a *different*,
+independently in-flight pull** — one kicked off by the realtime listener
+(`postgres_changes` fires on `event: '*'`, so the delete's own commit, and
+every row the accompanying `pushAllTasksToCloud` upserts, each trigger a
+fresh `pullCloudData`), or just a slower concurrent request, that started
+*before* the delete and is still carrying pre-delete data. If that stale
+pull's response lands *after* the tombstone was already cleared, its data
+gets merged straight back in — no error anywhere, because nothing failed;
+two independent async operations just resolved out of order.
+
+**Fix**: stop clearing tombstones on delete confirmation entirely. Protect
+purely by time instead — `DELETE_TOMBSTONE_GRACE_MS` (30s, exported from
+`syncEngine.ts`) — any cloud row whose id was deleted within the last 30s is
+excluded from every merge, confirmed or not. 30s comfortably covers any
+realistic in-flight staleness. Self-healing side benefit: if a delete
+genuinely fails, the row correctly reappears after the grace window expires
+instead of staying hidden locally forever while silently still existing in
+the cloud.
+
+- `mergeById` (`syncEngine.ts`) now takes the raw `pendingDeletes: Record<id,
+  deletedAt>` and checks `Date.now() - deletedAt < DELETE_TOMBSTONE_GRACE_MS`
+  per row, instead of a `Set` of ids checked by bare presence.
+- Every `deleteXFromCloud(...).then(ok => ok && clearPendingDeletes(...))`
+  call site in `useCloudSync` reverted to fire-and-forget — the time-based
+  expiry is what protects now, not confirmation.
+- `clearPendingDeletes` removed from all four stores (nothing calls it
+  anymore). Each store instead self-prunes expired tombstones inline on
+  every new delete (`pruneExpiredPendingDeletes`, duplicated per store —
+  same value as `syncEngine.ts`'s constant, avoiding a circular import)
+  rather than needing a separate timer or clear call.
+
+**Status**: root cause identified from hard evidence (a real network trace),
+not inferred — this is the first fix in this saga backed by a confirmed
+mechanism rather than a plausible theory. Still asking the user to confirm
+one more time after this lands before calling it closed.
 
 ## Data Schema / Interface Contracts
 

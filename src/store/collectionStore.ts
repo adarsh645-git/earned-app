@@ -5,6 +5,20 @@ import { useGoalStore } from './goalStore';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 
+// Must match syncEngine.ts's DELETE_TOMBSTONE_GRACE_MS — duplicated rather
+// than imported to avoid a circular import. See
+// docs/sdd/030-delete-tombstones.md.
+const DELETE_TOMBSTONE_GRACE_MS = 30_000;
+
+function pruneExpiredPendingDeletes(pendingDeletes: Record<string, number>): Record<string, number> {
+  const now = Date.now();
+  const next: Record<string, number> = {};
+  for (const [id, deletedAt] of Object.entries(pendingDeletes)) {
+    if (now - deletedAt < DELETE_TOMBSTONE_GRACE_MS) next[id] = deletedAt;
+  }
+  return next;
+}
+
 export type CollectionCategory = 'books' | 'games' | 'stocks' | 'fitness' | 'courses' | 'travel' | 'general';
 
 export type Waypoint = {
@@ -80,7 +94,6 @@ interface CollectionState {
   // uuids, no collision risk) — see taskStore.ts's pendingDeletes for why
   // this exists. See docs/sdd/030-delete-tombstones.md.
   pendingDeletes: Record<string, number>;
-  clearPendingDeletes: (ids: string[]) => void;
 }
 
 export const useCollectionStore = create<CollectionState>()(
@@ -91,11 +104,6 @@ export const useCollectionStore = create<CollectionState>()(
       items: [],
       journeyBackfillApplied: false,
       pendingDeletes: {},
-      clearPendingDeletes: (ids) => set((state) => {
-        const next = { ...state.pendingDeletes };
-        ids.forEach((id) => delete next[id]);
-        return { pendingDeletes: next };
-      }),
 
       addCollection: (collectionData) => {
         const id = uuidv4();
@@ -172,7 +180,7 @@ export const useCollectionStore = create<CollectionState>()(
           waypoints: (state.waypoints || []).filter((w) => w.collectionId !== id),
           items: state.items.filter((i) => i.collectionId !== id),
           pendingDeletes: {
-            ...state.pendingDeletes,
+            ...pruneExpiredPendingDeletes(state.pendingDeletes),
             ...Object.fromEntries(removedIds.map((rid) => [rid, Date.now()])),
           },
         }));
@@ -199,7 +207,7 @@ export const useCollectionStore = create<CollectionState>()(
         set((state) => ({
           waypoints: (state.waypoints || []).filter((w) => w.id !== id),
           items: state.items.map((i) => (i.waypointId === id ? { ...i, waypointId: undefined } : i)),
-          pendingDeletes: { ...state.pendingDeletes, [id]: Date.now() },
+          pendingDeletes: { ...pruneExpiredPendingDeletes(state.pendingDeletes), [id]: Date.now() },
         }));
 
         // Dynamic require avoids a circular import (taskStore doesn't import
@@ -252,7 +260,7 @@ export const useCollectionStore = create<CollectionState>()(
       deleteItem: (id) => {
         set((state) => ({
           items: state.items.filter((i) => i.id !== id),
-          pendingDeletes: { ...state.pendingDeletes, [id]: Date.now() },
+          pendingDeletes: { ...pruneExpiredPendingDeletes(state.pendingDeletes), [id]: Date.now() },
         }));
       },
 

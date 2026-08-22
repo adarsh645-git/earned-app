@@ -57,6 +57,23 @@ export function sortKey(t: Task): number {
   return t.sortOrder ?? Date.parse(t.dateCreated);
 }
 
+// Must match syncEngine.ts's DELETE_TOMBSTONE_GRACE_MS — duplicated rather
+// than imported to avoid a circular import (syncEngine.ts imports this
+// store). See docs/sdd/030-delete-tombstones.md.
+const DELETE_TOMBSTONE_GRACE_MS = 30_000;
+
+// Drops tombstones old enough that any realistically-stale in-flight
+// request protecting against would have long since resolved — keeps
+// pendingDeletes from growing forever now that nothing clears it early.
+function pruneExpiredPendingDeletes(pendingDeletes: Record<string, number>): Record<string, number> {
+  const now = Date.now();
+  const next: Record<string, number> = {};
+  for (const [id, deletedAt] of Object.entries(pendingDeletes)) {
+    if (now - deletedAt < DELETE_TOMBSTONE_GRACE_MS) next[id] = deletedAt;
+  }
+  return next;
+}
+
 // The Goal a Task's completion should reconcile progress/milestones
 // against: its own goalId, or (when unset) the goalId of the Journey it's
 // linked to via collectionId. See
@@ -83,15 +100,18 @@ interface TaskState {
   tagPillarIdBackfillApplied: boolean;
   // Guards dedupeTags so it only ever runs once per device.
   tagDedupeApplied: boolean;
-  // Ids deleted locally but not yet confirmed removed from Supabase, mapped
-  // to when the delete happened. A cloud pull (e.g. on reload, which runs
-  // one immediately) skips any cloud row whose id is in here — otherwise
+  // Ids deleted locally, mapped to when the delete happened. A cloud pull
+  // (e.g. on reload, which runs one immediately) skips any cloud row whose
+  // id is in here for DELETE_TOMBSTONE_GRACE_MS (syncEngine.ts) — otherwise
   // mergeById has no way to tell "never existed locally" apart from "just
-  // deleted, delete hasn't reached the server yet," and resurrects it. See
-  // docs/sdd/030-delete-tombstones.md. Cleared once syncEngine confirms the
-  // cloud delete succeeded.
+  // deleted, delete hasn't reached the server yet," and resurrects it.
+  // Time-based, not confirmation-based: clearing on the delete's own
+  // confirmation reopened the same race against a *different*,
+  // independently in-flight pull that started before the delete and
+  // resolves after — see docs/sdd/030-delete-tombstones.md. Self-prunes
+  // (drops expired entries) on every new delete rather than needing a
+  // separate clear call or timer.
   pendingDeletes: Record<string, number>;
-  clearPendingDeletes: (ids: string[]) => void;
 
   // Task Actions
   // title is the only required field — quick-add can create a task from just
@@ -159,11 +179,6 @@ export const useTaskStore = create<TaskState>()(
       tagPillarIdBackfillApplied: false,
       tagDedupeApplied: false,
       pendingDeletes: {},
-      clearPendingDeletes: (ids) => set((state) => {
-        const next = { ...state.pendingDeletes };
-        ids.forEach((id) => delete next[id]);
-        return { pendingDeletes: next };
-      }),
 
       addTask: (task) => {
         const id = uuidv4();
@@ -297,7 +312,7 @@ export const useTaskStore = create<TaskState>()(
           return {
             tasks: newTasks,
             pendingDeletes: {
-              ...state.pendingDeletes,
+              ...pruneExpiredPendingDeletes(state.pendingDeletes),
               ...Object.fromEntries(removedIds.map((rid) => [rid, Date.now()])),
             },
           };

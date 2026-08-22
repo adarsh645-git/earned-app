@@ -6,6 +6,20 @@ import { computeProgress } from './progress';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 
+// Must match syncEngine.ts's DELETE_TOMBSTONE_GRACE_MS — duplicated rather
+// than imported to avoid a circular import. See
+// docs/sdd/030-delete-tombstones.md.
+const DELETE_TOMBSTONE_GRACE_MS = 30_000;
+
+function pruneExpiredPendingDeletes(pendingDeletes: Record<string, number>): Record<string, number> {
+  const now = Date.now();
+  const next: Record<string, number> = {};
+  for (const [id, deletedAt] of Object.entries(pendingDeletes)) {
+    if (now - deletedAt < DELETE_TOMBSTONE_GRACE_MS) next[id] = deletedAt;
+  }
+  return next;
+}
+
 export type UnlockedMilestoneInfo = {
   percentage: number;
   dollarsAwarded: number;
@@ -160,7 +174,6 @@ interface GoalState {
   // delete-then-cloud-pull-races-ahead resurrection bug, same fix. See
   // docs/sdd/030-delete-tombstones.md.
   pendingDeletes: Record<string, number>;
-  clearPendingDeletes: (ids: string[]) => void;
   // Recomputes this Goal's (and every ancestor's, via parentId) % fresh
   // through the trickle-up engine (progress.ts), diffs against
   // unlockedMilestones, and awards/revokes getMilestoneDollars for whatever
@@ -182,11 +195,6 @@ export const useGoalStore = create<GoalState>()(
       paysCurrencyDefaultsApplied: false,
       backfillGoalPillarIdsApplied: false,
       pendingDeletes: {},
-      clearPendingDeletes: (ids) => set((state) => {
-        const next = { ...state.pendingDeletes };
-        ids.forEach((id) => delete next[id]);
-        return { pendingDeletes: next };
-      }),
 
       // One-time: existing chains predate the single-paying-level rule and would
       // otherwise pay at every level. Default the root of each chain to pay and
@@ -279,7 +287,7 @@ export const useGoalStore = create<GoalState>()(
         set((state) => ({
           goals: state.goals.filter(g => !idsToRemove.has(g.id)),
           pendingDeletes: {
-            ...state.pendingDeletes,
+            ...pruneExpiredPendingDeletes(state.pendingDeletes),
             ...Object.fromEntries(Array.from(idsToRemove).map((rid) => [rid, Date.now()])),
           },
         }));
