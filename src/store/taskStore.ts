@@ -171,6 +171,16 @@ export const useTaskStore = create<TaskState>()(
 
         const updatedState = get();
 
+        // A Journey with a Pillar locks its Tasks to that Pillar's Tags (see
+        // docs/sdd/028-journey-pillar-lock.md) — its first Tag is the
+        // default whenever a task lands in that Journey without an explicit
+        // pick. Dynamic require avoids a circular import; toggleTask below
+        // already uses this same pattern for collectionStore.
+        const journeyPillarId = task.collectionId
+          ? require('./collectionStore').useCollectionStore.getState().collections
+              .find((c: { id: string; pillarId?: string }) => c.id === task.collectionId)?.pillarId
+          : undefined;
+
         // Safe default-fill so any caller (quick-add included) can create a
         // task from just a title. A subtask always inherits its parent's own
         // Category (and therefore Pillar) rather than the app-wide
@@ -181,6 +191,7 @@ export const useTaskStore = create<TaskState>()(
           ? undefined
           : (task.tagId
             || parent?.tagId
+            || (journeyPillarId ? updatedState.tags.find(t => t.pillarId === journeyPillarId && !t.isArchived)?.id : undefined)
             || (updatedState.tags.find(t => t.id === updatedState.lastUsedTagId && !t.isArchived)?.id)
             || updatedState.tags.find(t => !t.isArchived)?.id
             || undefined);

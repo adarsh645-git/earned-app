@@ -76,7 +76,8 @@ CREATE TABLE IF NOT EXISTS public.collections (
   goal_id TEXT REFERENCES public.goals(id) ON DELETE SET NULL,
   date_created TIMESTAMPTZ DEFAULT NOW(),
   unit_label TEXT, -- a Journey can own its own progress node; see 20260729000002
-  target_metric NUMERIC -- unset = passive (pure organization); see 20260729000002
+  target_metric NUMERIC, -- unset = passive (pure organization); see 20260729000002
+  pillar_id TEXT -- see 20260822000001; FK added below once public.pillars exists
 );
 
 -- 7. Waypoints (Journey sub-goal timeframe buckets) Table
@@ -277,6 +278,10 @@ CREATE TABLE IF NOT EXISTS public.tags (
 -- public.pillars doesn't exist yet at that point in this script; see 20260727000003
 ALTER TABLE public.goals
   ADD CONSTRAINT goals_pillar_id_fkey FOREIGN KEY (pillar_id) REFERENCES public.pillars(id) ON DELETE SET NULL;
+
+-- collections.pillar_id's FK, same reason; see 20260822000001
+ALTER TABLE public.collections
+  ADD CONSTRAINT collections_pillar_id_fkey FOREIGN KEY (pillar_id) REFERENCES public.pillars(id) ON DELETE SET NULL;
 
 -- ==============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES

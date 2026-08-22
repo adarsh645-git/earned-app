@@ -316,6 +316,7 @@ export async function pullCloudData(userId: string) {
         dateCreated: c.date_created,
         targetMetric: c.target_metric || undefined,
         unitLabel: c.unit_label || undefined,
+        pillarId: c.pillar_id || undefined,
       }));
       useCollectionStore.setState((s) => ({ ...s, collections: mergeById(s.collections, formattedCollections) }));
 
@@ -593,6 +594,7 @@ export async function pushAllCollectionsToCloud(userId: string, collections: Col
         date_created: c.dateCreated,
         target_metric: c.targetMetric || null,
         unit_label: c.unitLabel || null,
+        pillar_id: c.pillarId || null,
       }));
       const { error } = await supabase.from('collections').upsert(cPayload, { onConflict: 'id' });
       if (error) throw error;

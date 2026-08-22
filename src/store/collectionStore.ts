@@ -36,6 +36,11 @@ export type Collection = {
   // passive: pure organization, transparent to the trickle-up engine.
   targetMetric?: number;
   unitLabel?: string;
+  // Optional Pillar (life area) this Journey belongs to — unset means no
+  // lock: Tasks created inside stay unrestricted, exactly as before this
+  // field existed. Once set, Tasks inside are hard-locked to this Pillar's
+  // Tags (see taskStore.addTask). See docs/sdd/028-journey-pillar-lock.md.
+  pillarId?: string;
 };
 
 export type CollectionItem = {
@@ -56,7 +61,7 @@ interface CollectionState {
   journeyBackfillApplied: boolean;
   // category is required on the stored record, but optional here — quick-add
   // can create a Journey from just a title, defaulting category to 'general'.
-  addCollection: (collection: { title: string; category?: CollectionCategory; goalId?: string; targetMetric?: number; unitLabel?: string }) => string;
+  addCollection: (collection: { title: string; category?: CollectionCategory; goalId?: string; targetMetric?: number; unitLabel?: string; pillarId?: string }) => string;
   updateCollection: (id: string, updates: Partial<Collection>) => void;
   deleteCollection: (id: string) => void;
   addWaypoint: (waypoint: Omit<Waypoint, 'id' | 'dateCreated' | 'completedMetric'>) => string;
@@ -92,6 +97,7 @@ export const useCollectionStore = create<CollectionState>()(
               goalId: collectionData.goalId,
               targetMetric: collectionData.targetMetric,
               unitLabel: collectionData.unitLabel,
+              pillarId: collectionData.pillarId,
               id,
               dateCreated: new Date().toISOString(),
             },
@@ -101,9 +107,28 @@ export const useCollectionStore = create<CollectionState>()(
       },
 
       updateCollection: (id, updates) => {
+        const prev = get().collections.find((c) => c.id === id);
         set((state) => ({
           collections: state.collections.map((c) => (c.id === id ? { ...c, ...updates } : c)),
         }));
+
+        // Setting/changing the Pillar retags every Task already in this
+        // Journey to the new Pillar's first Tag — the hard-lock (see
+        // taskStore.addTask) only gates future tag *picks*, so without this
+        // a Journey's pre-existing tasks would silently sit outside the
+        // Pillar they're now locked to. Only fires on set-to-a-value, not on
+        // clearing back to unset. Dynamic require avoids a circular import,
+        // same pattern deleteWaypoint above uses.
+        if (updates.pillarId && updates.pillarId !== prev?.pillarId) {
+          const { useTaskStore } = require('./taskStore');
+          const taskState = useTaskStore.getState();
+          const firstTag = taskState.tags.find((t: any) => t.pillarId === updates.pillarId && !t.isArchived);
+          if (firstTag) {
+            useTaskStore.setState((s: any) => ({
+              tasks: s.tasks.map((t: any) => (t.collectionId === id ? { ...t, tagId: firstTag.id } : t)),
+            }));
+          }
+        }
       },
 
       deleteCollection: (id) => {
