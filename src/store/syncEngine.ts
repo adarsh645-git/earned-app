@@ -416,12 +416,24 @@ export async function pushEconomyToCloud(userId: string, state: any) {
 // Returns whether the cloud delete is confirmed done — callers use this to
 // clear the local pendingDeletes tombstone (see mergeById above) only once
 // it's actually safe to trust a future pull again.
+//
+// Checking `count` (not just the absence of a thrown error) matters: when
+// RLS's USING clause excludes a row from a DELETE, Postgrest doesn't treat
+// that as an error — the statement just matches and deletes 0 rows and
+// resolves normally. A delete silently blocked that way would otherwise
+// report success, clear the tombstone, and the very next pull resurrects
+// the "deleted" row right back — the exact bug this file exists to fix, one
+// layer deeper than the first pass caught. See
+// docs/sdd/030-delete-tombstones.md.
 export async function deleteTasksFromCloud(userId: string, ids: string[]): Promise<boolean> {
   if (!isSupabaseConfigured() || ids.length === 0) return true;
   try {
-    await supabase.from('tasks').delete().eq('user_id', userId).in('id', ids);
-    reportResult('tasks', true);
-    return true;
+    const { error, count } = await supabase.from('tasks').delete({ count: 'exact' }).eq('user_id', userId).in('id', ids);
+    if (error) throw error;
+    const ok = count === ids.length;
+    if (!ok) console.log(`Delete tasks: expected ${ids.length} row(s), Supabase reports ${count} — likely RLS-blocked, not clearing tombstone`);
+    reportResult('tasks', ok);
+    return ok;
   } catch (err) {
     reportResult('tasks', false, err);
     console.log('Error deleting tasks from cloud:', err);
@@ -501,9 +513,11 @@ export async function pushAllTagsToCloud(userId: string, tags: Tag[]) {
 export async function deleteRewardsFromCloud(userId: string, ids: string[]): Promise<boolean> {
   if (!isSupabaseConfigured() || ids.length === 0) return true;
   try {
-    await supabase.from('rewards').delete().eq('user_id', userId).in('id', ids);
-    reportResult('rewards', true);
-    return true;
+    const { error, count } = await supabase.from('rewards').delete({ count: 'exact' }).eq('user_id', userId).in('id', ids);
+    if (error) throw error;
+    const ok = count === ids.length;
+    reportResult('rewards', ok);
+    return ok;
   } catch (err) {
     reportResult('rewards', false, err);
     console.log('Error deleting rewards from cloud:', err);
@@ -533,9 +547,11 @@ export async function pushAllRewardsToCloud(userId: string, rewards: Reward[]) {
 export async function deleteGoalsFromCloud(userId: string, ids: string[]): Promise<boolean> {
   if (!isSupabaseConfigured() || ids.length === 0) return true;
   try {
-    await supabase.from('goals').delete().eq('user_id', userId).in('id', ids);
-    reportResult('goals', true);
-    return true;
+    const { error, count } = await supabase.from('goals').delete({ count: 'exact' }).eq('user_id', userId).in('id', ids);
+    if (error) throw error;
+    const ok = count === ids.length;
+    reportResult('goals', ok);
+    return ok;
   } catch (err) {
     reportResult('goals', false, err);
     console.log('Error deleting goals from cloud:', err);
@@ -576,9 +592,11 @@ export async function pushAllGoalsToCloud(userId: string, goals: Goal[]) {
 export async function deleteCollectionsFromCloud(userId: string, ids: string[]): Promise<boolean> {
   if (!isSupabaseConfigured() || ids.length === 0) return true;
   try {
-    await supabase.from('collections').delete().eq('user_id', userId).in('id', ids);
-    reportResult('collections', true);
-    return true;
+    const { error, count } = await supabase.from('collections').delete({ count: 'exact' }).eq('user_id', userId).in('id', ids);
+    if (error) throw error;
+    const ok = count === ids.length;
+    reportResult('collections', ok);
+    return ok;
   } catch (err) {
     reportResult('collections', false, err);
     console.log('Error deleting collections from cloud:', err);
@@ -589,9 +607,11 @@ export async function deleteCollectionsFromCloud(userId: string, ids: string[]):
 export async function deleteWaypointsFromCloud(userId: string, ids: string[]): Promise<boolean> {
   if (!isSupabaseConfigured() || ids.length === 0) return true;
   try {
-    await supabase.from('waypoints').delete().eq('user_id', userId).in('id', ids);
-    reportResult('collections', true);
-    return true;
+    const { error, count } = await supabase.from('waypoints').delete({ count: 'exact' }).eq('user_id', userId).in('id', ids);
+    if (error) throw error;
+    const ok = count === ids.length;
+    reportResult('collections', ok);
+    return ok;
   } catch (err) {
     reportResult('collections', false, err);
     console.log('Error deleting waypoints from cloud:', err);
@@ -604,9 +624,11 @@ export async function deleteItemsFromCloud(ids: string[]): Promise<boolean> {
   // the parent collection, same as the upsert path for this table.
   if (!isSupabaseConfigured() || ids.length === 0) return true;
   try {
-    await supabase.from('collection_items').delete().in('id', ids);
-    reportResult('collections', true);
-    return true;
+    const { error, count } = await supabase.from('collection_items').delete({ count: 'exact' }).in('id', ids);
+    if (error) throw error;
+    const ok = count === ids.length;
+    reportResult('collections', ok);
+    return ok;
   } catch (err) {
     reportResult('collections', false, err);
     console.log('Error deleting collection items from cloud:', err);

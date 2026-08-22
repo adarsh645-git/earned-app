@@ -55,6 +55,24 @@ are globally unique uuids, no collision risk.
   `reportResult`/sync-health-indicator (spec 018) machinery still surfaces
   the failure through the normal channel.
 
+### Addendum — "confirmed" wasn't actually confirmed (fixed same day)
+
+First pass judged success purely by "the Supabase call didn't throw." That's
+not sufficient: when RLS's `USING` clause on a DELETE policy excludes a row,
+Postgrest doesn't error — the statement matches and deletes 0 rows and
+resolves *normally* (confirmed straight from `@supabase/postgrest-js`'s own
+source/docs: "only rows visible through SELECT policies are deleted... by
+default no rows are visible"). A delete silently blocked that way would
+still report success and clear the tombstone, and the very next pull
+resurrects the row right back — same bug, one layer deeper, and exactly
+what the user hit immediately after the first fix shipped.
+
+Fix: every `deleteXFromCloud` call now passes `{ count: 'exact' }` and
+compares the returned `count` against the number of ids requested — only a
+count match is treated as `ok`/tombstone-clearable. A mismatch (silently
+blocked by RLS, or the row was already gone) leaves the tombstone in place,
+same as a thrown error.
+
 No pruning/expiry was added for old tombstones — the overwhelming majority
 clear within one sync round-trip, and at this app's personal-use scale an
 unbounded (if rare) leftover entry has no meaningful cost. Flagged here
