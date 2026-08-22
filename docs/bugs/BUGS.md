@@ -134,7 +134,7 @@ Entry template — copy this for each new bug:
 
 ### 005 — Tasks created inside a journey/waypoint don't inherit the journey's pillar
 - **Date**: 2026-08-22
-- **Status**: 🚧 In Progress — [docs/sdd/028-journey-pillar-lock.md](../sdd/028-journey-pillar-lock.md)
+- **Status**: ✅ Fixed — [docs/sdd/028-journey-pillar-lock.md](../sdd/028-journey-pillar-lock.md)
 - **Screenshot**: ./screenshots/005.png
 - **Report**: A journey should be tagged to a pillar, and tasks created
   within that journey (e.g. from a waypoint's "Add a task") should
@@ -146,9 +146,9 @@ Entry template — copy this for each new bug:
   every newly-created Journey going forward (existing ones stay unset, no
   guessed backfill), and setting/changing an existing Journey's Pillar
   auto-retags its existing Tasks to the new Pillar's first Tag. Implemented
-  in full (see spec's checklist) — code is committed and pushed. Left
-  🚧 In Progress rather than ✅ Fixed only because the migration
-  (`20260822000001_collection_pillar_id.sql`) still needs to be run against
-  the live Supabase project, and full interactive browser verification
-  wasn't possible in this environment (no headless-browser tool available) —
-  flip to ✅ once both are confirmed.
+  in full (see spec's checklist) — code committed and pushed.
+  `20260822000001_collection_pillar_id.sql` confirmed run against the live
+  Supabase project (user ran it, independently re-verified via an anon-key
+  REST query — `collections.pillar_id` exists, no missing-column error).
+  Full interactive browser click-through still wasn't possible in this
+  environment (no headless-browser tool available) — worth a manual pass.

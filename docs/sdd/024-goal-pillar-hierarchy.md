@@ -99,8 +99,10 @@ on narrow screens.
       blocked-modal logic removed
 - [x] Milestone-badge row wraps (`AnimatedGoalCard.tsx` + `GoalDetailModal.tsx`)
 - [x] `npx tsc --noEmit` clean
-- [ ] User confirms `20260727000003_goal_pillar_id.sql` has been run against
-      the live Supabase project
+- [x] User confirms `20260727000003_goal_pillar_id.sql` has been run against
+      the live Supabase project (confirmed 2026-08-22, alongside spec 028's
+      migration; independently re-verified via anon-key REST query —
+      `goals.pillar_id` exists, no missing-column error)
 
 ## Notes
 

@@ -132,8 +132,10 @@ task's Pillar.
       transform/syntax errors — confirmed by fetching the served bundle and
       checking each file compiled in cleanly. Flagging per AGENTS.md's "verify
       visually in a real browser" rule rather than claiming full coverage.
-- [ ] User confirms `20260822000001_collection_pillar_id.sql` has been run
-      against the live Supabase project
+- [x] User confirms `20260822000001_collection_pillar_id.sql` has been run
+      against the live Supabase project (independently re-verified via
+      anon-key REST query — `collections.pillar_id` exists, no
+      missing-column error)
 
 ## Notes
 
