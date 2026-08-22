@@ -134,9 +134,21 @@ Entry template — copy this for each new bug:
 
 ### 005 — Tasks created inside a journey/waypoint don't inherit the journey's pillar
 - **Date**: 2026-08-22
-- **Status**: 🆕 New
+- **Status**: 🚧 In Progress — [docs/sdd/028-journey-pillar-lock.md](../sdd/028-journey-pillar-lock.md)
 - **Screenshot**: ./screenshots/005.png
 - **Report**: A journey should be tagged to a pillar, and tasks created
   within that journey (e.g. from a waypoint's "Add a task") should
   automatically be attached to that same pillar. Currently they aren't.
-- **Notes**: —
+- **Notes**: Genuine data-model gap, not a rendering bug — `Collection` had
+  no `pillarId` at all. Went through the SDD loop per AGENTS.md (store-shape
+  change). Ran Phase 0 three-lens brainstorming with the user; confirmed:
+  hard-lock (not just soft-default) once a Journey has a Pillar, required on
+  every newly-created Journey going forward (existing ones stay unset, no
+  guessed backfill), and setting/changing an existing Journey's Pillar
+  auto-retags its existing Tasks to the new Pillar's first Tag. Implemented
+  in full (see spec's checklist) — code is committed and pushed. Left
+  🚧 In Progress rather than ✅ Fixed only because the migration
+  (`20260822000001_collection_pillar_id.sql`) still needs to be run against
+  the live Supabase project, and full interactive browser verification
+  wasn't possible in this environment (no headless-browser tool available) —
+  flip to ✅ once both are confirmed.
