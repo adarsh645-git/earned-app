@@ -34,6 +34,7 @@ import TimeSelectorModal from '../components/TimeSelectorModal';
 import ConfirmModal from '../components/ConfirmModal';
 import ProgressPromptModal from '../components/ProgressPromptModal';
 import QuickAddBar from '../components/QuickAddBar';
+import WeeklyReviewSheet from '../components/WeeklyReviewSheet';
 import PillPicker from '../components/PillPicker';
 import { getEligibleJourneys } from '../components/LinkProgressPicker';
 import { getPillarColor } from '../utils/pillarColor';
@@ -55,8 +56,10 @@ function formatDateLabel(dateStr: string, isToday: boolean): string {
 export default function TasksScreen() {
   const { tasks, tags, pillars, lastUsedTagId, addTask, updateTask, deleteTask, toggleTask, moveToIcebox, activateFromIcebox, reorderTasks } = useTaskStore();
   const { goals } = useGoalStore();
-  const { collections, waypoints } = useCollectionStore();
+  const { collections, waypoints, addCollection } = useCollectionStore();
   const { startTimer } = useTimerStore();
+  const { isWeeklyReviewDue, completeWeeklyReview } = useEconomyStore();
+  const [reviewSheetVisible, setReviewSheetVisible] = useState(false);
   const isMobile = useIsMobile();
 
   // Quick-add bar state — title + the one economy-critical field (Duration)
@@ -78,6 +81,10 @@ export default function TasksScreen() {
   const [quickAddGoalId, setQuickAddGoalId] = useState('');
   const [quickAddWaypointId, setQuickAddWaypointId] = useState('');
   const [quickAddIsIcebox, setQuickAddIsIcebox] = useState(false);
+  // Explicit "leave untagged" capture — bypasses the last-used-tag default
+  // entirely so the task lands in the Inbox instead. See
+  // docs/sdd/026-gtd-inbox-clarify-review.md.
+  const [quickAddSkipTag, setQuickAddSkipTag] = useState(false);
 
   // Blocks completing a Waypoint-linked task until its progress quantity is
   // entered — see src/utils/taskCompletionGate.ts.
@@ -172,6 +179,20 @@ export default function TasksScreen() {
     activateFromIcebox(id);
   };
 
+  // Clarify decision: "this is actually a project, not a single next
+  // action." Bare title-only Journey — everything else gets configured
+  // later from the Journey itself, not asked for here. The original Inbox
+  // task is discarded, not kept as the Journey's first Task. See
+  // docs/sdd/026-gtd-inbox-clarify-review.md.
+  const handleConvertToJourney = (id: string) => {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    feedback('select');
+    addCollection({ title: task.title });
+    deleteTask(id);
+  };
+
   // Modals state — id-based (not a snapshot) so the detail screen reflects
   // live edits (tag/duration/journey autosave) while it's still open.
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
@@ -179,13 +200,20 @@ export default function TasksScreen() {
 
   const iceboxTasks = tasks.filter(t => t.isIcebox);
 
-  // Bundle non-icebox tasks by the day they were created — today's group is
-  // expanded by default, every other day collapses, and only the 5 most
-  // recent distinct days are shown at all (older tasks simply don't render).
+  // Untagged top-level tasks are sitting in the Inbox (GTD Capture, not yet
+  // Clarified) — not yet a trusted next action, so they're excluded from
+  // Today's Focus List below and surfaced only in their own section. See
+  // docs/sdd/026-gtd-inbox-clarify-review.md.
+  const inboxTasks = tasks.filter(t => !t.tagId && !t.isIcebox && !t.parentId);
+
+  // Bundle non-icebox, tagged tasks by the day they were created — today's
+  // group is expanded by default, every other day collapses, and only the 5
+  // most recent distinct days are shown at all (older tasks simply don't
+  // render).
   const todayStr = localDateKey();
 
   const tasksByDate: Record<string, Task[]> = {};
-  tasks.filter(t => !t.isIcebox && !t.parentId).forEach(t => {
+  tasks.filter(t => !t.isIcebox && !t.parentId && t.tagId).forEach(t => {
     // dateCreated is a full UTC-instant timestamp (for the time-of-day pill
     // below); grouping keys off the device's LOCAL calendar date, not the
     // UTC one — otherwise tasks jump into "yesterday" every evening once
@@ -249,6 +277,7 @@ export default function TasksScreen() {
       title: title.trim(),
       estimatedMinutes,
       tagId: quickAddTagId || undefined,
+      skipTag: quickAddSkipTag,
       collectionId: quickAddCollectionId || undefined,
       goalId: quickAddGoalId || undefined,
       waypointId: quickAddWaypointId || undefined,
@@ -263,6 +292,7 @@ export default function TasksScreen() {
     setQuickAddGoalId('');
     setQuickAddWaypointId('');
     setQuickAddIsIcebox(false);
+    setQuickAddSkipTag(false);
     setQuickAddOpenPill(null);
     // Duration is intentionally NOT reset — the next quick-add inherits it,
     // matching the "remember" spirit of the Tag default.
@@ -282,7 +312,27 @@ export default function TasksScreen() {
       <View style={{ maxWidth: 900, width: '100%', alignSelf: 'center' }} className="flex-1 px-5">
         
         {/* Header */}
-        <Text className="text-white text-3xl font-extrabold tracking-tight mt-3 mb-4">Manage Focus</Text>
+        <View className="flex-row items-center justify-between mt-3 mb-4">
+          <Text className="text-white text-3xl font-extrabold tracking-tight">Manage Focus</Text>
+          <Pressable
+            onPress={() => setReviewSheetVisible(true)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: isWeeklyReviewDue() ? 'rgba(90,200,250,0.2)' : '#1C1C1E',
+              borderWidth: 1,
+              borderColor: isWeeklyReviewDue() ? 'rgba(90,200,250,0.4)' : 'rgba(255,255,255,0.08)',
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 10,
+            }}
+          >
+            <Ionicons name="refresh-circle-outline" size={14} color={isWeeklyReviewDue() ? '#5AC8FA' : '#8E8E93'} style={{ marginRight: 4 }} />
+            <Text style={{ color: isWeeklyReviewDue() ? '#5AC8FA' : '#8E8E93', fontSize: 12, fontWeight: '700' }}>
+              Review
+            </Text>
+          </Pressable>
+        </View>
 
         {/* Quick-add — title + Enter to save; Duration is the one field that
             stays visible here (it scales the Hours payout). Tag/Journey
@@ -393,6 +443,25 @@ export default function TasksScreen() {
                     <Ionicons name="snow-outline" size={13} color={quickAddIsIcebox ? '#BF5AF2' : '#8E8E93'} style={{ marginRight: 4 }} />
                     <Text style={{ color: quickAddIsIcebox ? '#BF5AF2' : '#FFF', fontSize: 12, fontWeight: '600' }}>
                       Icebox
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => setQuickAddSkipTag(v => !v)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: quickAddSkipTag ? 'rgba(90,200,250,0.2)' : '#2C2C2E',
+                      borderWidth: 1,
+                      borderColor: quickAddSkipTag ? 'rgba(90,200,250,0.4)' : '#3A3A3C',
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Ionicons name="mail-outline" size={13} color={quickAddSkipTag ? '#5AC8FA' : '#8E8E93'} style={{ marginRight: 4 }} />
+                    <Text style={{ color: quickAddSkipTag ? '#5AC8FA' : '#FFF', fontSize: 12, fontWeight: '600' }}>
+                      Inbox (skip tagging)
                     </Text>
                   </Pressable>
                 </View>
@@ -542,6 +611,51 @@ export default function TasksScreen() {
             );
           })}
 
+          {/* Inbox Section — GTD Capture landing zone: untagged tasks,
+              waiting on a Clarify decision (tag it, or it's actually a
+              Journey). Only rendered once there's something to clarify. */}
+          {inboxTasks.length > 0 && (
+            <View className="mt-5">
+              <View className="flex-row items-center gap-1.5 mb-3">
+                <Ionicons name="mail-outline" size={16} color="#5AC8FA" />
+                <Text className="text-[#5AC8FA] font-bold text-xs uppercase tracking-[1.5px]">
+                  Inbox ({inboxTasks.length})
+                </Text>
+              </View>
+
+              <View style={{ ...CARD_STYLE, borderColor: 'rgba(90,200,250,0.2)' }} className="rounded-2xl overflow-hidden mb-3">
+                {inboxTasks.map((task, index) => {
+                  const isLast = index === inboxTasks.length - 1;
+                  return (
+                    <Pressable
+                      key={task.id}
+                      onPress={() => setDetailTaskId(task.id)}
+                      style={{
+                        borderBottomWidth: isLast ? 0 : 0.5,
+                        borderBottomColor: 'rgba(255,255,255,0.05)',
+                      }}
+                      className="p-4 flex-row items-center justify-between"
+                    >
+                      <View className="flex-1 pr-4">
+                        <Text className="text-white text-base font-semibold">{task.title}</Text>
+                        <Text className="text-[#8E8E93] text-xs font-medium mt-0.5">Tap to tag</Text>
+                      </View>
+
+                      <Pressable
+                        onPress={() => handleConvertToJourney(task.id)}
+                        style={{ backgroundColor: 'rgba(191,90,242,0.2)', borderColor: 'rgba(191,90,242,0.4)', borderWidth: 1 }}
+                        className="flex-row items-center px-3 py-1.5 rounded-xl"
+                      >
+                        <Ionicons name="flag-outline" size={13} color="#BF5AF2" />
+                        <Text className="text-[#BF5AF2] font-bold text-xs ml-1">Journey</Text>
+                      </Pressable>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
           {/* Icebox Tasks Section */}
           <View className="mt-5">
             <View className="flex-row items-center gap-1.5 mb-3">
@@ -607,6 +721,14 @@ export default function TasksScreen() {
           </View>
         </ScrollView>
       </View>
+
+      <WeeklyReviewSheet
+        visible={reviewSheetVisible}
+        onClose={() => setReviewSheetVisible(false)}
+        tasks={tasks}
+        collections={collections}
+        onComplete={completeWeeklyReview}
+      />
 
       <TaskDetailModal
         task={detailTask}

@@ -13,7 +13,7 @@ interface PillPickerProps {
   label: string; // current display text on the pill face
   icon?: React.ReactNode; // leading icon on the pill face
   options: PillOption[];
-  selectedId: string;
+  selectedId: string | undefined;
   onSelect: (id: string) => void;
   open: boolean; // controlled — the parent row owns which pill (if any) is open
   onToggle: () => void;

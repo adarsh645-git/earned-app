@@ -21,7 +21,9 @@ export type Tag = {
 export type Task = {
   id: string;
   title: string;
-  tagId: string;
+  // Unset = sitting in the Inbox (GTD Capture, not yet Clarified). See
+  // docs/sdd/026-gtd-inbox-clarify-review.md.
+  tagId?: string;
   goalId?: string;
   collectionId?: string; // Journey this task belongs to
   waypointId?: string; // Sub-bucket of collectionId's Journey, if any
@@ -68,7 +70,11 @@ interface TaskState {
   // Task Actions
   // title is the only required field — quick-add can create a task from just
   // a title; tagId/estimatedMinutes/isIcebox get safe defaults filled in below.
-  addTask: (task: { title: string; tagId?: string; estimatedMinutes?: number; isIcebox?: boolean; goalId?: string; collectionId?: string; waypointId?: string; parentId?: string; }) => string;
+  // skipTag bypasses the last-used/first-tag default entirely, leaving the
+  // task untagged (in the Inbox) — used by the quick-add bar's explicit
+  // "Inbox" capture pill. Without it, an unset tagId falls back to the
+  // usual default, same as before.
+  addTask: (task: { title: string; tagId?: string; skipTag?: boolean; estimatedMinutes?: number; isIcebox?: boolean; goalId?: string; collectionId?: string; waypointId?: string; parentId?: string; }) => string;
   setLastUsedTagId: (id: string) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
@@ -142,11 +148,13 @@ export const useTaskStore = create<TaskState>()(
         // last-used tag — a subtask belongs to the same Pillar/Category as
         // its parent, full stop (see TaskDetailModal's locked Pillar pill
         // and pillar-scoped Tag options for the editing-time half of this).
-        const tagId = task.tagId
-          || parent?.tagId
-          || (updatedState.tags.find(t => t.id === updatedState.lastUsedTagId && !t.isArchived)?.id)
-          || updatedState.tags.find(t => !t.isArchived)?.id
-          || '';
+        const tagId = task.skipTag
+          ? undefined
+          : (task.tagId
+            || parent?.tagId
+            || (updatedState.tags.find(t => t.id === updatedState.lastUsedTagId && !t.isArchived)?.id)
+            || updatedState.tags.find(t => !t.isArchived)?.id
+            || undefined);
         const estimatedMinutes = task.estimatedMinutes && task.estimatedMinutes > 0 ? task.estimatedMinutes : 25;
         const isIcebox = task.isIcebox ?? false;
 

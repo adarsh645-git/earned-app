@@ -31,6 +31,13 @@ export interface EconomyState {
   lastCheckInDate: string | null;
   gracePeriodUsed: boolean;
 
+  // Weekly Review (GTD Reflect) — see docs/sdd/026-gtd-inbox-clarify-review.md.
+  // Own grace field, kept separate from the daily check-in's gracePeriodUsed
+  // above so the two independent cadences (daily vs. weekly) never clobber
+  // each other's forgiveness state.
+  lastReviewedAt: string | null;
+  reviewGracePeriodUsed: boolean;
+
   // Interest-free IOU on Dollars only — a flat-capped tab, repaid automatically
   // from future earnings (garnishment in addBalance). No interest, no default/lockout.
   debt: number;
@@ -57,6 +64,8 @@ export interface EconomyState {
   checkInDaily: () => CheckInResult;
   clearDebtForTesting: () => void;
   applyEntertainmentClawback: () => void;
+  isWeeklyReviewDue: () => boolean;
+  completeWeeklyReview: () => void;
 }
 
 // Flat tab limit for the interest-free Dollar IOU. Deliberately not score-gated —
@@ -108,6 +117,8 @@ export const useEconomyStore = create<EconomyState>()(
       lastActiveDate: null,
       lastCheckInDate: null,
       gracePeriodUsed: false,
+      lastReviewedAt: null,
+      reviewGracePeriodUsed: false,
 
       // Interest-free Dollar IOU
       debt: 0,
@@ -323,6 +334,36 @@ export const useEconomyStore = create<EconomyState>()(
           isWelcomeBack,
         };
       },
+
+      isWeeklyReviewDue: () => {
+        const { lastReviewedAt } = get();
+        if (!lastReviewedAt) return true;
+        const diffMs = Date.now() - Date.parse(lastReviewedAt);
+        return diffMs > 7 * 24 * 60 * 60 * 1000;
+      },
+
+      // Evaluated lazily against the gap since the last completed review —
+      // same lazy-diff pattern checkInDaily uses for the daily cadence, just
+      // on a 7-day window and its own grace token (reviewGracePeriodUsed).
+      // A first missed window is forgiven; a second consecutive miss breaks
+      // the same `streak` value the rest of the app reads.
+      completeWeeklyReview: () => set((state) => {
+        const now = new Date().toISOString();
+
+        if (!state.lastReviewedAt) {
+          return { lastReviewedAt: now, reviewGracePeriodUsed: false };
+        }
+
+        const diffDays = Math.floor((Date.now() - Date.parse(state.lastReviewedAt)) / (1000 * 60 * 60 * 24));
+
+        if (diffDays <= 7) {
+          return { lastReviewedAt: now, reviewGracePeriodUsed: false };
+        }
+        if (!state.reviewGracePeriodUsed) {
+          return { lastReviewedAt: now, reviewGracePeriodUsed: true };
+        }
+        return { lastReviewedAt: now, reviewGracePeriodUsed: false, streak: 0 };
+      }),
     }),
     {
       name: 'earned-economy-storage',

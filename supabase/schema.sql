@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   debt NUMERIC(12, 2) DEFAULT 0.00,
   streak INTEGER DEFAULT 1,
   last_check_in_date DATE,
+  last_reviewed_at TIMESTAMPTZ, -- Weekly Review cadence; see 20260821000002
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -23,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   id TEXT PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
-  tag_id TEXT NOT NULL,
+  tag_id TEXT, -- nullable = Inbox (GTD Capture, not yet tagged); see 20260821000001
   goal_id TEXT,
   collection_id TEXT,
   parent_id TEXT, -- subtask link (one level only); not a FK, see 20260725000004

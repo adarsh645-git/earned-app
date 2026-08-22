@@ -177,12 +177,22 @@ export async function pullCloudData(userId: string) {
             : localLastCheckIn
           : cloudLastCheckIn || localLastCheckIn || null;
 
+      const localLastReviewed = useEconomyStore.getState().lastReviewedAt;
+      const cloudLastReviewed = profile.last_reviewed_at;
+      const effectiveLastReviewed =
+        cloudLastReviewed && localLastReviewed
+          ? cloudLastReviewed > localLastReviewed
+            ? cloudLastReviewed
+            : localLastReviewed
+          : cloudLastReviewed || localLastReviewed || null;
+
       useEconomyStore.setState({
         dollarBalance: parseFloat(profile.dollar_balance) || 0,
         hoursBalanceMinutes: parseInt(profile.hours_balance_minutes, 10) || 0,
         debt: parseFloat(profile.debt) || 0,
         streak: profile.streak ?? 1,
         lastCheckInDate: effectiveCheckInDate,
+        lastReviewedAt: effectiveLastReviewed,
       });
     }
 
@@ -372,6 +382,7 @@ export async function pushEconomyToCloud(userId: string, state: any) {
       debt: state.debt,
       streak: state.streak,
       last_check_in_date: state.lastCheckInDate,
+      last_reviewed_at: state.lastReviewedAt,
       updated_at: new Date().toISOString(),
     });
     reportResult('economy', true);
