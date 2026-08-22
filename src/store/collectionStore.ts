@@ -31,6 +31,11 @@ export type Collection = {
   category: CollectionCategory;
   goalId?: string; // Links to a Goal
   dateCreated: string;
+  // A Journey can optionally be its own progress node (see
+  // docs/sdd/025-unified-trickle-up-progress.md) — unset on both means
+  // passive: pure organization, transparent to the trickle-up engine.
+  targetMetric?: number;
+  unitLabel?: string;
 };
 
 export type CollectionItem = {
@@ -51,14 +56,12 @@ interface CollectionState {
   journeyBackfillApplied: boolean;
   // category is required on the stored record, but optional here — quick-add
   // can create a Journey from just a title, defaulting category to 'general'.
-  addCollection: (collection: { title: string; category?: CollectionCategory; goalId?: string }) => string;
+  addCollection: (collection: { title: string; category?: CollectionCategory; goalId?: string; targetMetric?: number; unitLabel?: string }) => string;
   updateCollection: (id: string, updates: Partial<Collection>) => void;
   deleteCollection: (id: string) => void;
   addWaypoint: (waypoint: Omit<Waypoint, 'id' | 'dateCreated' | 'completedMetric'>) => string;
   updateWaypoint: (id: string, updates: Partial<Waypoint>) => void;
   deleteWaypoint: (id: string) => void;
-  applyWaypointProgress: (id: string, minutes: number, metricProgress?: number) => void;
-  revokeWaypointProgress: (id: string, minutes: number, metricProgress?: number) => void;
   addItem: (item: Omit<CollectionItem, 'id' | 'completed' | 'dateCreated'>) => string;
   updateItem: (id: string, updates: Partial<CollectionItem>) => void;
   toggleItemCompletion: (id: string) => void;
@@ -87,6 +90,8 @@ export const useCollectionStore = create<CollectionState>()(
               title: collectionData.title,
               category: collectionData.category ?? 'general',
               goalId: collectionData.goalId,
+              targetMetric: collectionData.targetMetric,
+              unitLabel: collectionData.unitLabel,
               id,
               dateCreated: new Date().toISOString(),
             },
@@ -141,53 +146,6 @@ export const useCollectionStore = create<CollectionState>()(
         }));
       },
 
-      applyWaypointProgress: (id, minutes, metricProgress) => {
-        set((state) => {
-          const wp = state.waypoints?.find((w) => w.id === id);
-          if (!wp) return state;
-          
-          const collection = state.collections.find(c => c.id === wp.collectionId);
-          // A units-mode linked Goal governs; otherwise the Waypoint's own
-          // unitLabel (see waypointUnit.ts's resolveWaypointUnit — mirrored
-          // here rather than imported, since this store's actions run
-          // outside React and duplicating this one boolean check is safer
-          // than risking a load-order issue with a cross-store import) means
-          // it tracks its own quantity too. Only a Waypoint with no unit at
-          // all (the pre-existing behavior) falls back to raw minutes.
-          const goal = collection?.goalId ? useGoalStore.getState().goals.find(g => g.id === collection.goalId) : undefined;
-          const hasUnit = goal?.metricType === 'units' || !!wp.unitLabel;
-          const addedValue = hasUnit ? (metricProgress || 1) : minutes;
-
-          return {
-            waypoints: state.waypoints.map((w) =>
-              w.id === id
-                ? { ...w, completedMetric: w.completedMetric + addedValue }
-                : w
-            ),
-          };
-        });
-      },
-
-      revokeWaypointProgress: (id, minutes, metricProgress) => {
-        set((state) => {
-          const wp = state.waypoints?.find((w) => w.id === id);
-          if (!wp) return state;
-
-          const collection = state.collections.find(c => c.id === wp.collectionId);
-          const goal = collection?.goalId ? useGoalStore.getState().goals.find(g => g.id === collection.goalId) : undefined;
-          const hasUnit = goal?.metricType === 'units' || !!wp.unitLabel;
-          const removedValue = hasUnit ? (metricProgress || 1) : minutes;
-          
-          return {
-            waypoints: state.waypoints.map((w) =>
-              w.id === id
-                ? { ...w, completedMetric: Math.max(0, w.completedMetric - removedValue) }
-                : w
-            ),
-          };
-        });
-      },
-
       addItem: (itemData) => {
         const id = uuidv4();
         set((state) => ({
@@ -210,38 +168,20 @@ export const useCollectionStore = create<CollectionState>()(
         if (!item) return;
 
         const isCurrentlyCompleted = item.completed;
-        if (!isCurrentlyCompleted) {
-          const collection = get().collections.find((c) => c.id === item.collectionId);
-          if (collection && collection.goalId) {
-            const goal = useGoalStore.getState().goals.find(g => g.id === collection.goalId);
 
-            if (goal) {
-              // Routes to +1 for a count chain or the item's minutes for a time
-              // chain; cascades up the chain from there.
-              useGoalStore.getState().applyLeafProgress(goal.id, item.estimatedMinutes || 60, 1);
-            }
-          }
-          if (item.waypointId) {
-            get().applyWaypointProgress(item.waypointId, item.estimatedMinutes || 60, 1);
-          }
-        } else {
-          // Un-completing
-          const collection = get().collections.find((c) => c.id === item.collectionId);
-          if (collection && collection.goalId) {
-            const goal = useGoalStore.getState().goals.find(g => g.id === collection.goalId);
-            if (goal) {
-              useGoalStore.getState().revokeLeafProgress(goal.id, item.estimatedMinutes || 60, 1);
-            }
-          }
-          if (item.waypointId) {
-            get().revokeWaypointProgress(item.waypointId, item.estimatedMinutes || 60, 1);
-          }
-        }
-
-        // Toggle state locally
         set((state) => ({
           items: state.items.map((i) => (i.id === id ? { ...i, completed: !isCurrentlyCompleted } : i)),
         }));
+
+        // Progress/milestone reconciliation runs after the flip is committed,
+        // so the engine (which reads live store state) sees the new value.
+        // Waypoint/Journey progress bars need no explicit update — they're a
+        // pure recompute (see progress.ts) — only a linked Goal's milestone
+        // unlocks are real stored state.
+        const collection = get().collections.find((c) => c.id === item.collectionId);
+        if (collection?.goalId) {
+          useGoalStore.getState().reconcileGoalMilestones(collection.goalId);
+        }
       },
 
       deleteItem: (id) => {

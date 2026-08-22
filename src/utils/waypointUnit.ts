@@ -17,25 +17,24 @@ export const WAYPOINT_UNIT_TYPES: { id: string; label: string }[] = [
 ];
 
 /**
- * Single source of truth for "what unit governs this Waypoint, if any."
- * A units-mode linked Goal always wins (a Waypoint can't disagree with the
- * metric its own Journey's Goal is tracking); otherwise the Waypoint's own
- * unitLabel applies. Returns undefined when neither is set — the Waypoint
- * has no enforced unit and behaves exactly like before this feature.
+ * Single source of truth for "what unit governs this Waypoint, if any" —
+ * mirrors the trickle-up engine's own priority (progress.ts's
+ * waypointUnit/collectionUnit): the Waypoint's own unitLabel wins if set
+ * (a Waypoint is a fully independent progress node — e.g. a "pages"
+ * Waypoint under a "books"-mode Goal, see
+ * docs/sdd/025-unified-trickle-up-progress.md scenario 1); otherwise its
+ * Journey's own unitLabel; otherwise a units-mode linked Goal's unit is the
+ * fallback for a Waypoint that never set its own. Returns undefined when
+ * nothing in the chain has one — no enforced unit.
  */
 export function resolveWaypointUnit(
   waypoint: Waypoint | undefined,
   collection: Collection | undefined,
   goals: Goal[]
 ): string | undefined {
+  if (waypoint?.unitLabel) return waypoint.unitLabel;
+  if (collection?.unitLabel) return collection.unitLabel;
   const goal = collection?.goalId ? goals.find(g => g.id === collection.goalId) : undefined;
   if (goal?.metricType === 'units') return goal.unitLabel || 'units';
-  return waypoint?.unitLabel;
-}
-
-// True when a Waypoint's unit is locked to its Goal (not independently
-// editable) — i.e. the Journey has a units-mode linked Goal.
-export function isWaypointUnitGoalGoverned(collection: Collection | undefined, goals: Goal[]): boolean {
-  const goal = collection?.goalId ? goals.find(g => g.id === collection.goalId) : undefined;
-  return goal?.metricType === 'units';
+  return undefined;
 }

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { safeStorage } from './safeStorage';
 import { useEconomyStore } from './economyStore';
+import { computeProgress } from './progress';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -155,17 +156,15 @@ interface GoalState {
   addGoal: (goal: Omit<Goal, 'id' | 'completedMinutes' | 'completedMetric' | 'unlockedMilestones'>) => string;
   updateGoal: (id: string, updates: Partial<Goal>) => void;
   deleteGoal: (id: string) => void;
-  addProgress: (id: string, amount: number) => UnlockedMilestoneInfo[];
-  removeProgress: (id: string, amount: number) => void;
-  // Walks a units (count) chain from parentId to root, stepping each ancestor's
-  // completed count by delta (+1 on a leaf completion, -1 on an un-completion).
-  stepCountAncestors: (parentId: string, delta: 1 | -1) => UnlockedMilestoneInfo[];
-  // Routes a leaf action to the correct unit for the linked goal's chain:
-  // a discrete completion is +1 to a count goal (or the task's own
-  // metricAmount, e.g. "10 pages", when it reports one); effort is minutes to
-  // a time goal. metricAmount is ignored entirely for time goals.
-  applyLeafProgress: (goalId: string, minutes: number, metricAmount?: number) => UnlockedMilestoneInfo[];
-  revokeLeafProgress: (goalId: string, minutes: number, metricAmount?: number) => void;
+  // Recomputes this Goal's (and every ancestor's, via parentId) % fresh
+  // through the trickle-up engine (progress.ts), diffs against
+  // unlockedMilestones, and awards/revokes getMilestoneDollars for whatever
+  // changed — the one place milestone economy is touched. Call after any
+  // task/item completion change that could affect this Goal's chain. Returns
+  // only the newly-unlocked milestones (never revokes) for toast feedback,
+  // mirroring the old applyLeafProgress/addProgress return shape. See
+  // docs/sdd/025-unified-trickle-up-progress.md.
+  reconcileGoalMilestones: (goalId: string) => UnlockedMilestoneInfo[];
   // Makes `goalId` the one paying level of its whole chain (root + all
   // descendants), clearing paysCurrency everywhere else in that chain.
   setPayingLevel: (goalId: string) => void;
@@ -270,222 +269,82 @@ export const useGoalStore = create<GoalState>()(
           ),
         }));
       },
-      addProgress: (id, amount) => {
-        const goal = get().goals.find(g => g.id === id);
-        if (!goal) return [];
+      reconcileGoalMilestones: (goalId) => {
+        // Dynamic requires avoid a circular import — collectionStore already
+        // statically imports this store, same defensive pattern used
+        // elsewhere in this file (e.g. deleteGoal below).
+        const { useCollectionStore } = require('./collectionStore');
+        const { useTaskStore } = require('./taskStore');
+        const collectionsState = useCollectionStore.getState();
+        const tasksState = useTaskStore.getState();
 
-        const isUnits = goal.metricType === 'units';
-        // Currency is paid at exactly one designated level of a chain. Progress
-        // and milestone badges still update everywhere; only payout is gated.
-        const pays = goal.paysCurrency !== false;
+        const goals = get().goals;
+        const selectors = computeProgress({
+          goals,
+          collections: collectionsState.collections,
+          waypoints: collectionsState.waypoints || [],
+          tasks: tasksState.tasks,
+          items: collectionsState.items,
+        });
 
-        let newPct = 0;
-        let prevPct = 0;
-        let newMinutes = goal.completedMinutes;
-        let newMetric = goal.completedMetric || 0;
-        let targetForPayout = goal.targetMinutes;
-
-        if (isUnits) {
-          const target = goal.targetMetric || 1;
-          prevPct = Math.min(100, Math.floor(((goal.completedMetric || 0) / target) * 100));
-          newMetric = newMetric + amount;
-          newPct = Math.min(100, Math.floor((newMetric / target) * 100));
-          targetForPayout = (goal.targetMetric || 1) * 60; // Approximate 1 hour per unit for economy math fallback
-        } else {
-          const target = goal.targetMinutes;
-          prevPct = target > 0 ? Math.min(100, Math.floor((goal.completedMinutes / target) * 100)) : 0;
-          newMinutes = newMinutes + amount;
-          newPct = target > 0 ? Math.min(100, Math.floor((newMinutes / target) * 100)) : 0;
-        }
-
-        const existingMilestones = goal.unlockedMilestones || [];
-        const possibleMilestones = [25, 50, 75, 100];
+        const updates: Record<string, Partial<Goal>> = {};
         const newlyUnlocked: UnlockedMilestoneInfo[] = [];
-        const updatedUnlocked = [...existingMilestones];
 
-        possibleMilestones.forEach(m => {
-          if (newPct >= m && !existingMilestones.includes(m)) {
-            const dollars = getMilestoneDollars(targetForPayout, m, goal.type || 'productive');
-            newlyUnlocked.push({
-              percentage: m,
-              dollarsAwarded: dollars,
-              goalTitle: goal.title,
-            });
-            updatedUnlocked.push(m);
-            if (pays) {
-              // Award bonus dollars immediately to balance (garnish-safe)
-              useEconomyStore.getState().addBalance(dollars);
-              // Increment Discipline Score booster if 100% milestone reached
-              if (m === 100) {
-                useEconomyStore.getState().incrementCompletedGoals();
-              }
-            }
-          }
-        });
-
-        set((state) => ({
-          goals: state.goals.map(g =>
-            g.id === id
-              ? { ...g, completedMinutes: newMinutes, completedMetric: newMetric, unlockedMilestones: updatedUnlocked }
-              : g
-          ),
-        }));
-
-        // Cascade to the parent chain (chains are homogeneous in metricType):
-        //  - Time chains: minutes flow up continuously, one level at a time.
-        //  - Count chains: only a *completion* (transition to 100%) counts as a
-        //    discrete unit, contributing +1 to every count-ancestor exactly once
-        //    — so a 20-chapter book adds +1 to "20 books", never +20.
-        let parentUnlocked: UnlockedMilestoneInfo[] = [];
-        if (goal.parentId) {
-          if (isUnits) {
-            if (prevPct < 100 && newPct >= 100) {
-              parentUnlocked = get().stepCountAncestors(goal.parentId, 1);
-            }
-          } else {
-            parentUnlocked = get().addProgress(goal.parentId, amount);
-          }
-        }
-
-        return [...newlyUnlocked, ...parentUnlocked];
-      },
-
-      stepCountAncestors: (startParentId, delta) => {
-        const unlocked: UnlockedMilestoneInfo[] = [];
-        let cur: string | undefined = startParentId;
-        // Guard against malformed cycles.
+        // Walk this Goal + every ancestor up the parentId chain — a change
+        // anywhere in the tree can affect a milestone at any level above it.
+        let cur: Goal | undefined = goals.find(g => g.id === goalId);
         const seen = new Set<string>();
+        while (cur && !seen.has(cur.id)) {
+          seen.add(cur.id);
+          const p = selectors.goalProgress(cur.id);
 
-        while (cur && !seen.has(cur)) {
-          seen.add(cur);
-          const g = get().goals.find(x => x.id === cur);
-          // Homogeneity guard: stop if the chain breaks or switches metric.
-          if (!g || g.metricType !== 'units') break;
+          if (p && p.hasTarget) {
+            const isUnits = cur.metricType === 'units';
+            const targetForPayout = isUnits ? (cur.targetMetric || 1) * 60 : cur.targetMinutes;
+            const pays = cur.paysCurrency !== false;
+            const existing = cur.unlockedMilestones || [];
+            const updatedUnlocked = [...existing];
 
-          const target = g.targetMetric || 1;
-          const prev = g.completedMetric || 0;
-          const next = Math.max(0, prev + delta);
-          const prevPct = Math.min(100, Math.floor((prev / target) * 100));
-          const nextPct = Math.min(100, Math.floor((next / target) * 100));
-          const pays = g.paysCurrency !== false;
-          const existing = g.unlockedMilestones || [];
-          const updated = [...existing];
-
-          [25, 50, 75, 100].forEach(m => {
-            if (delta > 0 && nextPct >= m && !existing.includes(m)) {
-              const dollars = getMilestoneDollars(target * 60, m, g.type || 'productive');
-              unlocked.push({ percentage: m, dollarsAwarded: dollars, goalTitle: g.title });
-              updated.push(m);
-              if (pays) {
-                useEconomyStore.getState().addBalance(dollars);
-                if (m === 100) useEconomyStore.getState().incrementCompletedGoals();
+            [25, 50, 75, 100].forEach(m => {
+              const wasUnlocked = existing.includes(m);
+              const nowUnlocked = p.pct >= m;
+              if (nowUnlocked && !wasUnlocked) {
+                const dollars = getMilestoneDollars(targetForPayout, m, cur!.type || 'productive');
+                updatedUnlocked.push(m);
+                newlyUnlocked.push({ percentage: m, dollarsAwarded: dollars, goalTitle: cur!.title });
+                if (pays) {
+                  useEconomyStore.getState().addBalance(dollars);
+                  if (m === 100) useEconomyStore.getState().incrementCompletedGoals();
+                }
+              } else if (!nowUnlocked && wasUnlocked) {
+                const dollars = getMilestoneDollars(targetForPayout, m, cur!.type || 'productive');
+                const idx = updatedUnlocked.indexOf(m);
+                if (idx > -1) updatedUnlocked.splice(idx, 1);
+                if (pays) {
+                  useEconomyStore.getState().removeBalance(dollars);
+                }
               }
-            } else if (delta < 0 && existing.includes(m) && nextPct < m) {
-              const idx = updated.indexOf(m);
-              if (idx > -1) updated.splice(idx, 1);
-              if (pays) {
-                useEconomyStore.getState().removeBalance(getMilestoneDollars(target * 60, m, g.type || 'productive'));
-              }
-            }
-          });
+            });
 
-          const curId = cur;
+            // completedMinutes/completedMetric become a cosmetic/sync cache of
+            // the derived value — written here, never read back as truth.
+            updates[cur.id] = {
+              unlockedMilestones: updatedUnlocked,
+              completedMinutes: isUnits ? cur.completedMinutes : p.completed,
+              completedMetric: isUnits ? p.completed : cur.completedMetric,
+            };
+          }
+
+          cur = cur.parentId ? goals.find(g => g.id === cur!.parentId) : undefined;
+        }
+
+        if (Object.keys(updates).length > 0) {
           set((state) => ({
-            goals: state.goals.map(x =>
-              x.id === curId ? { ...x, completedMetric: next, unlockedMilestones: updated } : x
-            ),
+            goals: state.goals.map(g => (updates[g.id] ? { ...g, ...updates[g.id] } : g)),
           }));
-
-          cur = g.parentId;
         }
 
-        return unlocked;
-      },
-
-      applyLeafProgress: (goalId, minutes, metricAmount) => {
-        const goal = get().goals.find(g => g.id === goalId);
-        if (!goal) return [];
-        // Count chains advance by the task's own metricAmount (e.g. 10 pages),
-        // falling back to a flat +1 when the task never set one — preserves
-        // exact behavior for every existing units-mode goal. Time chains
-        // absorb the minutes of effort regardless. addProgress handles
-        // accumulation + the completion ripple to ancestors.
-        return get().addProgress(goalId, goal.metricType === 'units' ? (metricAmount ?? 1) : minutes);
-      },
-
-      revokeLeafProgress: (goalId, minutes, metricAmount) => {
-        const goal = get().goals.find(g => g.id === goalId);
-        if (!goal) return;
-        get().removeProgress(goalId, goal.metricType === 'units' ? (metricAmount ?? 1) : minutes);
-      },
-
-      removeProgress: (id, amount) => {
-        const goal = get().goals.find(g => g.id === id);
-        if (!goal) return;
-
-        const isUnits = goal.metricType === 'units';
-        const pays = goal.paysCurrency !== false;
-
-        let newPct = 0;
-        let prevPct = 0;
-        let newMinutes = goal.completedMinutes;
-        let newMetric = goal.completedMetric || 0;
-        let targetForPayout = goal.targetMinutes;
-
-        if (isUnits) {
-          const target = goal.targetMetric || 1;
-          prevPct = Math.min(100, Math.floor(((goal.completedMetric || 0) / target) * 100));
-          newMetric = Math.max(0, newMetric - amount);
-          newPct = Math.min(100, Math.floor((newMetric / target) * 100));
-          targetForPayout = (goal.targetMetric || 1) * 60;
-        } else {
-          const target = goal.targetMinutes;
-          prevPct = target > 0 ? Math.min(100, Math.floor((goal.completedMinutes / target) * 100)) : 0;
-          newMinutes = Math.max(0, newMinutes - amount);
-          newPct = target > 0 ? Math.min(100, Math.floor((newMinutes / target) * 100)) : 0;
-        }
-
-        const existingMilestones = goal.unlockedMilestones || [];
-        const possibleMilestones = [25, 50, 75, 100];
-        const updatedUnlocked = [...existingMilestones];
-
-        possibleMilestones.forEach(m => {
-          // If we had unlocked this milestone previously, but our new percentage has dropped below it...
-          if (existingMilestones.includes(m) && newPct < m) {
-            const dollars = getMilestoneDollars(targetForPayout, m, goal.type || 'productive');
-            // Remove the milestone from the active array
-            const idx = updatedUnlocked.indexOf(m);
-            if (idx > -1) {
-              updatedUnlocked.splice(idx, 1);
-            }
-            // Revoke the bonus dollars only if this level was the paying level.
-            if (pays) {
-              useEconomyStore.getState().removeBalance(dollars);
-            }
-          }
-        });
-
-        set((state) => ({
-          goals: state.goals.map(g =>
-            g.id === id
-              ? { ...g, completedMinutes: newMinutes, completedMetric: newMetric, unlockedMilestones: updatedUnlocked }
-              : g
-          ),
-        }));
-
-        // Mirror the addProgress cascade in reverse (homogeneous chains):
-        //  - Time chains: remove the same minutes from each ancestor.
-        //  - Count chains: only reverse a *completion* — if this node dropped out
-        //    of 100%, step every count-ancestor down by 1.
-        if (goal.parentId) {
-          if (isUnits) {
-            if (prevPct >= 100 && newPct < 100) {
-              get().stepCountAncestors(goal.parentId, -1);
-            }
-          } else {
-            get().removeProgress(goal.parentId, amount);
-          }
-        }
+        return newlyUnlocked;
       },
     }),
     {

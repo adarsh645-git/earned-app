@@ -13,7 +13,8 @@ import ConfirmModal from './ConfirmModal';
 import { CategoryVectorIcon } from '../utils/categoryIcons';
 import { getPillarColor } from '../utils/pillarColor';
 import { feedback } from '../utils/feedback';
-import { resolveWaypointUnit, isWaypointUnitGoalGoverned, WAYPOINT_UNIT_TYPES } from '../utils/waypointUnit';
+import { resolveWaypointUnit, WAYPOINT_UNIT_TYPES } from '../utils/waypointUnit';
+import useProgress from '../hooks/useProgress';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -47,6 +48,7 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
   } = useCollectionStore();
   const { goals, deleteGoal } = useGoalStore();
   const { tasks, tags, pillars, addTask } = useTaskStore();
+  const progressSelectors = useProgress();
 
   const [categoryPillOpen, setCategoryPillOpen] = useState(false);
   const [goalPillOpen, setGoalPillOpen] = useState(false);
@@ -64,6 +66,11 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
   // Draft buffer for the free-text label entered after picking "Custom…" in
   // the Unit picker — only rendered while a waypoint's unitType is 'custom'.
   const [waypointCustomUnitDraft, setWaypointCustomUnitDraft] = useState<Record<string, string>>({});
+  // Same pattern as the Waypoint target/unit drafts above, but for the
+  // Journey's own optional progress node (Collection.targetMetric/unitLabel
+  // — see docs/sdd/025-unified-trickle-up-progress.md).
+  const [journeyUnitPillOpen, setJourneyUnitPillOpen] = useState(false);
+  const [journeyTargetDraft, setJourneyTargetDraft] = useState<string | undefined>(undefined);
 
   if (!collection) return null;
 
@@ -75,6 +82,9 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
   const progress = collectionItems.length > 0 ? Math.round((completedCount / collectionItems.length) * 100) : 0;
   const linkedTasks = tasks.filter(t => t.collectionId === collection.id);
   const generalTasks = linkedTasks.filter(t => !t.waypointId);
+
+  const journeyProgressNode = progressSelectors.journeyProgress(collection.id);
+  const journeyUnitLabel = collection.unitLabel || (journeyProgressNode?.unit !== 'minutes' ? journeyProgressNode?.unit : undefined);
 
   const isGoalUnits = linkedGoal?.metricType === 'units';
   const goalCompleted = linkedGoal ? (isGoalUnits ? (linkedGoal.completedMetric || 0) : linkedGoal.completedMinutes) : 0;
@@ -136,6 +146,15 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
     }
   };
 
+  const commitJourneyTarget = () => {
+    if (journeyTargetDraft === undefined) return;
+    const parsed = parseInt(journeyTargetDraft, 10);
+    const next = isNaN(parsed) || parsed <= 0 ? undefined : parsed;
+    if (next !== collection.targetMetric) {
+      updateCollection(collection.id, { targetMetric: next });
+    }
+  };
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.96)' }}>
@@ -188,13 +207,56 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
               />
             </View>
 
-            {/* Progress — Journey's own item checklist, and (separately) the mirrored linked-Goal progress */}
+            {/* Progress — either the Journey's own target+unit node (when set),
+                or the plain item-checklist bar (unchanged cosmetic default
+                for a passive Journey) — plus, separately, the mirrored
+                linked-Goal progress below. */}
             <View style={{ marginBottom: 24 }}>
               <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
                 This Journey
               </Text>
-              <AnimatedProgressBar progress={progress} color="#BF5AF2" height={8} />
-              <Text style={{ color: '#8E8E93', fontSize: 11, marginTop: 6 }}>{completedCount}/{collectionItems.length} tasks ({progress}%)</Text>
+              {journeyProgressNode?.hasTarget ? (
+                <>
+                  <AnimatedProgressBar progress={journeyProgressNode.pctRounded} color="#BF5AF2" height={8} />
+                  <Text style={{ color: '#8E8E93', fontSize: 11, marginTop: 6 }}>
+                    {journeyProgressNode.completed}/{journeyProgressNode.target}{journeyUnitLabel ? ` ${journeyUnitLabel}` : ''} ({journeyProgressNode.pctRounded}%)
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <AnimatedProgressBar progress={progress} color="#BF5AF2" height={8} />
+                  <Text style={{ color: '#8E8E93', fontSize: 11, marginTop: 6 }}>{completedCount}/{collectionItems.length} tasks ({progress}%)</Text>
+                </>
+              )}
+
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 10 }}>
+                <TextInput
+                  value={journeyTargetDraft ?? (collection.targetMetric ? String(collection.targetMetric) : '')}
+                  onChangeText={setJourneyTargetDraft}
+                  onBlur={commitJourneyTarget}
+                  placeholder="No Target"
+                  placeholderTextColor="#5C5C5E"
+                  keyboardType="numeric"
+                  style={[
+                    { backgroundColor: '#2C2C2E', color: '#FFF', fontSize: 12, fontWeight: '600', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#3A3A3C', width: 90 },
+                    { outlineStyle: 'none' } as any,
+                  ]}
+                />
+                <PillPicker
+                  label={collection.unitLabel || 'No Unit'}
+                  options={[{ id: '', label: 'No Unit' }, ...WAYPOINT_UNIT_TYPES.filter(u => u.id !== 'custom')]}
+                  selectedId={collection.unitLabel || ''}
+                  onSelect={(id) => {
+                    feedback('select');
+                    const preset = WAYPOINT_UNIT_TYPES.find(u => u.id === id);
+                    updateCollection(collection.id, { unitLabel: id ? (preset?.label || id) : undefined });
+                    setJourneyUnitPillOpen(false);
+                  }}
+                  open={journeyUnitPillOpen}
+                  onToggle={() => setJourneyUnitPillOpen(p => !p)}
+                  accentColor="#BF5AF2"
+                />
+              </View>
             </View>
 
             {linkedGoal && (
@@ -217,11 +279,11 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                 const wpTasks = linkedTasks.filter(t => t.waypointId === wp.id);
                 
                 const unitLabel = resolveWaypointUnit(wp, collection, goals) || 'min';
-                const unitGoalGoverned = isWaypointUnitGoalGoverned(collection, goals);
+                const wpProgressNode = progressSelectors.waypointProgress(wp.id);
                 const hasTarget = wp.targetMetric != null;
                 const targetMetric = wp.targetMetric || 1;
-                const wpCompleted = wp.completedMetric || 0;
-                const wpPct = hasTarget ? Math.min(100, Math.round((wpCompleted / targetMetric) * 100)) : 0;
+                const wpCompleted = wpProgressNode?.completed || 0;
+                const wpPct = hasTarget ? (wpProgressNode?.pctRounded ?? 0) : 0;
                 const isWpComplete = hasTarget && wpPct === 100;
                 
                 const timeframeLabel = wp.month && wp.year
@@ -265,32 +327,26 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                             ]}
                           />
 
-                          {unitGoalGoverned ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#3A3A3C', opacity: 0.7 }}>
-                              <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>{unitLabel} (from Goal)</Text>
-                            </View>
-                          ) : (
-                            <PillPicker
-                              label={wp.unitType ? (WAYPOINT_UNIT_TYPES.find(u => u.id === wp.unitType)?.label || wp.unitLabel || 'Unit') : 'No Unit'}
-                              options={[{ id: '', label: 'No Unit' }, ...WAYPOINT_UNIT_TYPES]}
-                              selectedId={wp.unitType || ''}
-                              onSelect={(id) => {
-                                feedback('select');
-                                if (id === 'custom') {
-                                  updateWaypoint(wp.id, { unitType: 'custom' });
-                                } else if (id === '') {
-                                  updateWaypoint(wp.id, { unitType: undefined, unitLabel: undefined });
-                                } else {
-                                  const preset = WAYPOINT_UNIT_TYPES.find(u => u.id === id);
-                                  updateWaypoint(wp.id, { unitType: id, unitLabel: preset?.label });
-                                }
-                                setWaypointRowOpenField(prev => ({ ...prev, [wp.id]: null }));
-                              }}
-                              open={waypointRowOpenField[wp.id] === 'unit'}
-                              onToggle={() => setWaypointRowOpenField(prev => ({ ...prev, [wp.id]: prev[wp.id] === 'unit' ? null : 'unit' }))}
-                              accentColor="#5AC8FA"
-                            />
-                          )}
+                          <PillPicker
+                            label={wp.unitType ? (WAYPOINT_UNIT_TYPES.find(u => u.id === wp.unitType)?.label || wp.unitLabel || 'Unit') : 'No Unit'}
+                            options={[{ id: '', label: 'No Unit' }, ...WAYPOINT_UNIT_TYPES]}
+                            selectedId={wp.unitType || ''}
+                            onSelect={(id) => {
+                              feedback('select');
+                              if (id === 'custom') {
+                                updateWaypoint(wp.id, { unitType: 'custom' });
+                              } else if (id === '') {
+                                updateWaypoint(wp.id, { unitType: undefined, unitLabel: undefined });
+                              } else {
+                                const preset = WAYPOINT_UNIT_TYPES.find(u => u.id === id);
+                                updateWaypoint(wp.id, { unitType: id, unitLabel: preset?.label });
+                              }
+                              setWaypointRowOpenField(prev => ({ ...prev, [wp.id]: null }));
+                            }}
+                            open={waypointRowOpenField[wp.id] === 'unit'}
+                            onToggle={() => setWaypointRowOpenField(prev => ({ ...prev, [wp.id]: prev[wp.id] === 'unit' ? null : 'unit' }))}
+                            accentColor="#5AC8FA"
+                          />
                           <PillPicker
                             label={wp.year ? String(wp.year) : 'Ongoing'}
                             options={[{ id: '', label: 'Ongoing' }, ...[currentYear, currentYear + 1, currentYear + 2].map(y => ({ id: String(y), label: String(y) }))]}
@@ -311,7 +367,7 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                           />
                         </View>
 
-                        {!unitGoalGoverned && wp.unitType === 'custom' && (
+                        {wp.unitType === 'custom' && (
                           <TextInput
                             value={waypointCustomUnitDraft[wp.id] ?? (wp.unitLabel || '')}
                             onChangeText={(text) => setWaypointCustomUnitDraft(prev => ({ ...prev, [wp.id]: text }))}

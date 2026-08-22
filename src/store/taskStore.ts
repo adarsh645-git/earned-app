@@ -57,6 +57,21 @@ export function sortKey(t: Task): number {
   return t.sortOrder ?? Date.parse(t.dateCreated);
 }
 
+// The Goal a Task's completion should reconcile progress/milestones
+// against: its own goalId, or (when unset) the goalId of the Journey it's
+// linked to via collectionId. See
+// docs/sdd/025-unified-trickle-up-progress.md.
+export function resolveGoalIdForTask(
+  task: Task,
+  collections: { id: string; goalId?: string }[]
+): string | undefined {
+  if (task.goalId) return task.goalId;
+  if (task.collectionId) {
+    return collections.find(c => c.id === task.collectionId)?.goalId;
+  }
+  return undefined;
+}
+
 interface TaskState {
   tasks: Task[];
   tags: Tag[];
@@ -216,82 +231,76 @@ export const useTaskStore = create<TaskState>()(
         
         return { tasks: newTasks };
       }),
-      toggleTask: (id, isManual = true) => set((state) => {
-        const task = state.tasks.find(t => t.id === id);
-        if (!task) return state;
+      toggleTask: (id, isManual = true) => {
+        const task = get().tasks.find(t => t.id === id);
+        if (!task) return;
 
         const isCompleting = !task.completed;
-        const subtasks = state.tasks.filter(t => t.parentId === id);
+        const subtasks = get().tasks.filter(t => t.parentId === id);
         const isContainer = subtasks.length > 0;
 
         if (isManual && !isContainer) {
-          const tag = state.tags.find(t => t.id === task.tagId);
-          
-          // Require stores dynamically inside to avoid circular dependencies if any
+          const tag = get().tags.find(t => t.id === task.tagId);
           const { useEconomyStore } = require('./economyStore');
-          const { useGoalStore } = require('./goalStore');
-
           const economyState = useEconomyStore.getState();
-          const goalState = useGoalStore.getState();
 
           if (isCompleting) {
-            // Payout
             if (tag?.type === 'earner') {
               const conversion = economyState.getConversionRate();
               const hoursEarned = Math.round(task.estimatedMinutes * conversion.multiplier);
               economyState.addHours(hoursEarned);
               economyState.incrementStreak();
               economyState.incrementCompletedTasks();
-
-              if (task.goalId) {
-                goalState.applyLeafProgress(task.goalId, task.estimatedMinutes, task.metricProgress);
-              }
-              if (task.waypointId) {
-                const { useCollectionStore } = require('./collectionStore');
-                useCollectionStore.getState().applyWaypointProgress(task.waypointId, task.estimatedMinutes, task.metricProgress);
-              }
             } else if (tag?.type === 'burner') {
               economyState.spendHours(task.estimatedMinutes);
             }
           } else {
-            // Revert
             if (tag?.type === 'earner') {
               const conversion = economyState.getConversionRate();
               const hoursEarned = Math.round(task.estimatedMinutes * conversion.multiplier);
               economyState.removeHours(hoursEarned);
               economyState.decrementCompletedTasks();
-
-              if (task.goalId) {
-                goalState.revokeLeafProgress(task.goalId, task.estimatedMinutes, task.metricProgress);
-              }
-              if (task.waypointId) {
-                const { useCollectionStore } = require('./collectionStore');
-                useCollectionStore.getState().revokeWaypointProgress(task.waypointId, task.estimatedMinutes, task.metricProgress);
-              }
             } else if (tag?.type === 'burner') {
               economyState.addHours(task.estimatedMinutes);
             }
           }
         }
 
-        const newTasks = state.tasks.map(t => t.id === id ? { ...t, completed: isCompleting } : t);
+        set((state) => {
+          const newTasks = state.tasks.map(t => t.id === id ? { ...t, completed: isCompleting } : t);
 
-        // Auto-complete parent bubbling
-        if (task.parentId) {
-          const children = newTasks.filter(t => t.parentId === task.parentId);
-          const allChildrenCompleted = children.every(t => t.completed);
-          
-          if (isCompleting && allChildrenCompleted) {
-             const parentIndex = newTasks.findIndex(t => t.id === task.parentId);
-             if (parentIndex !== -1) newTasks[parentIndex] = { ...newTasks[parentIndex], completed: true };
-          } else if (!isCompleting) {
-             const parentIndex = newTasks.findIndex(t => t.id === task.parentId);
-             if (parentIndex !== -1) newTasks[parentIndex] = { ...newTasks[parentIndex], completed: false };
+          // Auto-complete parent bubbling
+          if (task.parentId) {
+            const children = newTasks.filter(t => t.parentId === task.parentId);
+            const allChildrenCompleted = children.every(t => t.completed);
+
+            if (isCompleting && allChildrenCompleted) {
+               const parentIndex = newTasks.findIndex(t => t.id === task.parentId);
+               if (parentIndex !== -1) newTasks[parentIndex] = { ...newTasks[parentIndex], completed: true };
+            } else if (!isCompleting) {
+               const parentIndex = newTasks.findIndex(t => t.id === task.parentId);
+               if (parentIndex !== -1) newTasks[parentIndex] = { ...newTasks[parentIndex], completed: false };
+            }
+          }
+
+          return { tasks: newTasks };
+        });
+
+        // Progress/milestone reconciliation runs after the completed-flip is
+        // committed above, so the trickle-up engine (which reads live store
+        // state) sees the new value. Only a manual, non-container completion
+        // changes payout-relevant progress — parent-bubbling above is a
+        // display-only mirror, same as before this engine existed. See
+        // docs/sdd/025-unified-trickle-up-progress.md.
+        if (isManual && !isContainer) {
+          const { useCollectionStore } = require('./collectionStore');
+          const goalId = resolveGoalIdForTask(task, useCollectionStore.getState().collections);
+          if (goalId) {
+            const { useGoalStore } = require('./goalStore');
+            useGoalStore.getState().reconcileGoalMilestones(goalId);
           }
         }
-
-        return { tasks: newTasks };
-      }),
+      },
       moveToIcebox: (id) => set((state) => ({
         // Cascade to subtasks so a parent's children don't strand as
         // orphaned, unrenderable rows (day view hides them once the parent

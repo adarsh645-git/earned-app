@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { useEconomyStore } from './economyStore';
-import { useTaskStore } from './taskStore';
+import { useTaskStore, resolveGoalIdForTask } from './taskStore';
+import { useCollectionStore } from './collectionStore';
 import { useGoalStore, UnlockedMilestoneInfo, getChainTrail } from './goalStore';
 import * as Notifications from 'expo-notifications';
 
@@ -200,13 +201,25 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     // Roll up progress to the Goal if linked & capture milestone rewards (awards Dollars at milestones)
     let unlockedMilestones: UnlockedMilestoneInfo[] = [];
     let chainTrail: string[] = [];
-    if (task?.goalId) {
-      unlockedMilestones = useGoalStore.getState().applyLeafProgress(task.goalId, minutesElapsed);
-      chainTrail = getChainTrail(useGoalStore.getState().goals, task.goalId);
+    // A Bonus Time session's actual elapsed minutes can differ from the
+    // task's stored estimatedMinutes — correct the estimate to match reality
+    // before reconciling, or the trickle-up engine (which reads the task's
+    // stored estimate, not the live timer) would recompute off a stale
+    // number. Side effect: fixes a pre-existing gap where a timer-completed
+    // task only ever fed the Goal, never its Waypoint too — reconcile now
+    // walks the same real chain toggleTask does.
+    if (task && task.estimatedMinutes !== minutesElapsed) {
+      useTaskStore.getState().updateTask(task.id, { estimatedMinutes: minutesElapsed });
+    }
+
+    const goalId = task ? resolveGoalIdForTask({ ...task, estimatedMinutes: minutesElapsed }, useCollectionStore.getState().collections) : undefined;
+    if (goalId) {
+      unlockedMilestones = useGoalStore.getState().reconcileGoalMilestones(goalId);
+      chainTrail = getChainTrail(useGoalStore.getState().goals, goalId);
     }
 
     const result: SessionCompletionResult = {
-      dollarsEarned: 0, // Milestone rewards handled by addProgress
+      dollarsEarned: 0, // Milestone rewards handled by reconcileGoalMilestones
       hoursEarnedMinutes,
       chainTrail,
       unlockedMilestones,

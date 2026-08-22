@@ -74,7 +74,9 @@ CREATE TABLE IF NOT EXISTS public.collections (
   title TEXT NOT NULL,
   category TEXT NOT NULL,
   goal_id TEXT REFERENCES public.goals(id) ON DELETE SET NULL,
-  date_created TIMESTAMPTZ DEFAULT NOW()
+  date_created TIMESTAMPTZ DEFAULT NOW(),
+  unit_label TEXT, -- a Journey can own its own progress node; see 20260729000002
+  target_metric NUMERIC -- unset = passive (pure organization); see 20260729000002
 );
 
 -- 7. Waypoints (Journey sub-goal timeframe buckets) Table

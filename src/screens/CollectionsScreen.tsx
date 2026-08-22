@@ -13,6 +13,7 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import AnimatedProgressBar from '../components/AnimatedProgressBar';
 import GoalDetailModal from '../components/GoalDetailModal';
 import QuickStartModal from '../components/QuickStartModal';
+import useProgress from '../hooks/useProgress';
 import RewardToast from '../components/RewardToast';
 import PillPicker from '../components/PillPicker';
 import EditableText from '../components/EditableText';
@@ -121,7 +122,7 @@ function GoalRow({
 }) {
   const isUnits = goal.metricType === 'units';
   const target = isUnits ? (goal.targetMetric || 1) : goal.targetMinutes;
-  const completed = isUnits ? (goal.completedMetric || 0) : goal.completedMinutes;
+  const completed = useProgress().goalProgress(goal.id)?.completed ?? 0;
   const isOpenEnded = target === 0;
   const pct = target > 0 ? Math.min(100, Math.round((completed / target) * 100)) : 0;
 

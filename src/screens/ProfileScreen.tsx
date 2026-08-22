@@ -11,6 +11,7 @@ import { useAuthStore } from '../store/authStore';
 import { useSyncStatusStore, isSyncUnhealthy } from '../store/syncStatusStore';
 import GoalDetailModal from '../components/GoalDetailModal';
 import { getPillarColor } from '../utils/pillarColor';
+import useProgress from '../hooks/useProgress';
 
 const PremiumInput = (props: React.ComponentProps<typeof TextInput>) => (
   <TextInput
@@ -31,6 +32,7 @@ export default function ProfileScreen() {
   } = useEconomyStore();
   const { tasks, pillars, tags, addPillar, archivePillar, addTag, archiveTag } = useTaskStore();
   const { goals: allGoals, updateGoal, deleteGoal } = useGoalStore();
+  const progressSelectors = useProgress();
   // Goals shown here are productive goals only — entertainment projects live in the Store.
   const goals = allGoals.filter(g => !g.type || g.type === 'productive');
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
@@ -425,7 +427,7 @@ export default function ProfileScreen() {
               // targetMetric, not minutes — this used to always show hours
               // regardless of metricType, which was meaningless for a Count goal.
               const isUnits = goal.metricType === 'units';
-              const completed = isUnits ? (goal.completedMetric || 0) : goal.completedMinutes;
+              const completed = progressSelectors.goalProgress(goal.id)?.completed ?? 0;
               const target = isUnits ? (goal.targetMetric || 0) : goal.targetMinutes;
               // target is 0 for open-ended goals — without this guard,
               // completed / 0 produces NaN/Infinity, which renders as an
@@ -433,7 +435,7 @@ export default function ProfileScreen() {
               const pct = target > 0 ? Math.min(100, Math.round((completed / target) * 100)) : 0;
               const progressLabel = isUnits
                 ? `${completed} / ${target}${goal.unitLabel ? ` ${goal.unitLabel}` : ''} (${pct}%)`
-                : `${(goal.completedMinutes / 60).toFixed(1)} / ${(goal.targetMinutes / 60).toFixed(1)} hrs (${pct}%)`;
+                : `${(completed / 60).toFixed(1)} / ${(goal.targetMinutes / 60).toFixed(1)} hrs (${pct}%)`;
               const unlocked = goal.unlockedMilestones || [];
               const milestones = [25, 50, 75, 100];
               const isLast = index === goals.length - 1;

@@ -5,6 +5,7 @@ import { Goal, useGoalStore } from '../store/goalStore';
 import { hapticHeavyImpact, hapticMediumImpact } from '../utils/haptics';
 import { useConfettiStore } from '../store/confettiStore';
 import GoalDetailModal from './GoalDetailModal';
+import useProgress from '../hooks/useProgress';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -190,11 +191,12 @@ export default function AnimatedGoalCard({
   onToggleExpand,
 }: AnimatedGoalCardProps) {
   const { updateGoal, deleteGoal } = useGoalStore();
+  const progressSelectors = useProgress();
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const isUnits = goal.metricType === 'units';
   const isEntertainment = goal.type === 'entertainment';
   const target = isUnits ? (goal.targetMetric || 1) : goal.targetMinutes;
-  const completed = isUnits ? (goal.completedMetric || 0) : goal.completedMinutes;
+  const completed = progressSelectors.goalProgress(goal.id)?.completed ?? 0;
   
   const isOpenEnded = target === 0;
   const pct = target > 0 ? Math.min(100, Math.round((completed / target) * 100)) : 0;
@@ -409,7 +411,7 @@ export default function AnimatedGoalCard({
           {subGoals && subGoals.map((subGoal) => {
             const subIsUnits = subGoal.metricType === 'units';
             const subTarget = subIsUnits ? (subGoal.targetMetric || 1) : subGoal.targetMinutes;
-            const subCompleted = subIsUnits ? (subGoal.completedMetric || 0) : subGoal.completedMinutes;
+            const subCompleted = progressSelectors.goalProgress(subGoal.id)?.completed ?? 0;
             const subIsOpenEnded = subTarget === 0;
             const subPct = subIsOpenEnded ? 0 : Math.min(100, Math.round((subCompleted / subTarget) * 100));
             

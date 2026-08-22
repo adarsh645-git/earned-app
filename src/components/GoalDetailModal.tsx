@@ -9,6 +9,7 @@ import { getPillarColor } from '../utils/pillarColor';
 import EditableText from './EditableText';
 import TimeSelectorModal from './TimeSelectorModal';
 import ConfirmModal from './ConfirmModal';
+import useProgress from '../hooks/useProgress';
 
 interface GoalDetailModalProps {
   goal: Goal | null;
@@ -41,6 +42,7 @@ export default function GoalDetailModal({
   const { goals: allGoals, setPayingLevel } = useGoalStore();
   const { collections } = useCollectionStore();
   const { pillars } = useTaskStore();
+  const progressSelectors = useProgress();
   const activePillars = pillars.filter(p => !p.isArchived);
 
   const [horizon, setHorizon] = useState<'monthly' | 'yearly'>('monthly');
@@ -72,7 +74,7 @@ export default function GoalDetailModal({
   const isUnits = goal?.metricType === 'units';
   const isEntertainment = goal?.type === 'entertainment';
   const target = goal ? (isUnits ? (goal.targetMetric || 1) : goal.targetMinutes) : 0;
-  const completed = goal ? (isUnits ? (goal.completedMetric || 0) : goal.completedMinutes) : 0;
+  const completed = goal ? (progressSelectors.goalProgress(goal.id)?.completed ?? 0) : 0;
   const goalIsOpenEnded = target === 0;
   const pct = target > 0 ? Math.min(100, Math.round((completed / target) * 100)) : 0;
 
@@ -376,7 +378,7 @@ export default function GoalDetailModal({
                 {subGoals.map((sg) => {
                   const sgIsUnits = sg.metricType === 'units';
                   const sgTarget = sgIsUnits ? (sg.targetMetric || 1) : sg.targetMinutes;
-                  const sgCompleted = sgIsUnits ? (sg.completedMetric || 0) : sg.completedMinutes;
+                  const sgCompleted = progressSelectors.goalProgress(sg.id)?.completed ?? 0;
                   const sgOpenEnded = sgTarget === 0;
                   const sgPct = sgOpenEnded ? 0 : Math.min(100, Math.round((sgCompleted / sgTarget) * 100));
                   return (
