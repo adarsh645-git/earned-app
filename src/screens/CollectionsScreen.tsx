@@ -364,7 +364,11 @@ export default function CollectionsScreen() {
     if (!journeyTitle.trim()) return;
     setJourneyValidationError('');
 
-    if (!journeyPillarId) {
+    // A Journey linked to a Goal inherits that Goal's Pillar (see
+    // docs/sdd/029-journey-page-audit.md) — only a standalone Journey (no
+    // Goal) needs its own explicit pick. The 'new' Goal path already
+    // requires newGoalPillarId below, which the Journey then inherits.
+    if (journeyLinkMode === 'none' && !journeyPillarId) {
       setJourneyValidationError('Pick a Pillar for this Journey');
       return;
     }
@@ -418,7 +422,9 @@ export default function CollectionsScreen() {
       title: journeyTitle.trim(),
       category: journeyCategory,
       goalId: linkedGoalId,
-      pillarId: journeyPillarId,
+      // Only meaningful for a standalone Journey — addCollection derives it
+      // from the linked Goal automatically whenever goalId is set.
+      pillarId: journeyLinkMode === 'none' ? journeyPillarId : undefined,
     });
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setIsNewJourneyExpanded(false);
@@ -579,33 +585,44 @@ export default function CollectionsScreen() {
               autoFocus
             />
 
-            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Pillar</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-              {activePillars.map((pillar) => {
-                const isSelected = journeyPillarId === pillar.id;
-                const color = getPillarColor(pillar.id, pillars);
-                return (
-                  <Pressable
-                    key={pillar.id}
-                    onPress={() => setJourneyPillarId(pillar.id)}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      paddingHorizontal: 16,
-                      paddingVertical: 10,
-                      borderRadius: 9999,
-                      borderWidth: 1,
-                      marginRight: 8,
-                      backgroundColor: isSelected ? `${color}26` : '#151517',
-                      borderColor: isSelected ? `${color}66` : '#2C2C2E',
-                    }}
-                  >
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color, marginRight: 6 }} />
-                    <Text style={{ color: isSelected ? '#FFFFFF' : '#8E8E93', fontSize: 13, fontWeight: isSelected ? '700' : '500' }}>{pillar.name}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+            {journeyLinkMode === 'none' ? (
+              <>
+                <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Pillar</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                  {activePillars.map((pillar) => {
+                    const isSelected = journeyPillarId === pillar.id;
+                    const color = getPillarColor(pillar.id, pillars);
+                    return (
+                      <Pressable
+                        key={pillar.id}
+                        onPress={() => setJourneyPillarId(pillar.id)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 16,
+                          paddingVertical: 10,
+                          borderRadius: 9999,
+                          borderWidth: 1,
+                          marginRight: 8,
+                          backgroundColor: isSelected ? `${color}26` : '#151517',
+                          borderColor: isSelected ? `${color}66` : '#2C2C2E',
+                        }}
+                      >
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color, marginRight: 6 }} />
+                        <Text style={{ color: isSelected ? '#FFFFFF' : '#8E8E93', fontSize: 13, fontWeight: isSelected ? '700' : '500' }}>{pillar.name}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            ) : (
+              // Linked to a Goal (existing or new-inline) — Pillar is
+              // inherited from that Goal, not picked separately here. See
+              // docs/sdd/029-journey-page-audit.md.
+              <Text style={{ color: '#5C5C5E', fontSize: 12, marginBottom: 14 }}>
+                Pillar: inherited from {journeyLinkMode === 'existing' ? "the linked Goal" : "the new Goal's Pillar below"}
+              </Text>
+            )}
 
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
               <PillPicker

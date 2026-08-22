@@ -191,6 +191,9 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
               <PillPicker
                 // Once set, every Task created inside this Journey is locked
                 // to this Pillar's Tags — see docs/sdd/028-journey-pillar-lock.md.
+                // Locked to the linked Goal's own Pillar once one exists —
+                // reassign it from GoalDetailModal instead. See
+                // docs/sdd/029-journey-page-audit.md.
                 label={`Pillar: ${activePillars.find(p => p.id === collection.pillarId)?.name || 'None'}`}
                 options={[{ id: '', label: 'None' }, ...activePillars.map(p => ({ id: p.id, label: p.name }))]}
                 selectedId={collection.pillarId || ''}
@@ -198,6 +201,7 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                 open={pillarPillOpen}
                 onToggle={() => setPillarPillOpen(p => !p)}
                 accentColor="#30D158"
+                disabled={!!collection.goalId}
               />
               <PillPicker
                 label={`${collection.category.charAt(0).toUpperCase()}${collection.category.slice(1)}`}

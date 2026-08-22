@@ -229,9 +229,25 @@ export const useGoalStore = create<GoalState>()(
         }));
         return id;
       },
-      updateGoal: (id, updates) => set((state) => ({
-        goals: state.goals.map(g => g.id === id ? { ...g, ...updates } : g)
-      })),
+      updateGoal: (id, updates) => {
+        set((state) => ({
+          goals: state.goals.map(g => g.id === id ? { ...g, ...updates } : g)
+        }));
+
+        // A Journey's Pillar is forced to match its linked Goal's (see
+        // docs/sdd/029-journey-page-audit.md) — reassigning the Goal's own
+        // Pillar cascades to every Journey linked to it, reusing
+        // collectionStore.updateCollection's own retag side effect so Tasks
+        // underneath cascade too. Dynamic require avoids a circular import,
+        // matching this file's existing deleteGoal pattern.
+        if ('pillarId' in updates) {
+          const { useCollectionStore } = require('./collectionStore');
+          const collectionState = useCollectionStore.getState();
+          collectionState.collections
+            .filter((c: { goalId?: string }) => c.goalId === id)
+            .forEach((c: { id: string }) => collectionState.updateCollection(c.id, { pillarId: updates.pillarId }));
+        }
+      },
       setPayingLevel: (goalId) => set((state) => {
         const root = getChainRoot(state.goals, goalId);
         if (!root) return state;

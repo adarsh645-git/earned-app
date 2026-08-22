@@ -88,6 +88,14 @@ export const useCollectionStore = create<CollectionState>()(
 
       addCollection: (collectionData) => {
         const id = uuidv4();
+        // A Journey linked to a Goal is forced onto that Goal's Pillar — no
+        // independent pick when a Goal is present (see
+        // docs/sdd/029-journey-page-audit.md). Standalone Journeys keep
+        // whatever pillarId was explicitly passed.
+        const linkedGoal = collectionData.goalId
+          ? useGoalStore.getState().goals.find((g) => g.id === collectionData.goalId)
+          : undefined;
+        const pillarId = linkedGoal ? linkedGoal.pillarId : collectionData.pillarId;
         set((state) => ({
           collections: [
             ...state.collections,
@@ -97,7 +105,7 @@ export const useCollectionStore = create<CollectionState>()(
               goalId: collectionData.goalId,
               targetMetric: collectionData.targetMetric,
               unitLabel: collectionData.unitLabel,
-              pillarId: collectionData.pillarId,
+              pillarId,
               id,
               dateCreated: new Date().toISOString(),
             },
@@ -108,8 +116,20 @@ export const useCollectionStore = create<CollectionState>()(
 
       updateCollection: (id, updates) => {
         const prev = get().collections.find((c) => c.id === id);
+
+        // Same forced-inheritance rule as addCollection above — re-linking a
+        // Journey to a (linked) Goal re-derives its Pillar from that Goal,
+        // overriding any explicit pillarId passed alongside it.
+        let effectiveUpdates = updates;
+        if ('goalId' in updates && updates.goalId) {
+          const linkedGoal = useGoalStore.getState().goals.find((g) => g.id === updates.goalId);
+          if (linkedGoal) {
+            effectiveUpdates = { ...updates, pillarId: linkedGoal.pillarId };
+          }
+        }
+
         set((state) => ({
-          collections: state.collections.map((c) => (c.id === id ? { ...c, ...updates } : c)),
+          collections: state.collections.map((c) => (c.id === id ? { ...c, ...effectiveUpdates } : c)),
         }));
 
         // Setting/changing the Pillar retags every Task already in this
@@ -119,10 +139,10 @@ export const useCollectionStore = create<CollectionState>()(
         // Pillar they're now locked to. Only fires on set-to-a-value, not on
         // clearing back to unset. Dynamic require avoids a circular import,
         // same pattern deleteWaypoint above uses.
-        if (updates.pillarId && updates.pillarId !== prev?.pillarId) {
+        if (effectiveUpdates.pillarId && effectiveUpdates.pillarId !== prev?.pillarId) {
           const { useTaskStore } = require('./taskStore');
           const taskState = useTaskStore.getState();
-          const firstTag = taskState.tags.find((t: any) => t.pillarId === updates.pillarId && !t.isArchived);
+          const firstTag = taskState.tags.find((t: any) => t.pillarId === effectiveUpdates.pillarId && !t.isArchived);
           if (firstTag) {
             useTaskStore.setState((s: any) => ({
               tasks: s.tasks.map((t: any) => (t.collectionId === id ? { ...t, tagId: firstTag.id } : t)),
