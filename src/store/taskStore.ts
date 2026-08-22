@@ -81,6 +81,8 @@ interface TaskState {
   lastUsedTagId: string;
   // Guards the one-time repair below so it only ever runs once per device.
   tagPillarIdBackfillApplied: boolean;
+  // Guards dedupeTags so it only ever runs once per device.
+  tagDedupeApplied: boolean;
 
   // Task Actions
   // title is the only required field — quick-add can create a task from just
@@ -117,6 +119,14 @@ interface TaskState {
   // violates tags.pillar_id's NOT NULL constraint on every sync attempt —
   // see docs/sdd/018-sync-health-indicator.md's "Journeys/Tags" failure.
   backfillTagPillarIds: () => void;
+  // Collapses tags that share a Pillar + name into one canonical id,
+  // remapping any Task/lastUsedTagId pointing at a duplicate and archiving
+  // the rest. Fixes duplicate seed tags created when a device without any
+  // persisted local storage (fresh install, cleared storage, second device)
+  // generated its own random-uuid defaults before its first cloud pull —
+  // mergeById in syncEngine.ts only dedupes by id, so those defaults piled
+  // up alongside the real ones on every such cold start. See BUGS.md #001.
+  dedupeTags: () => void;
 }
 
 export const useTaskStore = create<TaskState>()(
@@ -128,13 +138,17 @@ export const useTaskStore = create<TaskState>()(
         { id: 'health', name: 'Health' },
         { id: 'personal', name: 'Personal' }
       ],
+      // Stable ids (mirroring the pillars above) rather than uuidv4() — a
+      // fresh install merges these back into the same cloud rows on first
+      // sync instead of minting lookalike duplicates. See dedupeTags below.
       tags: [
-        { id: uuidv4(), pillarId: 'office', name: 'Deep Work', type: 'earner' },
-        { id: uuidv4(), pillarId: 'health', name: 'Fitness', type: 'earner' },
-        { id: uuidv4(), pillarId: 'personal', name: 'Gaming', type: 'burner' }
+        { id: 'deep-work', pillarId: 'office', name: 'Deep Work', type: 'earner' },
+        { id: 'fitness', pillarId: 'health', name: 'Fitness', type: 'earner' },
+        { id: 'gaming', pillarId: 'personal', name: 'Gaming', type: 'burner' }
       ],
       lastUsedTagId: '',
       tagPillarIdBackfillApplied: false,
+      tagDedupeApplied: false,
 
       addTask: (task) => {
         const id = uuidv4();
@@ -367,6 +381,41 @@ export const useTaskStore = create<TaskState>()(
         });
 
         set({ tagPillarIdBackfillApplied: true });
+      },
+      dedupeTags: () => {
+        if (get().tagDedupeApplied) return;
+
+        set((state) => {
+          const canonicalIdByKey = new Map<string, string>();
+          const duplicateToCanonicalId = new Map<string, string>();
+
+          const tags = state.tags.map((t) => {
+            if (t.isArchived) return t;
+            const key = `${t.pillarId}::${t.name.trim().toLowerCase()}`;
+            const canonicalId = canonicalIdByKey.get(key);
+            if (!canonicalId) {
+              canonicalIdByKey.set(key, t.id);
+              return t;
+            }
+            duplicateToCanonicalId.set(t.id, canonicalId);
+            return { ...t, isArchived: true };
+          });
+
+          if (duplicateToCanonicalId.size === 0) {
+            return { tags, tagDedupeApplied: true };
+          }
+
+          return {
+            tags,
+            tasks: state.tasks.map(t =>
+              t.tagId && duplicateToCanonicalId.has(t.tagId)
+                ? { ...t, tagId: duplicateToCanonicalId.get(t.tagId) }
+                : t
+            ),
+            lastUsedTagId: duplicateToCanonicalId.get(state.lastUsedTagId) || state.lastUsedTagId,
+            tagDedupeApplied: true,
+          };
+        });
       },
     }),
     {

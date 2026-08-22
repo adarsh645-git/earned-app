@@ -54,3 +54,68 @@ Entry template — copy this for each new bug:
 - **Report**: <what's wrong, expected vs actual, as given>
 - **Notes**: <root cause / fix / commit ref — filled in during triage>
 -->
+
+### 001 — Manage Focus category/pillar dropdowns show duplicated entries
+- **Date**: 2026-08-22
+- **Status**: ✅ Fixed
+- **Screenshot**: ./screenshots/001a.png, ./screenshots/001b.png, ./screenshots/001c.png
+- **Report**: On the Tasks page ("Manage Focus"), the dropdowns show repeated
+  entries — e.g. "Tag (last used)" lists "Deep Work" four times in a row.
+  Also seen: the same repeated categories in the profile page. Separately,
+  the first dropdown when creating a task is a pillar picker (Office/Health/
+  Personal), but once the task exists, that same-position dropdown ("Gaming")
+  instead shows a huge list of every category in the whole app rather than
+  staying scoped to pillars.
+- **Notes**: Two independent causes, both fixed:
+  1. The 3 default tags were seeded with `uuidv4()` on every cold start (no
+     local storage yet — fresh install, cleared storage, second device).
+     `syncEngine.ts`'s `mergeById` only dedupes by id, so each cold start's
+     lookalike defaults piled up next to the real ones instead of merging —
+     same root cause behind the profile page's repeated categories, since it
+     reads the same `tags` array. Fixed: default tags now use stable ids
+     (`deep-work`/`fitness`/`gaming`, mirroring the pillars' own stable ids)
+     so a fresh install always merges back into the same cloud rows; added
+     `dedupeTags()` in `taskStore.ts` (wired into `App.tsx`'s startup chain)
+     to collapse any tags already duplicated by Pillar+name, remapping
+     affected tasks/`lastUsedTagId` to the surviving tag and archiving the
+     rest.
+  2. `AnimatedTaskRow.tsx`'s top-level (non-subtask) Tag pill listed every
+     tag in the app instead of scoping to the task's own Pillar — the
+     subtask variant already did this correctly. Fixed to filter by the
+     task's current tag's `pillarId`, matching the subtask and
+     `TaskDetailModal` behavior.
+
+### 002 — "Inbox (skip tagging)" stays selectable after all category slots are filled
+- **Date**: 2026-08-22
+- **Status**: 🆕 New
+- **Screenshot**: ./screenshots/002.png
+- **Report**: "Skip tagging" can still be toggled on even after all the
+  category dropdowns (pillar, tag, journey/waypoint) have values selected —
+  it should presumably be disabled/hidden once tagging is already complete.
+- **Notes**: —
+
+### 003 — No way to create a task that targets all remaining pages in a waypoint
+- **Date**: 2026-08-22
+- **Status**: 🆕 New
+- **Report**: Forgot to log hours while reading, but finished the book. Wants
+  to create a task that targets all the pages in the waypoint (retroactively
+  cover the whole waypoint's unit target) — no way to do this currently.
+- **Notes**: —
+
+### 004 — Journey header shows two identical "Books" goal dropdowns
+- **Date**: 2026-08-22
+- **Status**: 🆕 New
+- **Screenshot**: ./screenshots/004.png
+- **Report**: On a journey's page (e.g. "Stormlight Archive"), two dropdowns
+  next to each other both show "Books" — looks like a duplicated goal-picker
+  control.
+- **Notes**: —
+
+### 005 — Tasks created inside a journey/waypoint don't inherit the journey's pillar
+- **Date**: 2026-08-22
+- **Status**: 🆕 New
+- **Screenshot**: ./screenshots/005.png
+- **Report**: A journey should be tagged to a pillar, and tasks created
+  within that journey (e.g. from a waypoint's "Add a task") should
+  automatically be attached to that same pillar. Currently they aren't.
+- **Notes**: —

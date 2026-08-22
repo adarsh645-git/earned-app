@@ -128,6 +128,11 @@ export default function AnimatedTaskRow({
   const { goals } = useGoalStore();
   const eligibleJourneys = onUpdate ? getEligibleJourneys(collections, goals, tagType === 'burner' ? 'burner' : 'earner') : [];
   const linkedJourney = task.collectionId ? collections.find(c => c.id === task.collectionId) : undefined;
+  // Top-level tasks aren't locked to a Pillar the way subtasks are, but the
+  // Tag pill should still only offer Categories within the task's current
+  // Pillar — falls back to every tag only for an untagged task, which has
+  // no Pillar to scope to yet.
+  const currentTagPillarId = tags.find(t => t.id === task.tagId)?.pillarId;
   const createdTime = formatCreatedTime(task.dateCreated);
 
   const [openPill, setOpenPill] = useState<OpenPill>(null);
@@ -351,7 +356,9 @@ export default function AnimatedTaskRow({
               <View className="flex-row items-center mt-1.5" style={{ flexWrap: 'wrap', gap: 6 }}>
                 <PillPicker
                   label={tagName || 'Tag'}
-                  options={tags.filter(t => !t.isArchived).map(t => ({ id: t.id, label: t.name }))}
+                  options={tags
+                    .filter(t => !t.isArchived && (!currentTagPillarId || t.pillarId === currentTagPillarId))
+                    .map(t => ({ id: t.id, label: t.name }))}
                   selectedId={task.tagId}
                   onSelect={(id) => { feedback('select'); onUpdate(task.id, { tagId: id }); setOpenPill(null); }}
                   open={openPill === 'tag'}
