@@ -94,7 +94,12 @@ export function useCloudSync() {
           if (ok) useTaskStore.getState().clearPendingDeletes(removedTaskIds);
         });
       }
-      pushAllTasksToCloud(user.id, state.tasks);
+      // Reads pendingDeletes live (not this callback's possibly-stale
+      // `state` closure) — an older in-flight push captured just before a
+      // delete could otherwise resolve after it and re-upload the deleted
+      // row via its own blanket upsert. See docs/sdd/030-delete-tombstones.md.
+      const taskPendingDeletes = useTaskStore.getState().pendingDeletes;
+      pushAllTasksToCloud(user.id, state.tasks.filter((t) => !(t.id in taskPendingDeletes)));
       // Tags FK-reference pillars (tags.pillar_id -> pillars.id), so pillars
       // must land in the cloud first - firing both in parallel let a
       // brand-new pillar's tags reach the tags upsert before that pillar's
@@ -113,7 +118,8 @@ export function useCloudSync() {
           if (ok) useRewardStore.getState().clearPendingDeletes(removedRewardIds);
         });
       }
-      pushAllRewardsToCloud(user.id, state.rewards);
+      const rewardPendingDeletes = useRewardStore.getState().pendingDeletes;
+      pushAllRewardsToCloud(user.id, state.rewards.filter((r) => !(r.id in rewardPendingDeletes)));
     });
 
     const unsubGoals = useGoalStore.subscribe((state, prevState) => {
@@ -123,7 +129,8 @@ export function useCloudSync() {
           if (ok) useGoalStore.getState().clearPendingDeletes(removedIds);
         });
       }
-      pushAllGoalsToCloud(user.id, state.goals);
+      const goalPendingDeletes = useGoalStore.getState().pendingDeletes;
+      pushAllGoalsToCloud(user.id, state.goals.filter((g) => !(g.id in goalPendingDeletes)));
     });
 
     const unsubCollections = useCollectionStore.subscribe((state, prevState) => {
@@ -147,7 +154,13 @@ export function useCloudSync() {
         });
       }
 
-      pushAllCollectionsToCloud(user.id, state.collections, state.items, state.waypoints);
+      const collectionPendingDeletes = useCollectionStore.getState().pendingDeletes;
+      pushAllCollectionsToCloud(
+        user.id,
+        state.collections.filter((c) => !(c.id in collectionPendingDeletes)),
+        state.items.filter((i) => !(i.id in collectionPendingDeletes)),
+        (state.waypoints || []).filter((w) => !(w.id in collectionPendingDeletes))
+      );
     });
 
     // 3. Subscribe to Realtime remote database changes

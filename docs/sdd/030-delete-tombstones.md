@@ -78,6 +78,50 @@ clear within one sync round-trip, and at this app's personal-use scale an
 unbounded (if rare) leftover entry has no meaningful cost. Flagged here
 rather than silently decided.
 
+### Addendum 2 — push-time filtering, and an unrelated bug found along the way
+
+User retested and still saw the task resurrect. Investigation ruled out:
+multiple open clients (confirmed single-client with the user), the count-
+check fix not firing (no error/log appeared), and `useCloudSync` not being
+mounted (it is, in `AppNavigator.tsx`). Self-audited `taskStore.ts`'s
+`pendingDeletes` wiring and the `persist` config (no `partialize` stripping
+it) — found no bug there either.
+
+One real, structural gap identified and closed: every push (`pushAllXToCloud`)
+sends the *entire current array* via upsert on *any* store mutation, fire-
+and-forget, with no request ordering guarantee. If an unrelated edit fires a
+push moments before a delete, that older push's payload was already
+finalized (still including the soon-to-be-deleted row) before the delete's
+own tombstone existed — network reordering could let it resolve *after* the
+delete and silently re-insert the row. Every push call site now filters its
+payload against `pendingDeletes` read live via `getState()` at push time
+(not the callback's `state` closure) — closes the common case (tombstone
+already existed when the push fires) but not the pathological one where the
+racing push's payload was finalized *before* the delete happened at all;
+noting that honestly rather than claiming full closure.
+
+Also found and fixed a genuinely unrelated bug while debugging: the
+browser console showed repeated `POST .../profiles 400`. Root cause (traced,
+not guessed — reproduced with a direct anon-key REST query returning
+`42703 column profiles.last_reviewed_at does not exist`):
+`20260821000002_profiles_last_reviewed_at.sql` (from spec 026) was flagged
+"not yet confirmed run" and never actually run against the live Supabase
+project. `pushEconomyToCloud`'s `.upsert()` call also never checked its
+`error` — a pre-existing, separate silent-failure gap (not caught by
+`reportResult` at all, since the code path never inspected the response).
+Not fixed in this pass (out of scope — surfaced while debugging a different
+report, not itself confirmed related to the resurrection bug); flagging
+here per AGENTS.md rather than leaving it unrecorded. User was told to run
+the migration; `pushEconomyToCloud`'s unchecked error still needs its own
+fix.
+
+**Status: not fully confirmed closed.** The count-check and push-time
+filtering are both real, verified-correct fixes for what they target, but
+the original resurrection report hasn't been reproduced-then-confirmed-fixed
+end-to-end by the user since these landed. If it recurs, the next diagnostic
+step is the Network tab (not just Console) filtered to `tasks`, watching
+the DELETE request/response and every subsequent POST around a repro.
+
 ## Data Schema / Interface Contracts
 
 - `src/store/taskStore.ts`: `pendingDeletes: Record<string, number>` +
