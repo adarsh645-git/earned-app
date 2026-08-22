@@ -197,7 +197,11 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                 onToggle={() => setCategoryPillOpen(p => !p)}
               />
               <PillPicker
-                label={linkedGoal ? linkedGoal.title : 'No Goal'}
+                // Prefixed — a Goal's title is free text and can collide
+                // with a Category name (e.g. a "Books" reading Goal next to
+                // the "Books" Category), which otherwise renders as two
+                // identical-looking pills with no way to tell them apart.
+                label={linkedGoal ? `Goal: ${linkedGoal.title}` : 'No Goal'}
                 options={[{ id: '', label: 'No Goal' }, ...goals.map(s => ({ id: s.id, label: s.title }))]}
                 selectedId={collection.goalId || ''}
                 onSelect={(id) => { feedback('select'); updateCollection(collection.id, { goalId: id || undefined }); setGoalPillOpen(false); }}

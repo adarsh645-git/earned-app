@@ -119,12 +119,18 @@ Entry template — copy this for each new bug:
 
 ### 004 — Journey header shows two identical "Books" goal dropdowns
 - **Date**: 2026-08-22
-- **Status**: 🆕 New
+- **Status**: ✅ Fixed
 - **Screenshot**: ./screenshots/004.png
 - **Report**: On a journey's page (e.g. "Stormlight Archive"), two dropdowns
   next to each other both show "Books" — looks like a duplicated goal-picker
   control.
-- **Notes**: —
+- **Notes**: Not actually duplicated — the first pill is the Journey's
+  Category (a fixed genre, here "Books"), the second is its linked Goal's
+  title, which the user had also named "Books" (matches the screenshot's
+  "3/20 toward 'Books'" Linked Goal section below). A Goal's title is free
+  text, so it can collide with any Category name and the two pills render
+  identically with nothing to tell them apart. `JourneyDetailModal.tsx`'s
+  Goal pill now prefixes its label with "Goal: " to disambiguate.
 
 ### 005 — Tasks created inside a journey/waypoint don't inherit the journey's pillar
 - **Date**: 2026-08-22
