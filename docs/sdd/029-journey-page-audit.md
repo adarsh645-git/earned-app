@@ -148,26 +148,32 @@ Waypoint-progress-quantity gate (`ProgressPromptModal`) on completion.
 
 ## Implementation Checklist
 
-- [ ] `progress.ts`: `NodeProgress.total`, `journeyProgress` passive-branch
+- [x] `progress.ts`: `NodeProgress.total`, `journeyProgress` passive-branch
       fix (Tasks + Items), `journeyContribution` passive-branch fix
       (Waypoint-exclusivity when Waypoints exist)
-- [ ] `JourneyDetailModal.tsx` + `CollectionsScreen.tsx` `JourneyRow`: read
+- [x] `JourneyDetailModal.tsx` + `CollectionsScreen.tsx` `JourneyRow`: read
       the fixed selector instead of local Items-only calcs
-- [ ] `taskStore.ts`: `deleteTask`/`updateTask` reconcile wiring
-- [ ] `collectionStore.ts`: `addCollection`/`updateCollection` Pillar
+- [x] `taskStore.ts`: `deleteTask`/`updateTask` reconcile wiring
+- [x] `collectionStore.ts`: `addCollection`/`updateCollection` Pillar
       derivation from linked Goal
-- [ ] `goalStore.ts`: `updateGoal` Pillar-reassignment cascade to linked
+- [x] `goalStore.ts`: `updateGoal` Pillar-reassignment cascade to linked
       Journeys
-- [ ] `CollectionsScreen.tsx`: New Journey form — Pillar chip-row gated to
+- [x] `CollectionsScreen.tsx`: New Journey form — Pillar chip-row gated to
       standalone Journeys only
-- [ ] `JourneyDetailModal.tsx`: Pillar pill `disabled` when Goal-linked
-- [ ] `JourneyDetailModal.tsx`: Waypoint/General Task rows → `AnimatedTaskRow`
+- [x] `JourneyDetailModal.tsx`: Pillar pill `disabled` when Goal-linked
+- [x] `JourneyDetailModal.tsx`: Waypoint/General Task rows → `AnimatedTaskRow`
       with full toggle/edit/delete, gated completion, embedded
       `TaskDetailModal`
-- [ ] Typecheck (`npx tsc --noEmit`)
-- [ ] End-to-end verification (same environment caveat as spec 028 — no
-      headless-browser tool available; verify via bundler compile + careful
-      read)
+- [x] Typecheck (`npx tsc --noEmit`) — clean after every phase
+- [ ] End-to-end interactive verification — **not done**, same environment
+      caveat as spec 028: no headless-browser tool available (no
+      `chromium-cli`, `playwright` not installed). Verified instead that the
+      live dev server's Metro bundler recompiled every changed file with no
+      transform/syntax errors (bundle fetched and checked after the final
+      commit). Worth a manual click-through: create/edit a units-mode Goal +
+      Waypointed Journey, complete a Waypoint, confirm the Goal count and
+      "This Journey" bar both read correctly, and confirm tasks toggle/edit
+      from inside the Journey view.
 
 ## Notes
 
