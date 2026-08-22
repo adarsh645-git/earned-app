@@ -52,6 +52,7 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
 
   const [categoryPillOpen, setCategoryPillOpen] = useState(false);
   const [goalPillOpen, setGoalPillOpen] = useState(false);
+  const [pillarPillOpen, setPillarPillOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [expandedWaypoints, setExpandedWaypoints] = useState<Record<string, boolean>>({});
   const [waypointRowOpenField, setWaypointRowOpenField] = useState<Record<string, 'unit' | 'year' | 'month' | null>>({});
@@ -75,6 +76,7 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
   if (!collection) return null;
 
   const currentYear = new Date().getFullYear();
+  const activePillars = pillars.filter(p => !p.isArchived);
   const linkedGoal = goals.find(s => s.id === collection.goalId);
   const collectionWaypoints = waypoints.filter(w => w.collectionId === collection.id);
   const collectionItems = items.filter(i => i.collectionId === collection.id);
@@ -186,8 +188,19 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
               />
             </View>
 
-            {/* Category / Goal pills */}
+            {/* Pillar / Category / Goal pills */}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+              <PillPicker
+                // Once set, every Task created inside this Journey is locked
+                // to this Pillar's Tags — see docs/sdd/028-journey-pillar-lock.md.
+                label={`Pillar: ${activePillars.find(p => p.id === collection.pillarId)?.name || 'None'}`}
+                options={[{ id: '', label: 'None' }, ...activePillars.map(p => ({ id: p.id, label: p.name }))]}
+                selectedId={collection.pillarId || ''}
+                onSelect={(id) => { feedback('select'); updateCollection(collection.id, { pillarId: id || undefined }); setPillarPillOpen(false); }}
+                open={pillarPillOpen}
+                onToggle={() => setPillarPillOpen(p => !p)}
+                accentColor="#30D158"
+              />
               <PillPicker
                 label={`${collection.category.charAt(0).toUpperCase()}${collection.category.slice(1)}`}
                 options={CATEGORIES.map(c => ({ id: c, label: `${c.charAt(0).toUpperCase()}${c.slice(1)}` }))}

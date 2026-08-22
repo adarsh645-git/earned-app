@@ -93,10 +93,19 @@ export default function TasksScreen() {
   const [progressPrompt, setProgressPrompt] = useState<{ taskId: string; unitLabel: string; taskTitle: string; remaining?: number } | null>(null);
 
   const activePillars = pillars.filter(p => !p.isArchived);
-  // Which Pillar the Category dropdown is currently scoped to — an explicit
-  // pick wins, otherwise fall back to the last-used tag's pillar (continuity
-  // with the pre-existing "Tag (last used)" default) or the first Pillar.
-  const currentPillarId = quickAddPillarId
+  // A Pillar-locked Journey (see docs/sdd/028-journey-pillar-lock.md) wins
+  // over everything else — the Pillar pill becomes read-only while it's
+  // selected, so Tag options stay scoped to it no matter what the user
+  // previously had picked.
+  const lockedJourneyPillarId = quickAddCollectionId
+    ? collections.find(c => c.id === quickAddCollectionId)?.pillarId
+    : undefined;
+  // Which Pillar the Category dropdown is currently scoped to — the locked
+  // Journey's Pillar wins, then an explicit pick, otherwise fall back to the
+  // last-used tag's pillar (continuity with the pre-existing "Tag (last
+  // used)" default) or the first Pillar.
+  const currentPillarId = lockedJourneyPillarId
+    || quickAddPillarId
     || tags.find(t => t.id === lastUsedTagId)?.pillarId
     || activePillars[0]?.id
     || '';
@@ -381,6 +390,7 @@ export default function TasksScreen() {
                     }}
                     open={quickAddOpenPill === 'pillar'}
                     onToggle={() => setQuickAddOpenPill(p => (p === 'pillar' ? null : 'pillar'))}
+                    disabled={!!lockedJourneyPillarId}
                   />
 
                   <PillPicker
@@ -406,6 +416,15 @@ export default function TasksScreen() {
                         setQuickAddWaypointId('');
                         setQuickAddOpenPill(null);
                         setQuickAddSkipTag(false);
+                        // A Pillar-locked Journey (see
+                        // docs/sdd/028-journey-pillar-lock.md) takes over the
+                        // Pillar pick and jumps Category to that Pillar's
+                        // first Tag, same as picking the Pillar directly.
+                        if (linked?.pillarId) {
+                          setQuickAddPillarId(linked.pillarId);
+                          const pillarTags = tags.filter(t => t.pillarId === linked.pillarId && !t.isArchived);
+                          setQuickAddTagId(pillarTags[0]?.id || '');
+                        }
                       }}
                       open={quickAddOpenPill === 'journey'}
                       onToggle={() => setQuickAddOpenPill(p => (p === 'journey' ? null : 'journey'))}

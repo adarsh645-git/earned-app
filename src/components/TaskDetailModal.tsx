@@ -89,7 +89,10 @@ export default function TaskDetailModal({
   const parentTask = task.parentId ? tasks.find(t => t.id === task.parentId) : undefined;
   const parentTag = parentTask ? tags.find(t => t.id === parentTask.tagId) : undefined;
   const isSubtask = !!task.parentId;
-  const currentPillarId = (isSubtask ? parentTag?.pillarId : tag?.pillarId) || activePillars[0]?.id || '';
+  // A Pillar-locked Journey (see docs/sdd/028-journey-pillar-lock.md) wins
+  // over the task's own current Tag — its Category options stay scoped to
+  // the Journey's Pillar even if the task was tagged before the lock.
+  const currentPillarId = (isSubtask ? parentTag?.pillarId : (linkedJourney?.pillarId || tag?.pillarId)) || activePillars[0]?.id || '';
   const pillarColor = getPillarColor(currentPillarId, pillars);
   const eligibleWaypoints = task.collectionId ? waypoints.filter(w => w.collectionId === task.collectionId) : [];
   // Progress quantity (e.g. "10 pages") matters whenever either the linked
@@ -201,6 +204,7 @@ export default function TaskDetailModal({
                   open={openPill === 'pillar'}
                   onToggle={() => setOpenPill(p => (p === 'pillar' ? null : 'pillar'))}
                   accentColor={pillarColor}
+                  disabled={!!linkedJourney?.pillarId}
                 />
               )}
 
@@ -232,7 +236,16 @@ export default function TaskDetailModal({
                     const linked = eligibleJourneys.find(c => c.id === id);
                     // Waypoint belongs to the old Journey — clear it whenever
                     // the Journey changes (including clearing to "No Journey").
-                    onUpdate(task.id, { collectionId: id || undefined, goalId: linked?.goalId || undefined, waypointId: undefined });
+                    const updates: Partial<Task> = { collectionId: id || undefined, goalId: linked?.goalId || undefined, waypointId: undefined };
+                    // A Pillar-locked Journey jumps the Tag to that Pillar's
+                    // first one too, same as picking the Pillar directly —
+                    // otherwise a task tagged before the switch could sit
+                    // outside the newly-linked Journey's Pillar.
+                    if (linked?.pillarId) {
+                      const pillarTags = tags.filter(t => t.pillarId === linked.pillarId && !t.isArchived);
+                      updates.tagId = pillarTags[0]?.id || '';
+                    }
+                    onUpdate(task.id, updates);
                     setOpenPill(null);
                   }}
                   open={openPill === 'journey'}

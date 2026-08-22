@@ -281,6 +281,10 @@ export default function CollectionsScreen() {
   const [journeyTitle, setJourneyTitle] = useState('');
   const [journeyCategory, setJourneyCategory] = useState<CollectionCategory>('books');
   const [journeyValidationError, setJourneyValidationError] = useState('');
+  // Required on every newly-created Journey (existing Journeys stay unset —
+  // no retroactive guess). Once set, locks every Task created inside to
+  // this Pillar's Tags. See docs/sdd/028-journey-pillar-lock.md.
+  const [journeyPillarId, setJourneyPillarId] = useState('');
 
   // Journey's Goal link — goal creation is Journey-only, so this modal is
   // also the only place a Goal gets created: None / link an existing one /
@@ -332,6 +336,7 @@ export default function CollectionsScreen() {
     setJourneyTitle('');
     setJourneyCategory('general'); // matches collectionStore's addCollection default
     setJourneyValidationError('');
+    setJourneyPillarId('');
     setJourneyLinkMode('none');
     setSelectedMacroId('');
     setNewGoalTitle('');
@@ -355,6 +360,11 @@ export default function CollectionsScreen() {
   const handleSaveJourney = () => {
     if (!journeyTitle.trim()) return;
     setJourneyValidationError('');
+
+    if (!journeyPillarId) {
+      setJourneyValidationError('Pick a Pillar for this Journey');
+      return;
+    }
 
     let linkedGoalId: string | undefined;
 
@@ -405,6 +415,7 @@ export default function CollectionsScreen() {
       title: journeyTitle.trim(),
       category: journeyCategory,
       goalId: linkedGoalId,
+      pillarId: journeyPillarId,
     });
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setIsNewJourneyExpanded(false);
@@ -564,6 +575,34 @@ export default function CollectionsScreen() {
               onChangeText={setJourneyTitle}
               autoFocus
             />
+
+            <Text style={{ color: '#8E8E93', marginBottom: 8, fontSize: 13, fontWeight: '600' }}>Pillar</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+              {activePillars.map((pillar) => {
+                const isSelected = journeyPillarId === pillar.id;
+                const color = getPillarColor(pillar.id, pillars);
+                return (
+                  <Pressable
+                    key={pillar.id}
+                    onPress={() => setJourneyPillarId(pillar.id)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      borderRadius: 9999,
+                      borderWidth: 1,
+                      marginRight: 8,
+                      backgroundColor: isSelected ? `${color}26` : '#151517',
+                      borderColor: isSelected ? `${color}66` : '#2C2C2E',
+                    }}
+                  >
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color, marginRight: 6 }} />
+                    <Text style={{ color: isSelected ? '#FFFFFF' : '#8E8E93', fontSize: 13, fontWeight: isSelected ? '700' : '500' }}>{pillar.name}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
 
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
               <PillPicker

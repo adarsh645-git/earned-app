@@ -25,6 +25,11 @@ interface PillPickerProps {
    * same tap-to-edit popover without the visual weight of a chip. The
    * popover itself is identical either way. */
   variant?: 'chip' | 'plain';
+  /** Renders the pill face dimmed and inert — no tap, no popover. For a
+   * value that's locked by something else (e.g. a Task's Pillar once its
+   * Journey has one — see docs/sdd/028-journey-pillar-lock.md) rather than
+   * genuinely absent. */
+  disabled?: boolean;
 }
 
 const DROPDOWN_MAX_HEIGHT = 280;
@@ -54,6 +59,7 @@ export default function PillPicker({
   accentColor = '#BF5AF2',
   footerAction,
   variant = 'chip',
+  disabled = false,
 }: PillPickerProps) {
   const anchorRef = useRef<View>(null);
   const [anchorRect, setAnchorRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -96,11 +102,11 @@ export default function PillPicker({
   return (
     <View ref={anchorRef} collapsable={false}>
       <Pressable
-        onPress={handleTogglePress}
+        onPress={disabled ? undefined : handleTogglePress}
         hitSlop={variant === 'plain' ? 6 : undefined}
         style={
           variant === 'plain'
-            ? { flexDirection: 'row', alignItems: 'center' }
+            ? { flexDirection: 'row', alignItems: 'center', opacity: disabled ? 0.5 : 1 }
             : {
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -111,6 +117,7 @@ export default function PillPicker({
                 borderWidth: 1,
                 borderColor: open ? accentColor : '#3A3A3C',
                 flexShrink: 1,
+                opacity: disabled ? 0.5 : 1,
               }
         }
       >
@@ -125,10 +132,11 @@ export default function PillPicker({
         >
           {label}
         </Text>
-        {variant === 'chip' && <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={12} color="#8E8E93" />}
+        {variant === 'chip' && !disabled && <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={12} color="#8E8E93" />}
+        {variant === 'chip' && disabled && <Ionicons name="lock-closed" size={11} color="#8E8E93" />}
       </Pressable>
 
-      {open && anchorRect && (
+      {!disabled && open && anchorRect && (
         <Modal visible transparent animationType="fade" onRequestClose={onToggle}>
           <View style={{ flex: 1 }}>
             {/* Backdrop — sibling to the popover, not a parent, so taps inside
