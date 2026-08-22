@@ -224,38 +224,70 @@ export const useTaskStore = create<TaskState>()(
         return id;
       },
       setLastUsedTagId: (id) => set({ lastUsedTagId: id }),
-      updateTask: (id, updates) => set((state) => ({
-        tasks: state.tasks.map(t => t.id === id ? { ...t, ...updates } : t)
-      })),
-      deleteTask: (id) => set((state) => {
-        const taskToDelete = state.tasks.find(t => t.id === id);
-        if (!taskToDelete) return state;
+      updateTask: (id, updates) => {
+        set((state) => ({
+          tasks: state.tasks.map(t => t.id === id ? { ...t, ...updates } : t)
+        }));
 
-        let newTasks = state.tasks.filter(t => t.id !== id && t.parentId !== id);
-
-        // Edge case: when deleting a subtask, handle the parent's completion state
-        if (taskToDelete.parentId) {
-            const remainingSiblings = newTasks.filter(t => t.parentId === taskToDelete.parentId);
-            if (remainingSiblings.length === 0) {
-                // Parent just became childless. If it's currently completed, force it to false so it doesn't stay in a state where it never paid out but is marked complete.
-                const parentIndex = newTasks.findIndex(t => t.id === taskToDelete.parentId);
-                if (parentIndex !== -1 && newTasks[parentIndex].completed) {
-                    newTasks[parentIndex] = { ...newTasks[parentIndex], completed: false };
-                }
-            } else if (taskToDelete.completed === false) {
-                // We deleted an incomplete sibling. Maybe now all remaining siblings are completed?
-                const allChildrenCompleted = remainingSiblings.every(t => t.completed);
-                if (allChildrenCompleted) {
-                    const parentIndex = newTasks.findIndex(t => t.id === taskToDelete.parentId);
-                    if (parentIndex !== -1 && !newTasks[parentIndex].completed) {
-                        newTasks[parentIndex] = { ...newTasks[parentIndex], completed: true };
-                    }
-                }
+        // Editing a completed task's logged quantity after the fact must
+        // re-sync the Goal chain it feeds — otherwise Goal.completedMetric
+        // (and the milestone $ payouts derived from it) silently drifts from
+        // the true state. See docs/sdd/029-journey-page-audit.md.
+        if ('metricProgress' in updates) {
+          const task = get().tasks.find(t => t.id === id);
+          if (task) {
+            const { useCollectionStore } = require('./collectionStore');
+            const goalId = resolveGoalIdForTask(task, useCollectionStore.getState().collections);
+            if (goalId) {
+              const { useGoalStore } = require('./goalStore');
+              useGoalStore.getState().reconcileGoalMilestones(goalId);
             }
+          }
         }
-        
-        return { tasks: newTasks };
-      }),
+      },
+      deleteTask: (id) => {
+        const taskToDelete = get().tasks.find(t => t.id === id);
+        if (!taskToDelete) return;
+
+        set((state) => {
+          let newTasks = state.tasks.filter(t => t.id !== id && t.parentId !== id);
+
+          // Edge case: when deleting a subtask, handle the parent's completion state
+          if (taskToDelete.parentId) {
+              const remainingSiblings = newTasks.filter(t => t.parentId === taskToDelete.parentId);
+              if (remainingSiblings.length === 0) {
+                  // Parent just became childless. If it's currently completed, force it to false so it doesn't stay in a state where it never paid out but is marked complete.
+                  const parentIndex = newTasks.findIndex(t => t.id === taskToDelete.parentId);
+                  if (parentIndex !== -1 && newTasks[parentIndex].completed) {
+                      newTasks[parentIndex] = { ...newTasks[parentIndex], completed: false };
+                  }
+              } else if (taskToDelete.completed === false) {
+                  // We deleted an incomplete sibling. Maybe now all remaining siblings are completed?
+                  const allChildrenCompleted = remainingSiblings.every(t => t.completed);
+                  if (allChildrenCompleted) {
+                      const parentIndex = newTasks.findIndex(t => t.id === taskToDelete.parentId);
+                      if (parentIndex !== -1 && !newTasks[parentIndex].completed) {
+                          newTasks[parentIndex] = { ...newTasks[parentIndex], completed: true };
+                      }
+                  }
+              }
+          }
+
+          return { tasks: newTasks };
+        });
+
+        // Deleting an already-completed task must re-sync the Goal chain it
+        // fed — otherwise Goal.completedMetric stays frozen at its old,
+        // now-wrong value. See docs/sdd/029-journey-page-audit.md.
+        if (taskToDelete.completed) {
+          const { useCollectionStore } = require('./collectionStore');
+          const goalId = resolveGoalIdForTask(taskToDelete, useCollectionStore.getState().collections);
+          if (goalId) {
+            const { useGoalStore } = require('./goalStore');
+            useGoalStore.getState().reconcileGoalMilestones(goalId);
+          }
+        }
+      },
       toggleTask: (id, isManual = true) => {
         const task = get().tasks.find(t => t.id === id);
         if (!task) return;
