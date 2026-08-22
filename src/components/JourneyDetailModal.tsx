@@ -80,8 +80,6 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
   const linkedGoal = goals.find(s => s.id === collection.goalId);
   const collectionWaypoints = waypoints.filter(w => w.collectionId === collection.id);
   const collectionItems = items.filter(i => i.collectionId === collection.id);
-  const completedCount = collectionItems.filter(i => i.completed).length;
-  const progress = collectionItems.length > 0 ? Math.round((completedCount / collectionItems.length) * 100) : 0;
   const linkedTasks = tasks.filter(t => t.collectionId === collection.id);
   const generalTasks = linkedTasks.filter(t => !t.waypointId);
 
@@ -241,8 +239,10 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                 </>
               ) : (
                 <>
-                  <AnimatedProgressBar progress={progress} color="#BF5AF2" height={8} />
-                  <Text style={{ color: '#8E8E93', fontSize: 11, marginTop: 6 }}>{completedCount}/{collectionItems.length} tasks ({progress}%)</Text>
+                  <AnimatedProgressBar progress={journeyProgressNode?.pctRounded || 0} color="#BF5AF2" height={8} />
+                  <Text style={{ color: '#8E8E93', fontSize: 11, marginTop: 6 }}>
+                    {journeyProgressNode?.completed || 0}/{journeyProgressNode?.total || 0} done ({journeyProgressNode?.pctRounded || 0}%)
+                  </Text>
                 </>
               )}
 

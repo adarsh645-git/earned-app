@@ -30,6 +30,10 @@ export type NodeProgress = {
   completed: number; // raw accumulated amount, expressed in `unit`
   pct: number; // 0-100, floored — used for milestone/completion gating (money-safe)
   pctRounded: number; // 0-100, rounded — display only
+  // Denominator for a passive (hasTarget: false) node's own "X/Y" display —
+  // e.g. total leaf Tasks+Items under it. Equals `target` when hasTarget is
+  // true (display code can read this field either way without branching).
+  total: number;
 };
 
 export interface ProgressSources {
@@ -110,14 +114,14 @@ export function computeProgress(src: ProgressSources) {
     if (hasTarget) {
       const completed =
         lt.reduce((s, t) => s + taskAmount(t, unit), 0) + li.reduce((s, i) => s + itemAmount(i, unit), 0);
-      result = { id: w.id, unit, hasTarget: true, target: w.targetMetric!, completed, ...pctOf(completed, w.targetMetric!) };
+      result = { id: w.id, unit, hasTarget: true, target: w.targetMetric!, total: w.targetMetric!, completed, ...pctOf(completed, w.targetMetric!) };
     } else {
       // Passive Waypoint: no target set — binary completed/total-tasks
       // display fallback (its own display only; rollup transparency is
       // handled separately by waypointContribution below).
       const total = lt.length + li.length;
       const done = lt.filter((t) => t.completed).length + li.filter((i) => i.completed).length;
-      result = { id: w.id, unit, hasTarget: false, target: 0, completed: done, ...pctOf(done, total) };
+      result = { id: w.id, unit, hasTarget: false, target: 0, total, completed: done, ...pctOf(done, total) };
     }
     waypointCache.set(w.id, result);
     return result;
@@ -153,15 +157,20 @@ export function computeProgress(src: ProgressSources) {
         lt.reduce((s, t) => s + taskAmount(t, unit), 0) +
         li.reduce((s, i) => s + itemAmount(i, unit), 0) +
         childWaypoints.reduce((s, w) => s + waypointContribution(w, unit), 0);
-      result = { id: c.id, unit, hasTarget: true, target: c.targetMetric!, completed, ...pctOf(completed, c.targetMetric!) };
+      result = { id: c.id, unit, hasTarget: true, target: c.targetMetric!, total: c.targetMetric!, completed, ...pctOf(completed, c.targetMetric!) };
     } else {
-      // Passive Journey: "This Journey" own display stays the simple binary
-      // items-completed bar (unchanged cosmetic behavior from before this
-      // engine existed); rollup transparency is handled by
-      // journeyContribution below, not here.
+      // Passive Journey: "This Journey" own display counts every Task +
+      // Item under it — every Waypoint's leaves plus general ones —
+      // mirroring waypointProgress's own passive branch above. (Previously
+      // this counted Items only, which went stale/misleading once spec 025
+      // made "Add a task" inside a Waypoint create a real Task instead of a
+      // CollectionItem — see docs/sdd/029-journey-page-audit.md.) Rollup
+      // *into a parent* is handled separately by journeyContribution below.
+      const journeyTasks = tasks.filter((t) => t.collectionId === c.id);
       const journeyItems = items.filter((i) => i.collectionId === c.id);
-      const done = journeyItems.filter((i) => i.completed).length;
-      result = { id: c.id, unit, hasTarget: false, target: 0, completed: done, ...pctOf(done, journeyItems.length) };
+      const total = journeyTasks.length + journeyItems.length;
+      const done = journeyTasks.filter((t) => t.completed).length + journeyItems.filter((i) => i.completed).length;
+      result = { id: c.id, unit, hasTarget: false, target: 0, total, completed: done, ...pctOf(done, total) };
     }
     journeyCache.set(c.id, result);
     return result;
@@ -171,12 +180,21 @@ export function computeProgress(src: ProgressSources) {
     const p = journeyProgress(c);
     if (!p.hasTarget) {
       const childWaypoints = waypoints.filter((w) => w.collectionId === c.id);
+      if (childWaypoints.length > 0) {
+        // Once a Journey has Waypoints, each Waypoint IS the unit of
+        // completion (e.g. one book) — a bare general Task/Item on the same
+        // Journey is a note/subtask about one of those Waypoints, not a
+        // second one, so it doesn't independently roll up too. Fixes a real
+        // overcount (3 books credited for 1 read) — see
+        // docs/sdd/029-journey-page-audit.md. A Journey with no Waypoints at
+        // all keeps the direct-leaf behavior below, unchanged.
+        return childWaypoints.reduce((s, w) => s + waypointContribution(w, parentUnit), 0);
+      }
       const lt = tasks.filter((t) => t.collectionId === c.id && !t.waypointId);
       const li = items.filter((i) => i.collectionId === c.id && !i.waypointId);
       return (
         lt.reduce((s, t) => s + taskAmount(t, parentUnit), 0) +
-        li.reduce((s, i) => s + itemAmount(i, parentUnit), 0) +
-        childWaypoints.reduce((s, w) => s + waypointContribution(w, parentUnit), 0)
+        li.reduce((s, i) => s + itemAmount(i, parentUnit), 0)
       );
     }
     if (p.unit === parentUnit) return p.completed;
@@ -204,8 +222,8 @@ export function computeProgress(src: ProgressSources) {
       childGoals.reduce((s, sg) => s + goalContribution(sg, unit, new Set([g.id])), 0);
 
     const result: NodeProgress = hasTarget
-      ? { id: g.id, unit, hasTarget: true, target, completed, ...pctOf(completed, target) }
-      : { id: g.id, unit, hasTarget: false, target: 0, completed, pct: 0, pctRounded: 0 };
+      ? { id: g.id, unit, hasTarget: true, target, total: target, completed, ...pctOf(completed, target) }
+      : { id: g.id, unit, hasTarget: false, target: 0, total: 0, completed, pct: 0, pctRounded: 0 };
     goalCache.set(g.id, result);
     return result;
   }

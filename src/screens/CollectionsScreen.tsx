@@ -176,9 +176,12 @@ function JourneyRow({
   isExpanded: boolean;
   onToggleExpand: () => void;
 }) {
-  const collectionItems = items.filter(i => i.collectionId === collection.id);
-  const completedCount = collectionItems.filter(i => i.completed).length;
-  const progress = collectionItems.length > 0 ? Math.round((completedCount / collectionItems.length) * 100) : 0;
+  // Same fixed selector as JourneyDetailModal's "This Journey" bar — counts
+  // Tasks + Items under the whole Journey when it has no explicit target of
+  // its own, instead of the old Items-only local calc that went stale once
+  // Waypoint tasks became real Tasks (spec 025). See
+  // docs/sdd/029-journey-page-audit.md.
+  const journeyProgress = useProgress().journeyProgress(collection.id);
   const collectionWaypoints = waypoints.filter(w => w.collectionId === collection.id);
 
   return (
@@ -200,7 +203,7 @@ function JourneyRow({
           containerStyle={{ flex: 1 }}
           textStyle={{ color: '#FFF', fontSize: 15, fontWeight: '500' }}
         />
-        <InlineProgress pct={progress} color="#BF5AF2" />
+        <InlineProgress pct={journeyProgress?.pctRounded ?? 0} color="#BF5AF2" />
       </Pressable>
 
       {isExpanded && collectionWaypoints.length > 0 && (
