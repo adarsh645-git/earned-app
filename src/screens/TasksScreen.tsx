@@ -371,6 +371,10 @@ export default function TasksScreen() {
                       const pillarTags = tags.filter(t => t.pillarId === id && !t.isArchived);
                       setQuickAddTagId(pillarTags[0]?.id || '');
                       setQuickAddOpenPill(null);
+                      // An explicit Pillar pick is a Clarify decision — skip
+                      // tagging (raw Inbox capture) and this are mutually
+                      // exclusive, so picking one clears the other.
+                      setQuickAddSkipTag(false);
                     }}
                     open={quickAddOpenPill === 'pillar'}
                     onToggle={() => setQuickAddOpenPill(p => (p === 'pillar' ? null : 'pillar'))}
@@ -380,7 +384,7 @@ export default function TasksScreen() {
                     label={quickAddTagId ? (tags.find(t => t.id === quickAddTagId)?.name || 'Tag') : 'Tag (last used)'}
                     options={tags.filter(t => t.pillarId === currentPillarId && !t.isArchived).map(t => ({ id: t.id, label: t.name }))}
                     selectedId={quickAddTagId}
-                    onSelect={(id) => { feedback('select'); setQuickAddTagId(id); setQuickAddOpenPill(null); }}
+                    onSelect={(id) => { feedback('select'); setQuickAddTagId(id); setQuickAddOpenPill(null); setQuickAddSkipTag(false); }}
                     open={quickAddOpenPill === 'tag'}
                     onToggle={() => setQuickAddOpenPill(p => (p === 'tag' ? null : 'tag'))}
                   />
@@ -398,6 +402,7 @@ export default function TasksScreen() {
                         // Waypoint belongs to the old Journey — clear it too.
                         setQuickAddWaypointId('');
                         setQuickAddOpenPill(null);
+                        setQuickAddSkipTag(false);
                       }}
                       open={quickAddOpenPill === 'journey'}
                       onToggle={() => setQuickAddOpenPill(p => (p === 'journey' ? null : 'journey'))}
@@ -409,7 +414,7 @@ export default function TasksScreen() {
                       label={quickAddWaypointId ? (quickAddEligibleWaypoints.find(w => w.id === quickAddWaypointId)?.title || 'Waypoint') : 'No Waypoint'}
                       options={[{ id: '', label: 'No Waypoint' }, ...quickAddEligibleWaypoints.map(w => ({ id: w.id, label: w.title }))]}
                       selectedId={quickAddWaypointId}
-                      onSelect={(id) => { feedback('select'); setQuickAddWaypointId(id); setQuickAddOpenPill(null); }}
+                      onSelect={(id) => { feedback('select'); setQuickAddWaypointId(id); setQuickAddOpenPill(null); setQuickAddSkipTag(false); }}
                       open={quickAddOpenPill === 'waypoint'}
                       onToggle={() => setQuickAddOpenPill(p => (p === 'waypoint' ? null : 'waypoint'))}
                       accentColor="#5AC8FA"
@@ -447,7 +452,21 @@ export default function TasksScreen() {
                   </Pressable>
 
                   <Pressable
-                    onPress={() => setQuickAddSkipTag(v => !v)}
+                    onPress={() => {
+                      const turningOn = !quickAddSkipTag;
+                      setQuickAddSkipTag(turningOn);
+                      if (turningOn) {
+                        // Skip tagging (raw Inbox capture) and an explicit
+                        // Pillar/Category/Journey/Waypoint pick are mutually
+                        // exclusive — turning this on clears any of those,
+                        // instead of silently leaving both "set" at once.
+                        setQuickAddPillarId('');
+                        setQuickAddTagId('');
+                        setQuickAddCollectionId('');
+                        setQuickAddGoalId('');
+                        setQuickAddWaypointId('');
+                      }
+                    }}
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',

@@ -87,12 +87,16 @@ Entry template — copy this for each new bug:
 
 ### 002 — "Inbox (skip tagging)" stays selectable after all category slots are filled
 - **Date**: 2026-08-22
-- **Status**: 🆕 New
+- **Status**: ✅ Fixed
 - **Screenshot**: ./screenshots/002.png
 - **Report**: "Skip tagging" can still be toggled on even after all the
   category dropdowns (pillar, tag, journey/waypoint) have values selected —
   it should presumably be disabled/hidden once tagging is already complete.
-- **Notes**: —
+- **Notes**: Skip Tagging and an explicit Pillar/Category/Journey/Waypoint
+  pick could both be "on" at once with no reconciliation between them.
+  Made them mutually exclusive in `TasksScreen.tsx`'s quick-add bar: turning
+  Skip Tagging on now clears any explicit pillar/tag/journey/waypoint
+  selection, and picking any of those now turns Skip Tagging back off.
 
 ### 003 — No way to create a task that targets all remaining pages in a waypoint
 - **Date**: 2026-08-22
