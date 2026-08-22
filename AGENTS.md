@@ -113,6 +113,10 @@ Treat the user as a **Senior IT Professional & Solution Architect** with deep sy
 
 When the user drops a raw, unrefined app idea mid-conversation ("add this to the idea backlog: ..."), don't design or implement it — just append it to `docs/ideas/BACKLOG.md` as a new numbered entry (date, verbatim text, status `🆕 New`) and fast-track-commit that one file. See the file's own header for the full capture → triage → promote workflow into Trivial Changes or Feature Work below.
 
+## Bug Backlog
+
+When the user reports a bug mid-conversation (text, a screenshot, or both), don't fix it yet — record it. Append a new numbered entry to `docs/bugs/BUGS.md` (date, the report, a link to the screenshot saved under `docs/bugs/screenshots/` if one was given, status `🆕 New`), fast-track-commit that one file, and a clarifying question or two before recording is fine. Keep recording across however many bugs come in. Only once the user says something explicit like "that's all of them" / "start fixing" does recording stop and triage begin: fix every `🆕 New` entry one at a time (not in parallel), sized against the Trivial Changes / Feature Work split below, marking each `✅ Fixed` with its commit ref as it lands. See the file's own header for the full workflow.
+
 ## Feature Work
 
 Non-trivial features (new economy rules, currency/reward math, store shape changes, new Supabase tables, or anything touching user-facing behavior) follow the SDD loop defined in `.claude/skills/sdd-feature-loop/SKILL.md`. Claude Code loads it automatically when the task matches; other agents should read it directly. Specs live in `docs/sdd/`, indexed in `docs/sdd/README.md`.
