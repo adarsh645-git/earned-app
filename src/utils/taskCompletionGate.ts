@@ -1,7 +1,7 @@
 import { Task } from '../store/taskStore';
 import { Waypoint, Collection } from '../store/collectionStore';
 import { Goal } from '../store/goalStore';
-import { chainMetricContext } from '../store/progress';
+import { chainMetricContext, ProgressSelectors } from '../store/progress';
 
 /**
  * Returns the unit label a task must report progress in before it can be
@@ -28,4 +28,39 @@ export function getRequiredUnitLabel(
   const goal = goalId ? goals.find(g => g.id === goalId) : undefined;
   const { show, unitLabel } = chainMetricContext(waypoint, collection, goal);
   return show ? unitLabel : null;
+}
+
+/**
+ * How much of the gating node's target is still outstanding, to prefill the
+ * quantity prompt above — so finishing a whole Waypoint/Journey/Goal in one
+ * task (e.g. "I read the entire book") is a single tap on the prefilled
+ * value instead of the user manually computing and typing it. Checks the
+ * same chain and priority order as getRequiredUnitLabel (Waypoint's own
+ * target first, then Journey's, then a units-mode Goal). Returns undefined
+ * when there's nothing to prefill (no target, or already fully covered by
+ * other progress) — the prompt's input then simply starts empty.
+ */
+export function getRemainingUnitAmount(
+  task: Task,
+  waypoints: Waypoint[],
+  collections: Collection[],
+  goals: Goal[],
+  progress: ProgressSelectors
+): number | undefined {
+  const waypoint = task.waypointId ? waypoints.find(w => w.id === task.waypointId) : undefined;
+  const collection = task.collectionId ? collections.find(c => c.id === task.collectionId) : undefined;
+  const goalId = task.goalId || collection?.goalId;
+  const goal = goalId ? goals.find(g => g.id === goalId) : undefined;
+
+  const node = waypoint?.targetMetric
+    ? progress.waypointProgress(waypoint.id)
+    : collection?.targetMetric
+    ? progress.journeyProgress(collection.id)
+    : goal?.metricType === 'units'
+    ? progress.goalProgress(goal.id)
+    : undefined;
+
+  if (!node || !node.hasTarget) return undefined;
+  const remaining = node.target - node.completed;
+  return remaining > 0 ? remaining : undefined;
 }

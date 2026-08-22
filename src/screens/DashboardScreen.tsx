@@ -15,9 +15,10 @@ import CurrencyPill from '../components/CurrencyPill';
 import TaskDetailModal from '../components/TaskDetailModal';
 import ProgressPromptModal from '../components/ProgressPromptModal';
 import { getPillarColor } from '../utils/pillarColor';
-import { getRequiredUnitLabel } from '../utils/taskCompletionGate';
+import { getRequiredUnitLabel, getRemainingUnitAmount } from '../utils/taskCompletionGate';
 import { localDateKey, localDayKeyFromTimestamp } from '../utils/date';
 import useTimerLauncher from '../hooks/useTimerLauncher';
+import useProgress from '../hooks/useProgress';
 
 export default function DashboardScreen() {
   const { width } = useWindowDimensions();
@@ -33,6 +34,7 @@ export default function DashboardScreen() {
   const { tasks, tags, pillars, toggleTask, moveToIcebox, deleteTask, updateTask, addTask } = useTaskStore();
   const { waypoints, collections } = useCollectionStore();
   const { goals } = useGoalStore();
+  const progress = useProgress();
   const detailTask = tasks.find(t => t.id === detailTaskId) || null;
   const activePillars = pillars.filter(p => !p.isArchived);
   const currentPillarId = activePillarId || activePillars[0]?.id;
@@ -40,7 +42,7 @@ export default function DashboardScreen() {
 
   // Blocks completing a Waypoint-linked task until its progress quantity is
   // entered — see src/utils/taskCompletionGate.ts. Un-completing is never gated.
-  const [progressPrompt, setProgressPrompt] = useState<{ taskId: string; unitLabel: string; taskTitle: string } | null>(null);
+  const [progressPrompt, setProgressPrompt] = useState<{ taskId: string; unitLabel: string; taskTitle: string; remaining?: number } | null>(null);
   // Checked synchronously by AnimatedTaskRow before it plays the optimistic
   // completion animation — false skips the animation so a blocked
   // completion (gatedToggle opens ProgressPromptModal instead) never shows
@@ -52,7 +54,8 @@ export default function DashboardScreen() {
     if (task && !task.completed) {
       const requiredUnit = getRequiredUnitLabel(task, waypoints, collections, goals);
       if (requiredUnit) {
-        setProgressPrompt({ taskId: id, unitLabel: requiredUnit, taskTitle: task.title });
+        const remaining = getRemainingUnitAmount(task, waypoints, collections, goals, progress);
+        setProgressPrompt({ taskId: id, unitLabel: requiredUnit, taskTitle: task.title, remaining });
         return;
       }
     }
@@ -312,6 +315,7 @@ export default function DashboardScreen() {
         visible={!!progressPrompt}
         unitLabel={progressPrompt?.unitLabel || ''}
         taskTitle={progressPrompt?.taskTitle || ''}
+        defaultValue={progressPrompt?.remaining}
         onCancel={() => setProgressPrompt(null)}
         onSubmit={(value) => {
           if (progressPrompt) {

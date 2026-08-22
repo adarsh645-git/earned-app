@@ -5,6 +5,11 @@ interface ProgressPromptModalProps {
   visible: boolean;
   unitLabel: string;
   taskTitle: string;
+  /** Prefills the input with the gating Waypoint/Journey/Goal's remaining
+   * target, if any — lets "I finished the whole thing" be a single tap on
+   * the prefilled value instead of computing and typing it. Still freely
+   * editable for partial progress. */
+  defaultValue?: number;
   onCancel: () => void;
   onSubmit: (value: number) => void;
 }
@@ -15,12 +20,12 @@ interface ProgressPromptModalProps {
  * in place of a plain message, since a bare confirm/cancel can't collect a
  * value.
  */
-export default function ProgressPromptModal({ visible, unitLabel, taskTitle, onCancel, onSubmit }: ProgressPromptModalProps) {
+export default function ProgressPromptModal({ visible, unitLabel, taskTitle, defaultValue, onCancel, onSubmit }: ProgressPromptModalProps) {
   const [value, setValue] = useState('');
 
   useEffect(() => {
-    if (visible) setValue('');
-  }, [visible]);
+    if (visible) setValue(defaultValue != null ? String(defaultValue) : '');
+  }, [visible, defaultValue]);
 
   const parsed = parseFloat(value);
   const canSubmit = !isNaN(parsed) && parsed > 0;

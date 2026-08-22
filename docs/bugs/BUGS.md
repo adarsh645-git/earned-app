@@ -100,11 +100,22 @@ Entry template — copy this for each new bug:
 
 ### 003 — No way to create a task that targets all remaining pages in a waypoint
 - **Date**: 2026-08-22
-- **Status**: 🆕 New
+- **Status**: ✅ Fixed
 - **Report**: Forgot to log hours while reading, but finished the book. Wants
   to create a task that targets all the pages in the waypoint (retroactively
   cover the whole waypoint's unit target) — no way to do this currently.
-- **Notes**: —
+- **Notes**: The mechanism already existed (any waypoint-linked task's
+  completion prompt takes a free-typed quantity, and progress sums across
+  all its tasks) — the gap was that the prompt always started blank, so
+  logging "the whole thing" meant computing and typing the exact remaining
+  amount yourself. Discussed two options with the user (prefill the prompt
+  vs. a standalone "Mark Waypoint Complete" shortcut); went with the
+  prefill. `ProgressPromptModal` now takes a `defaultValue` and pre-fills
+  the input with the gating Waypoint/Journey/Goal's remaining target
+  (`getRemainingUnitAmount` in `taskCompletionGate.ts`) — completing a task
+  that covers everything left is now a single tap on the prefilled value,
+  still freely editable for partial progress. Wired into both
+  `TasksScreen.tsx` and `DashboardScreen.tsx`.
 
 ### 004 — Journey header shows two identical "Books" goal dropdowns
 - **Date**: 2026-08-22

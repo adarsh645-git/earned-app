@@ -38,10 +38,11 @@ import WeeklyReviewSheet from '../components/WeeklyReviewSheet';
 import PillPicker from '../components/PillPicker';
 import { getEligibleJourneys } from '../components/LinkProgressPicker';
 import { getPillarColor } from '../utils/pillarColor';
-import { getRequiredUnitLabel } from '../utils/taskCompletionGate';
+import { getRequiredUnitLabel, getRemainingUnitAmount } from '../utils/taskCompletionGate';
 import { resolveWaypointUnit } from '../utils/waypointUnit';
 import { localDateKey, parseLocalDateKey, yesterdayDateKey, localDayKeyFromTimestamp } from '../utils/date';
 import useIsMobile from '../hooks/useIsMobile';
+import useProgress from '../hooks/useProgress';
 
 // "Today's Focus List — Friday, July 25" / "Yesterday" / "Wed, Jul 23"
 function formatDateLabel(dateStr: string, isToday: boolean): string {
@@ -61,6 +62,7 @@ export default function TasksScreen() {
   const { isWeeklyReviewDue, completeWeeklyReview } = useEconomyStore();
   const [reviewSheetVisible, setReviewSheetVisible] = useState(false);
   const isMobile = useIsMobile();
+  const progress = useProgress();
 
   // Quick-add bar state — title + the one economy-critical field (Duration)
   // that stays visible in the bar itself; everything else (Tag, Journey)
@@ -88,7 +90,7 @@ export default function TasksScreen() {
 
   // Blocks completing a Waypoint-linked task until its progress quantity is
   // entered — see src/utils/taskCompletionGate.ts.
-  const [progressPrompt, setProgressPrompt] = useState<{ taskId: string; unitLabel: string; taskTitle: string } | null>(null);
+  const [progressPrompt, setProgressPrompt] = useState<{ taskId: string; unitLabel: string; taskTitle: string; remaining?: number } | null>(null);
 
   const activePillars = pillars.filter(p => !p.isArchived);
   // Which Pillar the Category dropdown is currently scoped to — an explicit
@@ -160,7 +162,8 @@ export default function TasksScreen() {
     if (task && !task.completed) {
       const requiredUnit = getRequiredUnitLabel(task, waypoints, collections, goals);
       if (requiredUnit) {
-        setProgressPrompt({ taskId: id, unitLabel: requiredUnit, taskTitle: task.title });
+        const remaining = getRemainingUnitAmount(task, waypoints, collections, goals, progress);
+        setProgressPrompt({ taskId: id, unitLabel: requiredUnit, taskTitle: task.title, remaining });
         return;
       }
     }
@@ -770,6 +773,7 @@ export default function TasksScreen() {
         visible={!!progressPrompt}
         unitLabel={progressPrompt?.unitLabel || ''}
         taskTitle={progressPrompt?.taskTitle || ''}
+        defaultValue={progressPrompt?.remaining}
         onCancel={() => setProgressPrompt(null)}
         onSubmit={(value) => {
           if (progressPrompt) {
