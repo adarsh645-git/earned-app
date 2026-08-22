@@ -76,6 +76,11 @@ interface CollectionState {
   // gets an auto-created Journey wrapper so it stays reachable from task
   // creation's Journey-only LinkProgressPicker instead of going silently dark.
   backfillJourneysForOrphanGoals: () => void;
+  // Shared across collections/waypoints/items (ids are globally unique
+  // uuids, no collision risk) — see taskStore.ts's pendingDeletes for why
+  // this exists. See docs/sdd/030-delete-tombstones.md.
+  pendingDeletes: Record<string, number>;
+  clearPendingDeletes: (ids: string[]) => void;
 }
 
 export const useCollectionStore = create<CollectionState>()(
@@ -85,6 +90,12 @@ export const useCollectionStore = create<CollectionState>()(
       waypoints: [],
       items: [],
       journeyBackfillApplied: false,
+      pendingDeletes: {},
+      clearPendingDeletes: (ids) => set((state) => {
+        const next = { ...state.pendingDeletes };
+        ids.forEach((id) => delete next[id]);
+        return { pendingDeletes: next };
+      }),
 
       addCollection: (collectionData) => {
         const id = uuidv4();
@@ -152,10 +163,18 @@ export const useCollectionStore = create<CollectionState>()(
       },
 
       deleteCollection: (id) => {
+        const removedWaypointIds = (get().waypoints || []).filter((w) => w.collectionId === id).map((w) => w.id);
+        const removedItemIds = get().items.filter((i) => i.collectionId === id).map((i) => i.id);
+        const removedIds = [id, ...removedWaypointIds, ...removedItemIds];
+
         set((state) => ({
           collections: state.collections.filter((c) => c.id !== id),
           waypoints: (state.waypoints || []).filter((w) => w.collectionId !== id),
           items: state.items.filter((i) => i.collectionId !== id),
+          pendingDeletes: {
+            ...state.pendingDeletes,
+            ...Object.fromEntries(removedIds.map((rid) => [rid, Date.now()])),
+          },
         }));
       },
 
@@ -180,6 +199,7 @@ export const useCollectionStore = create<CollectionState>()(
         set((state) => ({
           waypoints: (state.waypoints || []).filter((w) => w.id !== id),
           items: state.items.map((i) => (i.waypointId === id ? { ...i, waypointId: undefined } : i)),
+          pendingDeletes: { ...state.pendingDeletes, [id]: Date.now() },
         }));
 
         // Dynamic require avoids a circular import (taskStore doesn't import
@@ -232,6 +252,7 @@ export const useCollectionStore = create<CollectionState>()(
       deleteItem: (id) => {
         set((state) => ({
           items: state.items.filter((i) => i.id !== id),
+          pendingDeletes: { ...state.pendingDeletes, [id]: Date.now() },
         }));
       },
 

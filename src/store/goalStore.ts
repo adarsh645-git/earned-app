@@ -156,6 +156,11 @@ interface GoalState {
   addGoal: (goal: Omit<Goal, 'id' | 'completedMinutes' | 'completedMetric' | 'unlockedMilestones'>) => string;
   updateGoal: (id: string, updates: Partial<Goal>) => void;
   deleteGoal: (id: string) => void;
+  // See taskStore.ts's pendingDeletes for why this exists — same
+  // delete-then-cloud-pull-races-ahead resurrection bug, same fix. See
+  // docs/sdd/030-delete-tombstones.md.
+  pendingDeletes: Record<string, number>;
+  clearPendingDeletes: (ids: string[]) => void;
   // Recomputes this Goal's (and every ancestor's, via parentId) % fresh
   // through the trickle-up engine (progress.ts), diffs against
   // unlockedMilestones, and awards/revokes getMilestoneDollars for whatever
@@ -176,6 +181,12 @@ export const useGoalStore = create<GoalState>()(
       goals: [],
       paysCurrencyDefaultsApplied: false,
       backfillGoalPillarIdsApplied: false,
+      pendingDeletes: {},
+      clearPendingDeletes: (ids) => set((state) => {
+        const next = { ...state.pendingDeletes };
+        ids.forEach((id) => delete next[id]);
+        return { pendingDeletes: next };
+      }),
 
       // One-time: existing chains predate the single-paying-level rule and would
       // otherwise pay at every level. Default the root of each chain to pay and
@@ -266,7 +277,11 @@ export const useGoalStore = create<GoalState>()(
         const idsToRemove = new Set([id, ...childIds]);
 
         set((state) => ({
-          goals: state.goals.filter(g => !idsToRemove.has(g.id))
+          goals: state.goals.filter(g => !idsToRemove.has(g.id)),
+          pendingDeletes: {
+            ...state.pendingDeletes,
+            ...Object.fromEntries(Array.from(idsToRemove).map((rid) => [rid, Date.now()])),
+          },
         }));
 
         // Dynamic require avoids a circular import (taskStore/collectionStore

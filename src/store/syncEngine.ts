@@ -48,9 +48,15 @@ function reportResult(channel: string, ok: boolean, err?: unknown) {
  * truth), but any local-only id (added but not yet reflected in this read)
  * is preserved rather than being wiped out by a stale snapshot.
  */
-function mergeById<T extends { id: string }>(local: T[], cloud: T[]): T[] {
+// pendingDeleteIds excludes ids the local store just deleted but hasn't
+// confirmed removed from Supabase yet — without this, a cloud row whose
+// delete request is still in flight (or silently failed) gets merged right
+// back in on the very next pull, most commonly the one that runs on every
+// app reload. See docs/sdd/030-delete-tombstones.md.
+function mergeById<T extends { id: string }>(local: T[], cloud: T[], pendingDeleteIds?: Set<string>): T[] {
   const merged = new Map(local.map((item) => [item.id, item]));
   for (const item of cloud) {
+    if (pendingDeleteIds?.has(item.id)) continue;
     merged.set(item.id, item);
   }
   return Array.from(merged.values());
@@ -84,7 +90,9 @@ export function useCloudSync() {
     const unsubTasks = useTaskStore.subscribe((state, prevState) => {
       const removedTaskIds = diffRemovedIds(prevState.tasks, state.tasks);
       if (removedTaskIds.length > 0) {
-        deleteTasksFromCloud(user.id, removedTaskIds);
+        deleteTasksFromCloud(user.id, removedTaskIds).then((ok) => {
+          if (ok) useTaskStore.getState().clearPendingDeletes(removedTaskIds);
+        });
       }
       pushAllTasksToCloud(user.id, state.tasks);
       // Tags FK-reference pillars (tags.pillar_id -> pillars.id), so pillars
@@ -101,7 +109,9 @@ export function useCloudSync() {
     const unsubRewards = useRewardStore.subscribe((state, prevState) => {
       const removedRewardIds = diffRemovedIds(prevState.rewards, state.rewards);
       if (removedRewardIds.length > 0) {
-        deleteRewardsFromCloud(user.id, removedRewardIds);
+        deleteRewardsFromCloud(user.id, removedRewardIds).then((ok) => {
+          if (ok) useRewardStore.getState().clearPendingDeletes(removedRewardIds);
+        });
       }
       pushAllRewardsToCloud(user.id, state.rewards);
     });
@@ -109,7 +119,9 @@ export function useCloudSync() {
     const unsubGoals = useGoalStore.subscribe((state, prevState) => {
       const removedIds = diffRemovedIds(prevState.goals, state.goals);
       if (removedIds.length > 0) {
-        deleteGoalsFromCloud(user.id, removedIds);
+        deleteGoalsFromCloud(user.id, removedIds).then((ok) => {
+          if (ok) useGoalStore.getState().clearPendingDeletes(removedIds);
+        });
       }
       pushAllGoalsToCloud(user.id, state.goals);
     });
@@ -120,13 +132,19 @@ export function useCloudSync() {
       const removedItemIds = diffRemovedIds(prevState.items, state.items);
 
       if (removedCollectionIds.length > 0) {
-        deleteCollectionsFromCloud(user.id, removedCollectionIds);
+        deleteCollectionsFromCloud(user.id, removedCollectionIds).then((ok) => {
+          if (ok) useCollectionStore.getState().clearPendingDeletes(removedCollectionIds);
+        });
       }
       if (removedWaypointIds.length > 0) {
-        deleteWaypointsFromCloud(user.id, removedWaypointIds);
+        deleteWaypointsFromCloud(user.id, removedWaypointIds).then((ok) => {
+          if (ok) useCollectionStore.getState().clearPendingDeletes(removedWaypointIds);
+        });
       }
       if (removedItemIds.length > 0) {
-        deleteItemsFromCloud(removedItemIds);
+        deleteItemsFromCloud(removedItemIds).then((ok) => {
+          if (ok) useCollectionStore.getState().clearPendingDeletes(removedItemIds);
+        });
       }
 
       pushAllCollectionsToCloud(user.id, state.collections, state.items, state.waypoints);
@@ -220,7 +238,7 @@ export async function pullCloudData(userId: string) {
         description: t.description ?? undefined,
         metricProgress: t.metric_progress ?? undefined,
       }));
-      useTaskStore.setState((s) => ({ ...s, tasks: mergeById(s.tasks, formattedTasks) }));
+      useTaskStore.setState((s) => ({ ...s, tasks: mergeById(s.tasks, formattedTasks, new Set(Object.keys(s.pendingDeletes))) }));
     }
 
     // Fetch Pillars
@@ -269,7 +287,7 @@ export async function pullCloudData(userId: string) {
         cost: parseFloat(r.cost) || 0,
         dateCreated: r.date_created,
       }));
-      useRewardStore.setState((s) => ({ rewards: mergeById(s.rewards, formattedRewards) }));
+      useRewardStore.setState((s) => ({ rewards: mergeById(s.rewards, formattedRewards, new Set(Object.keys(s.pendingDeletes))) }));
     }
 
     // Fetch Goals
@@ -297,7 +315,7 @@ export async function pullCloudData(userId: string) {
         unitLabel: g.unit_label || undefined,
         pillarId: g.pillar_id || undefined,
       }));
-      useGoalStore.setState((s) => ({ goals: mergeById(s.goals, formattedGoals) }));
+      useGoalStore.setState((s) => ({ goals: mergeById(s.goals, formattedGoals, new Set(Object.keys(s.pendingDeletes))) }));
     }
 
     // Fetch Collections
@@ -318,7 +336,7 @@ export async function pullCloudData(userId: string) {
         unitLabel: c.unit_label || undefined,
         pillarId: c.pillar_id || undefined,
       }));
-      useCollectionStore.setState((s) => ({ ...s, collections: mergeById(s.collections, formattedCollections) }));
+      useCollectionStore.setState((s) => ({ ...s, collections: mergeById(s.collections, formattedCollections, new Set(Object.keys(s.pendingDeletes))) }));
 
       // Fetch Waypoints
       const { data: waypoints, error: waypointsError } = await supabase
@@ -340,7 +358,7 @@ export async function pullCloudData(userId: string) {
           unitType: w.unit_type || undefined,
           unitLabel: w.unit_label || undefined,
         }));
-        useCollectionStore.setState((s) => ({ ...s, waypoints: mergeById(s.waypoints, formattedWaypoints) }));
+        useCollectionStore.setState((s) => ({ ...s, waypoints: mergeById(s.waypoints, formattedWaypoints, new Set(Object.keys(s.pendingDeletes))) }));
       }
     }
 
@@ -363,7 +381,7 @@ export async function pullCloudData(userId: string) {
           isAddedLater: i.is_added_later,
           dateCreated: i.date_created,
         }));
-        useCollectionStore.setState((s) => ({ ...s, items: mergeById(s.items, formattedItems) }));
+        useCollectionStore.setState((s) => ({ ...s, items: mergeById(s.items, formattedItems, new Set(Object.keys(s.pendingDeletes))) }));
       }
     }
 
@@ -395,14 +413,19 @@ export async function pushEconomyToCloud(userId: string, state: any) {
   }
 }
 
-export async function deleteTasksFromCloud(userId: string, ids: string[]) {
-  if (!isSupabaseConfigured() || ids.length === 0) return;
+// Returns whether the cloud delete is confirmed done — callers use this to
+// clear the local pendingDeletes tombstone (see mergeById above) only once
+// it's actually safe to trust a future pull again.
+export async function deleteTasksFromCloud(userId: string, ids: string[]): Promise<boolean> {
+  if (!isSupabaseConfigured() || ids.length === 0) return true;
   try {
     await supabase.from('tasks').delete().eq('user_id', userId).in('id', ids);
     reportResult('tasks', true);
+    return true;
   } catch (err) {
     reportResult('tasks', false, err);
     console.log('Error deleting tasks from cloud:', err);
+    return false;
   }
 }
 
@@ -475,14 +498,16 @@ export async function pushAllTagsToCloud(userId: string, tags: Tag[]) {
   }
 }
 
-export async function deleteRewardsFromCloud(userId: string, ids: string[]) {
-  if (!isSupabaseConfigured() || ids.length === 0) return;
+export async function deleteRewardsFromCloud(userId: string, ids: string[]): Promise<boolean> {
+  if (!isSupabaseConfigured() || ids.length === 0) return true;
   try {
     await supabase.from('rewards').delete().eq('user_id', userId).in('id', ids);
     reportResult('rewards', true);
+    return true;
   } catch (err) {
     reportResult('rewards', false, err);
     console.log('Error deleting rewards from cloud:', err);
+    return false;
   }
 }
 
@@ -505,14 +530,16 @@ export async function pushAllRewardsToCloud(userId: string, rewards: Reward[]) {
   }
 }
 
-export async function deleteGoalsFromCloud(userId: string, ids: string[]) {
-  if (!isSupabaseConfigured() || ids.length === 0) return;
+export async function deleteGoalsFromCloud(userId: string, ids: string[]): Promise<boolean> {
+  if (!isSupabaseConfigured() || ids.length === 0) return true;
   try {
     await supabase.from('goals').delete().eq('user_id', userId).in('id', ids);
     reportResult('goals', true);
+    return true;
   } catch (err) {
     reportResult('goals', false, err);
     console.log('Error deleting goals from cloud:', err);
+    return false;
   }
 }
 
@@ -546,38 +573,44 @@ export async function pushAllGoalsToCloud(userId: string, goals: Goal[]) {
   }
 }
 
-export async function deleteCollectionsFromCloud(userId: string, ids: string[]) {
-  if (!isSupabaseConfigured() || ids.length === 0) return;
+export async function deleteCollectionsFromCloud(userId: string, ids: string[]): Promise<boolean> {
+  if (!isSupabaseConfigured() || ids.length === 0) return true;
   try {
     await supabase.from('collections').delete().eq('user_id', userId).in('id', ids);
     reportResult('collections', true);
+    return true;
   } catch (err) {
     reportResult('collections', false, err);
     console.log('Error deleting collections from cloud:', err);
+    return false;
   }
 }
 
-export async function deleteWaypointsFromCloud(userId: string, ids: string[]) {
-  if (!isSupabaseConfigured() || ids.length === 0) return;
+export async function deleteWaypointsFromCloud(userId: string, ids: string[]): Promise<boolean> {
+  if (!isSupabaseConfigured() || ids.length === 0) return true;
   try {
     await supabase.from('waypoints').delete().eq('user_id', userId).in('id', ids);
     reportResult('collections', true);
+    return true;
   } catch (err) {
     reportResult('collections', false, err);
     console.log('Error deleting waypoints from cloud:', err);
+    return false;
   }
 }
 
-export async function deleteItemsFromCloud(ids: string[]) {
+export async function deleteItemsFromCloud(ids: string[]): Promise<boolean> {
   // collection_items has no user_id column; ownership is enforced by RLS via
   // the parent collection, same as the upsert path for this table.
-  if (!isSupabaseConfigured() || ids.length === 0) return;
+  if (!isSupabaseConfigured() || ids.length === 0) return true;
   try {
     await supabase.from('collection_items').delete().in('id', ids);
     reportResult('collections', true);
+    return true;
   } catch (err) {
     reportResult('collections', false, err);
     console.log('Error deleting collection items from cloud:', err);
+    return false;
   }
 }
 

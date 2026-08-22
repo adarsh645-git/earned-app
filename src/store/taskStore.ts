@@ -83,6 +83,15 @@ interface TaskState {
   tagPillarIdBackfillApplied: boolean;
   // Guards dedupeTags so it only ever runs once per device.
   tagDedupeApplied: boolean;
+  // Ids deleted locally but not yet confirmed removed from Supabase, mapped
+  // to when the delete happened. A cloud pull (e.g. on reload, which runs
+  // one immediately) skips any cloud row whose id is in here — otherwise
+  // mergeById has no way to tell "never existed locally" apart from "just
+  // deleted, delete hasn't reached the server yet," and resurrects it. See
+  // docs/sdd/030-delete-tombstones.md. Cleared once syncEngine confirms the
+  // cloud delete succeeded.
+  pendingDeletes: Record<string, number>;
+  clearPendingDeletes: (ids: string[]) => void;
 
   // Task Actions
   // title is the only required field — quick-add can create a task from just
@@ -149,6 +158,12 @@ export const useTaskStore = create<TaskState>()(
       lastUsedTagId: '',
       tagPillarIdBackfillApplied: false,
       tagDedupeApplied: false,
+      pendingDeletes: {},
+      clearPendingDeletes: (ids) => set((state) => {
+        const next = { ...state.pendingDeletes };
+        ids.forEach((id) => delete next[id]);
+        return { pendingDeletes: next };
+      }),
 
       addTask: (task) => {
         const id = uuidv4();
@@ -249,6 +264,12 @@ export const useTaskStore = create<TaskState>()(
         const taskToDelete = get().tasks.find(t => t.id === id);
         if (!taskToDelete) return;
 
+        // Every id actually leaving the array — the task itself plus any
+        // subtasks the filter below also removes — needs a tombstone so a
+        // cloud pull (e.g. on reload) can't resurrect it before the cloud
+        // delete confirms. See docs/sdd/030-delete-tombstones.md.
+        const removedIds = [id, ...get().tasks.filter(t => t.parentId === id).map(t => t.id)];
+
         set((state) => {
           let newTasks = state.tasks.filter(t => t.id !== id && t.parentId !== id);
 
@@ -273,7 +294,13 @@ export const useTaskStore = create<TaskState>()(
               }
           }
 
-          return { tasks: newTasks };
+          return {
+            tasks: newTasks,
+            pendingDeletes: {
+              ...state.pendingDeletes,
+              ...Object.fromEntries(removedIds.map((rid) => [rid, Date.now()])),
+            },
+          };
         });
 
         // Deleting an already-completed task must re-sync the Goal chain it
