@@ -4,16 +4,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Collection, CollectionCategory, useCollectionStore } from '../store/collectionStore';
 import { useGoalStore } from '../store/goalStore';
-import { useTaskStore } from '../store/taskStore';
+import { Task, useTaskStore } from '../store/taskStore';
 import EditableText from './EditableText';
 import PillPicker from './PillPicker';
 import QuickAddBar from './QuickAddBar';
 import AnimatedProgressBar from './AnimatedProgressBar';
+import AnimatedTaskRow from './AnimatedTaskRow';
+import TaskDetailModal from './TaskDetailModal';
+import ProgressPromptModal from './ProgressPromptModal';
 import ConfirmModal from './ConfirmModal';
 import { CategoryVectorIcon } from '../utils/categoryIcons';
 import { getPillarColor } from '../utils/pillarColor';
 import { feedback } from '../utils/feedback';
 import { resolveWaypointUnit, WAYPOINT_UNIT_TYPES } from '../utils/waypointUnit';
+import { getRequiredUnitLabel, getRemainingUnitAmount } from '../utils/taskCompletionGate';
 import useProgress from '../hooks/useProgress';
 
 const MONTH_NAMES = [
@@ -41,14 +45,35 @@ interface JourneyDetailModalProps {
  */
 export default function JourneyDetailModal({ collection, visible, onClose, onToggleItem }: JourneyDetailModalProps) {
   const {
-    waypoints, items,
+    collections, waypoints, items,
     updateCollection, deleteCollection,
     addWaypoint, updateWaypoint,
     addItem, updateItem, deleteItem,
   } = useCollectionStore();
   const { goals, deleteGoal } = useGoalStore();
-  const { tasks, tags, pillars, addTask } = useTaskStore();
+  const { tasks, tags, pillars, addTask, toggleTask, updateTask, deleteTask } = useTaskStore();
   const progressSelectors = useProgress();
+
+  // Full task interactivity inside the Journey view (toggle/edit/delete),
+  // matching Tasks/Dashboard exactly instead of the old read-only rows —
+  // same gated-completion pattern (a Waypoint-enforced unit blocks
+  // completion until a quantity is entered) as TasksScreen.tsx. See
+  // docs/sdd/029-journey-page-audit.md.
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const [progressPrompt, setProgressPrompt] = useState<{ taskId: string; unitLabel: string; taskTitle: string; remaining?: number } | null>(null);
+  const canCompleteTask = (task: Task) => !getRequiredUnitLabel(task, waypoints, collections, goals);
+  const handleToggleTask = (id: string) => {
+    const task = tasks.find(t => t.id === id);
+    if (task && !task.completed) {
+      const requiredUnit = getRequiredUnitLabel(task, waypoints, collections, goals);
+      if (requiredUnit) {
+        const remaining = getRemainingUnitAmount(task, waypoints, collections, goals, progressSelectors);
+        setProgressPrompt({ taskId: id, unitLabel: requiredUnit, taskTitle: task.title, remaining });
+        return;
+      }
+    }
+    toggleTask(id);
+  };
 
   const [categoryPillOpen, setCategoryPillOpen] = useState(false);
   const [goalPillOpen, setGoalPillOpen] = useState(false);
@@ -75,6 +100,7 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
 
   if (!collection) return null;
 
+  const detailTask = tasks.find(t => t.id === detailTaskId) || null;
   const currentYear = new Date().getFullYear();
   const activePillars = pillars.filter(p => !p.isArchived);
   const linkedGoal = goals.find(s => s.id === collection.goalId);
@@ -427,24 +453,26 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
 
                         {wpTasks.length > 0 && (
                           <View style={{ marginTop: wpItems.length > 0 ? 4 : 10 }}>
-                            {wpTasks.map(t => (
-                              <View
-                                key={t.id}
-                                style={{
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  paddingVertical: 6,
-                                  paddingLeft: 8,
-                                  borderLeftWidth: 3,
-                                  borderLeftColor: getPillarColor(tags.find(tag => tag.id === t.tagId)?.pillarId, pillars),
-                                }}
-                              >
-                                <Ionicons name={t.completed ? 'checkmark-circle' : 'ellipse-outline'} size={14} color={t.completed ? '#30D158' : '#8E8E93'} style={{ marginRight: 8 }} />
-                                <Text style={{ color: t.completed ? '#8E8E93' : '#EBEBF5', fontSize: 13, flex: 1, textDecorationLine: t.completed ? 'line-through' : 'none' }} numberOfLines={1}>
-                                  {t.title}
-                                </Text>
-                              </View>
-                            ))}
+                            {wpTasks.map((t, i) => {
+                              const tag = tags.find(tag => tag.id === t.tagId);
+                              return (
+                                <AnimatedTaskRow
+                                  key={t.id}
+                                  task={t}
+                                  tagName={tag?.name}
+                                  tagType={tag?.type}
+                                  tags={tags}
+                                  pillarColor={getPillarColor(tag?.pillarId, pillars)}
+                                  onUpdate={updateTask}
+                                  isLast={i === wpTasks.length - 1}
+                                  onToggle={handleToggleTask}
+                                  canComplete={canCompleteTask}
+                                  onEdit={(task) => setDetailTaskId(task.id)}
+                                  variant="subtask"
+                                  parentPillarId={collection.pillarId}
+                                />
+                              );
+                            })}
                           </View>
                         )}
 
@@ -514,28 +542,40 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                 <Text style={{ color: '#8E8E93', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
                   {collectionWaypoints.length > 0 ? 'General' : 'Tasks'}
                 </Text>
-                {generalTasks.map(t => (
-                  <View
-                    key={t.id}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: '#1C1C1E',
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: '#2C2C2E',
-                      borderLeftWidth: 3,
-                      borderLeftColor: getPillarColor(tags.find(tag => tag.id === t.tagId)?.pillarId, pillars),
-                      padding: 14,
-                      marginBottom: 8,
-                    }}
-                  >
-                    <Ionicons name={t.completed ? 'checkmark-circle' : 'ellipse-outline'} size={16} color={t.completed ? '#30D158' : '#8E8E93'} style={{ marginRight: 10 }} />
-                    <Text style={{ color: t.completed ? '#8E8E93' : '#EBEBF5', fontSize: 14, fontWeight: '500', flex: 1, textDecorationLine: t.completed ? 'line-through' : 'none' }} numberOfLines={1}>
-                      {t.title}
-                    </Text>
-                  </View>
-                ))}
+                {generalTasks.map(t => {
+                  const tag = tags.find(tag => tag.id === t.tagId);
+                  return (
+                    <View
+                      key={t.id}
+                      style={{
+                        backgroundColor: '#1C1C1E',
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: '#2C2C2E',
+                        borderLeftWidth: 3,
+                        borderLeftColor: getPillarColor(tag?.pillarId, pillars),
+                        paddingHorizontal: 14,
+                        marginBottom: 8,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <AnimatedTaskRow
+                        task={t}
+                        tagName={tag?.name}
+                        tagType={tag?.type}
+                        tags={tags}
+                        pillarColor={getPillarColor(tag?.pillarId, pillars)}
+                        onUpdate={updateTask}
+                        isLast={true}
+                        onToggle={handleToggleTask}
+                        canComplete={canCompleteTask}
+                        onEdit={(task) => setDetailTaskId(task.id)}
+                        variant="subtask"
+                        parentPillarId={collection.pillarId}
+                      />
+                    </View>
+                  );
+                })}
               </View>
             )}
           </ScrollView>
@@ -562,6 +602,35 @@ export default function JourneyDetailModal({ collection, visible, onClose, onTog
                 { label: 'Delete Journey', style: 'destructive', onPress: () => { deleteCollection(collection.id); onClose(); } },
               ]
         }
+      />
+
+      <TaskDetailModal
+        task={detailTask}
+        visible={!!detailTaskId}
+        tasks={tasks}
+        tags={tags}
+        pillars={pillars}
+        onClose={() => setDetailTaskId(null)}
+        onUpdate={updateTask}
+        onToggle={handleToggleTask}
+        canComplete={canCompleteTask}
+        onDelete={(id) => { deleteTask(id); setDetailTaskId(null); }}
+        addTask={addTask}
+      />
+
+      <ProgressPromptModal
+        visible={!!progressPrompt}
+        unitLabel={progressPrompt?.unitLabel || ''}
+        taskTitle={progressPrompt?.taskTitle || ''}
+        defaultValue={progressPrompt?.remaining}
+        onCancel={() => setProgressPrompt(null)}
+        onSubmit={(value) => {
+          if (progressPrompt) {
+            updateTask(progressPrompt.taskId, { metricProgress: value });
+            toggleTask(progressPrompt.taskId);
+          }
+          setProgressPrompt(null);
+        }}
       />
     </Modal>
   );
